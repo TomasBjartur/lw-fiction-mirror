@@ -294,8 +294,8 @@ function buildStylesheet() {
   --active-bg: #ebe7e0;
   --link: #6b3a2e;
   --max-prose: 38rem;
-  --serif: Charter, 'Bitstream Charter', 'Noto Serif', Georgia, serif;
-  --sans: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --serif: Charter, 'Bitstream Charter', 'Noto Serif', 'DejaVu Serif', 'Liberation Serif', Georgia, serif;
+  --sans: -apple-system, 'Segoe UI', system-ui, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
   --radius: 6px;
 }
 
@@ -760,7 +760,7 @@ article, .index-page {
 /* Low-res screens: swap serif for more legible sans */
 @media (max-resolution: 1.5dppx) {
   :root {
-    --serif: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --serif: 'Segoe UI', system-ui, -apple-system, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
   }
   body { line-height: 1.7; }
 }
