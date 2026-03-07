@@ -909,6 +909,9 @@ async function main() {
   // Create output directory
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+  // Prevent Jekyll processing on GitHub Pages
+  fs.writeFileSync(path.join(OUTPUT_DIR, '.nojekyll'), '');
+
   // Write stylesheet
   fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
   console.log('Wrote style.css');
