@@ -12,6 +12,8 @@ const SITE_TITLE = 'Tomás B.';
 const SITE_SUBTITLE = 'Fiction';
 const SITE_DESCRIPTION = 'Fiction by Tomás B., mirrored from LessWrong.';
 const LW_PROFILE = `https://www.lesswrong.com/users/${USER_SLUG}`;
+const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
+const SUBSTACK_URL = 'https://tomasbjartur.substack.com/';
 
 async function gqlQuery(query, variables = {}) {
   const res = await fetch(LW_GRAPHQL, {
@@ -161,12 +163,31 @@ function buildSidebar(posts, currentSlug) {
         </ul>
       </div>
 
-      <div class="sidebar-footer">
-        <div class="epub-links">
-          <span class="epub-label">EPUB</span>
-          <a href="fiction-by-karma.epub" class="lw-link">by karma</a>
-          <a href="fiction-by-date.epub" class="lw-link">by date</a>
+      <div class="sidebar-subscribe">
+        <a href="${SUBSTACK_URL}" class="subscribe-button">Subscribe by email</a>
+        <span class="subscribe-hint">Get new stories in your inbox via Substack</span>
+      </div>
+
+      <div class="sidebar-downloads">
+        <h3>Download</h3>
+        <div class="download-row">
+          <span class="download-icon">&#128214;</span>
+          <div class="download-detail">
+            <a href="fiction-by-karma.epub">EPUB by karma</a>
+            <a href="fiction-by-date.epub">EPUB by date</a>
+            <span class="download-hint">Works on Kindle, Apple Books, Kobo &amp; more</span>
+          </div>
         </div>
+        <div class="download-row">
+          <span class="download-icon">&#9883;</span>
+          <div class="download-detail">
+            <a href="feed.xml">RSS Feed</a>
+            <span class="download-hint">Subscribe for new stories</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
         <a href="${LW_PROFILE}" class="lw-link">LessWrong Profile</a>
       </div>
     </nav>`;
@@ -183,6 +204,7 @@ function pageShell(content, title, posts, currentSlug) {
   <title>${pageTitle}</title>
   <meta name="description" content="${SITE_DESCRIPTION}">
   <link rel="stylesheet" href="style.css">
+  <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
 </head>
 <body>
 
@@ -395,19 +417,82 @@ body {
   margin-top: 1rem;
 }
 
-.epub-links {
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-  margin-bottom: 0.8rem;
+.sidebar-subscribe {
+  padding: 1rem 1.4rem;
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
 }
 
-.epub-label {
+.subscribe-button {
+  display: block;
+  text-align: center;
+  padding: 0.55rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+.subscribe-button:hover {
+  background: #6b3a2e;
+}
+
+.subscribe-hint {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-light);
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+.sidebar-downloads {
+  padding: 0 1.4rem;
+  margin-top: 0.5rem;
+}
+
+.sidebar-downloads h3 {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-light);
   font-weight: 600;
+  padding: 0.8rem 0 0.5rem;
+}
+
+.download-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6em;
+  padding: 0.4rem 0;
+}
+
+.download-icon {
+  font-size: 1rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.download-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.8em;
+}
+
+.download-detail a {
+  font-size: 0.78rem;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.download-detail a:hover { color: var(--accent); }
+
+.download-hint {
+  width: 100%;
+  font-size: 0.65rem;
+  color: var(--text-light);
+  margin-top: 0.1rem;
 }
 
 .lw-link {
@@ -701,6 +786,47 @@ article, .index-page {
 `;
 }
 
+// --- RSS feed ---
+
+function escapeXml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildRssFeed(posts) {
+  const byDate = [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+  const buildDate = new Date().toUTCString();
+  const items = byDate.map(p => {
+    const pubDate = new Date(p.postedAt).toUTCString();
+    const link = `${SITE_URL}/${p.slug}.html`;
+    return `    <item>
+      <title>${escapeXml(p.title)}</title>
+      <link>${link}</link>
+      <guid isPermaLink="true">${link}</guid>
+      <pubDate>${pubDate}</pubDate>
+      <description>${escapeXml(p.title)} — ${p.baseScore} karma, ${estimateReadingTime(p.wordCount)}</description>
+      <content:encoded><![CDATA[${cleanHtml(p.htmlBody)}]]></content:encoded>
+    </item>`;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>${escapeXml(SITE_TITLE)} — ${escapeXml(SITE_SUBTITLE)}</title>
+    <link>${SITE_URL}</link>
+    <atom:link href="${SITE_URL}/feed.xml" rel="self" type="application/rss+xml"/>
+    <description>${escapeXml(SITE_DESCRIPTION)}</description>
+    <language>en</language>
+    <lastBuildDate>${buildDate}</lastBuildDate>
+${items}
+  </channel>
+</rss>`;
+}
+
 // --- EPUB generation (no dependencies, manual ZIP) ---
 
 function crc32(buf) {
@@ -939,7 +1065,11 @@ async function main() {
   fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-date.epub'), epubDate);
   console.log('Wrote fiction-by-date.epub');
 
-  console.log(`\nDone! ${fiction.length} pages + 2 EPUBs generated in ${OUTPUT_DIR}/`);
+  // Generate RSS feed
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'feed.xml'), buildRssFeed(fiction));
+  console.log('Wrote feed.xml');
+
+  console.log(`\nDone! ${fiction.length} pages + 2 EPUBs + RSS generated in ${OUTPUT_DIR}/`);
 }
 
 // Export for testing, run if called directly
