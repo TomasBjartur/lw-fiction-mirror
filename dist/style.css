@@ -144,6 +144,21 @@ body {
   margin-top: 1rem;
 }
 
+.epub-links {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-bottom: 0.8rem;
+}
+
+.epub-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-light);
+  font-weight: 600;
+}
+
 .lw-link {
   font-size: 0.75rem;
   color: var(--text-light);

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const LW_GRAPHQL = 'https://www.lesswrong.com/graphql';
 const USER_SLUG = 'bjartur-tomas';
@@ -161,6 +162,11 @@ function buildSidebar(posts, currentSlug) {
       </div>
 
       <div class="sidebar-footer">
+        <div class="epub-links">
+          <span class="epub-label">EPUB</span>
+          <a href="fiction-by-karma.epub" class="lw-link">by karma</a>
+          <a href="fiction-by-date.epub" class="lw-link">by date</a>
+        </div>
         <a href="${LW_PROFILE}" class="lw-link">LessWrong Profile</a>
       </div>
     </nav>`;
@@ -387,6 +393,21 @@ body {
   padding: 1.5rem 1.4rem 0;
   border-top: 1px solid var(--border);
   margin-top: 1rem;
+}
+
+.epub-links {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-bottom: 0.8rem;
+}
+
+.epub-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-light);
+  font-weight: 600;
 }
 
 .lw-link {
@@ -680,6 +701,194 @@ article, .index-page {
 `;
 }
 
+// --- EPUB generation (no dependencies, manual ZIP) ---
+
+function crc32(buf) {
+  if (typeof buf === 'string') buf = Buffer.from(buf);
+  const table = new Int32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[i] = c;
+  }
+  let crc = -1;
+  for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ table[(crc ^ buf[i]) & 0xFF];
+  return (crc ^ -1) >>> 0;
+}
+
+function buildZip(entries) {
+  // entries: [{name, data, store}] where data is Buffer
+  const centralHeaders = [];
+  const parts = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBuf = Buffer.from(entry.name);
+    const data = entry.data;
+    const store = entry.store || false;
+    const compressed = store ? data : zlib.deflateRawSync(data, { level: 9 });
+    const crc = crc32(data);
+
+    // Local file header
+    const local = Buffer.alloc(30 + nameBuf.length);
+    local.writeUInt32LE(0x04034b50, 0); // signature
+    local.writeUInt16LE(20, 4); // version needed
+    local.writeUInt16LE(0, 6); // flags
+    local.writeUInt16LE(store ? 0 : 8, 8); // compression (0=store, 8=deflate)
+    local.writeUInt16LE(0, 10); // mod time
+    local.writeUInt16LE(0, 12); // mod date
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28); // extra field length
+    nameBuf.copy(local, 30);
+
+    // Central directory header
+    const central = Buffer.alloc(46 + nameBuf.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4); // version made by
+    central.writeUInt16LE(20, 6); // version needed
+    central.writeUInt16LE(0, 8); // flags
+    central.writeUInt16LE(store ? 0 : 8, 10);
+    central.writeUInt16LE(0, 12); // mod time
+    central.writeUInt16LE(0, 14); // mod date
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28);
+    central.writeUInt16LE(0, 30); // extra field length
+    central.writeUInt16LE(0, 32); // file comment length
+    central.writeUInt16LE(0, 34); // disk number start
+    central.writeUInt16LE(0, 36); // internal file attributes
+    central.writeUInt32LE(0, 38); // external file attributes
+    central.writeUInt32LE(offset, 42); // relative offset of local header
+    nameBuf.copy(central, 46);
+    centralHeaders.push(central);
+
+    parts.push(local, compressed);
+    offset += local.length + compressed.length;
+  }
+
+  const centralDirOffset = offset;
+  let centralDirSize = 0;
+  for (const c of centralHeaders) centralDirSize += c.length;
+
+  // End of central directory
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4); // disk number
+  eocd.writeUInt16LE(0, 6); // disk with central dir
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralDirSize, 12);
+  eocd.writeUInt32LE(centralDirOffset, 16);
+  eocd.writeUInt16LE(0, 20); // comment length
+
+  return Buffer.concat([...parts, ...centralHeaders, eocd]);
+}
+
+function htmlToXhtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<br\s*>/gi, '<br/>')
+    .replace(/<hr\s*>/gi, '<hr/>')
+    .replace(/<img([^>]*?)(?<!\/)>/gi, '<img$1/>')
+    .replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
+    .replace(/<p>\s*<\/p>/g, '')
+    .replace(/class="[^"]*"/g, '')
+    .replace(/style="[^"]*"/g, '');
+}
+
+function buildEpub(posts, sortLabel) {
+  const bookId = `tomas-b-fiction-by-${sortLabel}`;
+  const entries = [];
+
+  // mimetype must be first and stored (not compressed)
+  entries.push({ name: 'mimetype', data: Buffer.from('application/epub+zip'), store: true });
+
+  // META-INF/container.xml
+  entries.push({
+    name: 'META-INF/container.xml',
+    data: Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`)
+  });
+
+  // Chapter XHTML files
+  const chapterFiles = posts.map((post, i) => {
+    const id = `chapter${i}`;
+    const filename = `${id}.xhtml`;
+    const readTime = estimateReadingTime(post.wordCount);
+    const meta = [formatDate(post.postedAt), readTime, `${post.baseScore} karma`].filter(Boolean).join(' \u00b7 ');
+    const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>${post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title>
+<style>
+body { font-family: serif; line-height: 1.6; margin: 1em; }
+h1 { font-size: 1.6em; margin-bottom: 0.3em; }
+.meta { font-size: 0.85em; color: #666; margin-bottom: 1.5em; }
+blockquote { border-left: 2px solid #999; padding-left: 1em; margin: 1em 0; font-style: italic; color: #555; }
+hr { border: none; text-align: center; margin: 2em 0; }
+hr::before { content: "\\2022\\2003\\2022\\2003\\2022"; color: #999; }
+</style>
+</head>
+<body>
+<h1>${post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</h1>
+<p class="meta">${meta}</p>
+${htmlToXhtml(post.htmlBody)}
+</body>
+</html>`;
+    entries.push({ name: `OEBPS/${filename}`, data: Buffer.from(xhtml) });
+    return { id, filename, title: post.title };
+  });
+
+  // Table of contents XHTML
+  const tocXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Table of Contents</title>
+<style>body { font-family: sans-serif; margin: 1em; } li { margin: 0.5em 0; }</style>
+</head>
+<body>
+<h1>Table of Contents</h1>
+<nav epub:type="toc">
+<ol>
+${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</a></li>`).join('\n')}
+</ol>
+</nav>
+</body>
+</html>`;
+  entries.push({ name: 'OEBPS/toc.xhtml', data: Buffer.from(tocXhtml) });
+
+  // content.opf
+  const opf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">${bookId}</dc:identifier>
+    <dc:title>${SITE_TITLE} — ${SITE_SUBTITLE} (by ${sortLabel})</dc:title>
+    <dc:creator>Tom\u00e1s B.</dc:creator>
+    <dc:language>en</dc:language>
+    <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z/, 'Z')}</meta>
+  </metadata>
+  <manifest>
+    <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
+  </manifest>
+  <spine>
+    <itemref idref="toc"/>
+${chapterFiles.map(c => `    <itemref idref="${c.id}"/>`).join('\n')}
+  </spine>
+</package>`;
+  entries.push({ name: 'OEBPS/content.opf', data: Buffer.from(opf) });
+
+  return buildZip(entries);
+}
+
 async function main() {
   console.log('Fetching user...');
   const user = await getUser();
@@ -715,7 +924,19 @@ async function main() {
     console.log(`Wrote ${filename}`);
   }
 
-  console.log(`\nDone! ${fiction.length} pages generated in ${OUTPUT_DIR}/`);
+  // Generate EPUBs
+  const byKarma = [...fiction].sort((a, b) => b.baseScore - a.baseScore);
+  const byDate = [...fiction].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+
+  const epubKarma = buildEpub(byKarma, 'karma');
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-karma.epub'), epubKarma);
+  console.log('Wrote fiction-by-karma.epub');
+
+  const epubDate = buildEpub(byDate, 'date');
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-date.epub'), epubDate);
+  console.log('Wrote fiction-by-date.epub');
+
+  console.log(`\nDone! ${fiction.length} pages + 2 EPUBs generated in ${OUTPUT_DIR}/`);
 }
 
 // Export for testing, run if called directly
