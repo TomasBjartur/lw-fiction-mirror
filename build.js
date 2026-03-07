@@ -163,29 +163,16 @@ function buildSidebar(posts, currentSlug) {
 
       <div class="sidebar-subscribe">
         <a href="${SUBSTACK_URL}" class="subscribe-button">Subscribe by email</a>
-        <span class="subscribe-hint">Get new stories in your inbox via Substack</span>
-      </div>
-
-      <div class="sidebar-downloads">
-        <h3>Download</h3>
-        <div class="download-row">
-          <span class="download-icon">&#128214;</span>
-          <div class="download-detail">
-            <a href="fiction-by-karma.epub">EPUB by karma</a>
-            <a href="fiction-by-date.epub">EPUB by date</a>
-            <span class="download-hint">Works on Kindle, Apple Books, Kobo &amp; more</span>
-          </div>
-        </div>
-        <div class="download-row">
-          <span class="download-icon">&#9883;</span>
-          <div class="download-detail">
-            <a href="feed.xml">RSS Feed</a>
-            <span class="download-hint">Subscribe for new stories</span>
-          </div>
-        </div>
       </div>
 
       <div class="sidebar-footer">
+        <h3>Download &amp; Subscribe</h3>
+        <ul class="footer-links">
+          <li><a href="fiction-by-karma.epub">EPUB by karma</a></li>
+          <li><a href="fiction-by-date.epub">EPUB by date</a></li>
+          <li><a href="feed.xml">RSS Feed</a></li>
+        </ul>
+        <p class="footer-hint">EPUBs work on Kindle, Apple Books, Kobo &amp; more</p>
         <a href="${LW_PROFILE}" class="lw-link">LessWrong Profile</a>
       </div>
     </nav>`;
@@ -394,9 +381,18 @@ body {
 }
 
 .sidebar-footer {
-  padding: 1.5rem 1.4rem 0;
+  padding: 1rem 1.4rem 0;
   border-top: 1px solid var(--border);
-  margin-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+.sidebar-footer h3 {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-light);
+  font-weight: 600;
+  padding: 0.3rem 0 0.4rem;
 }
 
 .sidebar-subscribe {
@@ -421,60 +417,27 @@ body {
   background: #6b3a2e;
 }
 
-.subscribe-hint {
+.footer-links {
+  list-style: none;
+  margin-bottom: 0.6rem;
+}
+
+.footer-links li a {
   display: block;
-  font-size: 0.65rem;
-  color: var(--text-light);
-  text-align: center;
-  margin-top: 0.4rem;
-}
-
-.sidebar-downloads {
-  padding: 0 1.4rem;
-  margin-top: 0.5rem;
-}
-
-.sidebar-downloads h3 {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-light);
-  font-weight: 600;
-  padding: 0.8rem 0 0.5rem;
-}
-
-.download-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6em;
-  padding: 0.4rem 0;
-}
-
-.download-icon {
-  font-size: 1rem;
-  line-height: 1.4;
-  flex-shrink: 0;
-}
-
-.download-detail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 0.8em;
-}
-
-.download-detail a {
+  padding: 0.25rem 0;
   font-size: 0.78rem;
   color: var(--text);
   text-decoration: none;
   transition: color 0.15s;
 }
-.download-detail a:hover { color: var(--accent); }
+.footer-links li a:hover {
+  color: var(--accent);
+}
 
-.download-hint {
-  width: 100%;
+.footer-hint {
   font-size: 0.65rem;
   color: var(--text-light);
-  margin-top: 0.1rem;
+  margin-bottom: 0.8rem;
 }
 
 .lw-link {
