@@ -174,11 +174,6 @@ function buildSidebar(posts, currentSlug) {
       <div class="sidebar-header">
         <a href="index.html" class="site-title">${SITE_TITLE}</a>
         <span class="site-subtitle">${SITE_SUBTITLE}</span>
-        <a href="${SUBSTACK_URL}" class="subscribe-button">Subscribe by email</a>
-        <div class="header-links">
-          <a href="fiction.epub">EPUB</a>
-          <a href="feed.xml">RSS</a>
-        </div>
       </div>
 
       <div class="nav-section">
@@ -217,8 +212,16 @@ function pageShell(content, title, posts, currentSlug) {
 <body>
 
   <input type="checkbox" id="menu-toggle" hidden>
-  <label for="menu-toggle" class="menu-button" aria-label="Toggle menu">☰</label>
   <label for="menu-toggle" class="menu-overlay" aria-hidden="true"></label>
+
+  <header class="top-bar">
+    <label for="menu-toggle" class="menu-button" aria-label="Toggle menu">☰</label>
+    <a href="index.html" class="top-bar-title">${SITE_TITLE}</a>
+    <div class="top-bar-actions">
+      <a href="fiction.epub" class="top-bar-btn">Download EPUB</a>
+      <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
+    </div>
+  </header>
 
   ${buildSidebar(posts, currentSlug)}
 
@@ -324,9 +327,9 @@ body {
   min-width: var(--sidebar-width);
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
-  padding: 2rem 0;
+  padding: 1.5rem 0;
   position: fixed;
-  top: 0;
+  top: 3rem;
   left: 0;
   bottom: 0;
   overflow-y: auto;
@@ -402,38 +405,63 @@ body {
   white-space: nowrap;
 }
 
-.subscribe-button {
-  display: block;
-  text-align: center;
-  padding: 0.5rem 1rem;
-  margin-top: 0.9rem;
-  background: #a0734f;
-  color: #fff;
-  font-size: 0.78rem;
+/* --- Top bar --- */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-width);
+  right: 0;
+  height: 3rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  z-index: 15;
+  font-family: var(--sans);
+  gap: 1rem;
+}
+
+.top-bar-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  margin-right: auto;
+  display: none;
+}
+
+.top-bar-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.top-bar-btn {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-decoration: none;
   border-radius: var(--radius);
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--bg);
 }
-.subscribe-button:hover {
-  background: #8b6243;
-}
-
-.header-links {
-  display: flex;
-  gap: 0.8em;
-  margin-top: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.header-links a {
-  font-size: 0.72rem;
-  color: var(--text-light);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.header-links a:hover {
+.top-bar-btn:hover {
+  background: var(--sidebar-bg);
   color: var(--accent);
+}
+
+.top-bar-btn-primary {
+  background: #a0734f;
+  color: #fff;
+  border-color: #a0734f;
+}
+.top-bar-btn-primary:hover {
+  background: #8b6243;
+  border-color: #8b6243;
+  color: #fff;
 }
 
 .sidebar-footer {
@@ -453,8 +481,9 @@ body {
 /* --- Main --- */
 main {
   margin-left: var(--sidebar-width);
+  margin-top: 3rem;
   flex: 1;
-  padding: 4rem 2.5rem 6rem;
+  padding: 3rem 2.5rem 6rem;
   display: flex;
   justify-content: center;
 }
@@ -641,37 +670,39 @@ article, .index-page {
   display: none;
 }
 
-/* --- Mobile hamburger --- */
+/* --- Mobile hamburger (in top bar) --- */
 .menu-button {
   display: none;
-  position: fixed;
-  top: 0.8rem;
-  left: 0.8rem;
-  z-index: 20;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  width: 2.4rem;
-  height: 2.4rem;
+  background: none;
+  border: none;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
-  border-radius: var(--radius);
   cursor: pointer;
-  font-size: 1.15rem;
-  line-height: 2.4rem;
+  font-size: 1.2rem;
+  line-height: 2rem;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  transition: background 0.15s;
+  color: var(--text);
+  flex-shrink: 0;
 }
 .menu-button:hover {
-  background: var(--sidebar-bg);
+  color: var(--accent);
 }
 
 @media (max-width: 860px) {
   .menu-button { display: block; }
+  .top-bar-title { display: block; }
+
+  .top-bar {
+    left: 0;
+  }
 
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: none;
+    top: 3rem;
+    height: calc(100vh - 3rem);
   }
 
   #menu-toggle:checked ~ .sidebar {
@@ -683,13 +714,14 @@ article, .index-page {
     display: block;
     position: fixed;
     inset: 0;
+    top: 3rem;
     z-index: 5;
     background: rgba(0,0,0,0.15);
   }
 
   main {
     margin-left: 0;
-    padding: 4rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 4rem;
   }
 
   .post-header h1, .index-page h1 {
@@ -700,8 +732,10 @@ article, .index-page {
 @media (max-width: 520px) {
   html { font-size: 17px; }
 
+  .top-bar-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+
   main {
-    padding: 3.5rem 1.2rem 3rem;
+    padding: 1.5rem 1.2rem 3rem;
   }
 
   .post-header {
