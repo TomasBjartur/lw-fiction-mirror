@@ -145,6 +145,12 @@ function buildSidebar(posts, currentSlug) {
       <div class="sidebar-header">
         <a href="index.html" class="site-title">${SITE_TITLE}</a>
         <span class="site-subtitle">${SITE_SUBTITLE}</span>
+        <a href="${SUBSTACK_URL}" class="subscribe-button">Subscribe by email</a>
+        <div class="header-links">
+          <a href="fiction-by-karma.epub">EPUB by karma</a>
+          <a href="fiction-by-date.epub">EPUB by date</a>
+          <a href="feed.xml">RSS</a>
+        </div>
       </div>
 
       <div class="nav-section">
@@ -161,18 +167,7 @@ function buildSidebar(posts, currentSlug) {
         </ul>
       </div>
 
-      <div class="sidebar-subscribe">
-        <a href="${SUBSTACK_URL}" class="subscribe-button">Subscribe by email</a>
-      </div>
-
       <div class="sidebar-footer">
-        <h3>Download &amp; Subscribe</h3>
-        <ul class="footer-links">
-          <li><a href="fiction-by-karma.epub">EPUB by karma</a></li>
-          <li><a href="fiction-by-date.epub">EPUB by date</a></li>
-          <li><a href="feed.xml">RSS Feed</a></li>
-        </ul>
-        <p class="footer-hint">EPUBs work on Kindle, Apple Books, Kobo &amp; more</p>
         <a href="${LW_PROFILE}" class="lw-link">LessWrong Profile</a>
       </div>
     </nav>`;
@@ -314,7 +309,7 @@ body {
 }
 
 .sidebar-header {
-  padding: 0 1.4rem 1.5rem;
+  padding: 0 1.4rem 1.2rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
 }
@@ -380,31 +375,11 @@ body {
   white-space: nowrap;
 }
 
-.sidebar-footer {
-  padding: 1rem 1.4rem 0;
-  border-top: 1px solid var(--border);
-  margin-top: 0.5rem;
-}
-
-.sidebar-footer h3 {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-light);
-  font-weight: 600;
-  padding: 0.3rem 0 0.4rem;
-}
-
-.sidebar-subscribe {
-  padding: 1rem 1.4rem;
-  border-top: 1px solid var(--border);
-  margin-top: 1rem;
-}
-
 .subscribe-button {
   display: block;
   text-align: center;
-  padding: 0.55rem 1rem;
+  padding: 0.5rem 1rem;
+  margin-top: 0.9rem;
   background: var(--accent);
   color: #fff;
   font-size: 0.78rem;
@@ -417,27 +392,27 @@ body {
   background: #6b3a2e;
 }
 
-.footer-links {
-  list-style: none;
-  margin-bottom: 0.6rem;
+.header-links {
+  display: flex;
+  gap: 0.8em;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.footer-links li a {
-  display: block;
-  padding: 0.25rem 0;
-  font-size: 0.78rem;
-  color: var(--text);
+.header-links a {
+  font-size: 0.72rem;
+  color: var(--text-light);
   text-decoration: none;
   transition: color 0.15s;
 }
-.footer-links li a:hover {
+.header-links a:hover {
   color: var(--accent);
 }
 
-.footer-hint {
-  font-size: 0.65rem;
-  color: var(--text-light);
-  margin-bottom: 0.8rem;
+.sidebar-footer {
+  padding: 1.5rem 1.4rem 0;
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
 }
 
 .lw-link {
