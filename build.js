@@ -181,7 +181,7 @@ function buildSidebar(posts, currentSlug) {
       </div>
 
       <div class="nav-section">
-        <h3>By Karma</h3>
+        <h3>By Popularity</h3>
         <ul>
           ${buildNav(posts, currentSlug, 'karma')}
         </ul>
@@ -231,7 +231,7 @@ function pageShell(content, title, posts, currentSlug) {
 
 function buildPostPage(post, allPosts) {
   const readTime = estimateReadingTime(post.wordCount);
-  const meta = [formatDate(post.postedAt), readTime, `${post.baseScore} karma`].filter(Boolean).join(' · ');
+  const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
 
   const content = `
     <article>
@@ -255,7 +255,7 @@ function buildIndexPage(posts) {
 
   const listing = byDate.map(p => {
     const readTime = estimateReadingTime(p.wordCount);
-    const meta = [formatDate(p.postedAt), readTime, `${p.baseScore} karma`].filter(Boolean).join(' · ');
+    const meta = [formatDate(p.postedAt), readTime].filter(Boolean).join(' · ');
     return `
       <li class="index-item">
         <a href="${p.slug}.html">
@@ -755,7 +755,7 @@ function buildRssFeed(posts) {
       <link>${link}</link>
       <guid isPermaLink="true">${link}</guid>
       <pubDate>${pubDate}</pubDate>
-      <description>${escapeXml(p.title)} — ${p.baseScore} karma, ${estimateReadingTime(p.wordCount)}</description>
+      <description>${escapeXml(p.title)} — ${estimateReadingTime(p.wordCount)}</description>
       <content:encoded><![CDATA[${cleanHtml(p.htmlBody)}]]></content:encoded>
     </item>`;
   }).join('\n');
@@ -896,7 +896,7 @@ function buildEpub(posts, sortLabel, bookTitle) {
     const id = `chapter${i}`;
     const filename = `${id}.xhtml`;
     const readTime = estimateReadingTime(post.wordCount);
-    const meta = [formatDate(post.postedAt), readTime, `${post.baseScore} karma`].filter(Boolean).join(' \u00b7 ');
+    const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' \u00b7 ');
     const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
