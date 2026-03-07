@@ -1277,7 +1277,7 @@ p { text-align: center; width: 100%; }
 <h1>${bookTitle.split(' and Other Stories')[0]}</h1>
 <p class="subtitle">and Other Stories</p>
 <p class="author">Tom\u00e1s Bjartur</p>
-<p class="dedication">Dedicated to my friends.</p>
+<p class="dedication">To those who told me to write more, even the one who changed his mind.</p>
 <p class="copyright">\u00a9 ${year} Tom\u00e1s Bjartur. All rights reserved.</p>
 <p class="copyright"><a href="${SUBSTACK_URL}">tomasbjartur.substack.com</a></p>
 </body>
