@@ -180,15 +180,14 @@ function buildSidebar(posts, currentSlug) {
       </div>
 
       <div class="nav-section">
-        <h3>By Popularity</h3>
-        <ul>
+        <div class="sort-toggle">
+          <button class="sort-btn active" data-sort="karma">Popular</button>
+          <button class="sort-btn" data-sort="date">Recent</button>
+        </div>
+        <ul class="nav-list" data-sort="karma">
           ${buildNav(posts, currentSlug, 'karma')}
         </ul>
-      </div>
-
-      <div class="nav-section">
-        <h3>By Date</h3>
-        <ul>
+        <ul class="nav-list" data-sort="date" style="display:none">
           ${buildNav(posts, currentSlug, 'date')}
         </ul>
       </div>
@@ -236,11 +235,23 @@ function pageShell(content, title, posts, currentSlug) {
 
   <script>
   (function(){
+    // Theme toggle
     var h=document.documentElement,b=document.getElementById('theme-btn');
     function isDark(){var t=h.getAttribute('data-theme');return t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches)}
-    function update(){b.textContent=isDark()?'\u2600\uFE0E':'\u263D\uFE0E'}
-    b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}update()});
-    update();
+    function updateTheme(){b.textContent=isDark()?'\u2600\uFE0E':'\u263D\uFE0E'}
+    b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}updateTheme()});
+    updateTheme();
+
+    // Sort toggle
+    var sort;try{sort=localStorage.getItem('sort')}catch(e){}
+    if(!sort)sort='karma';
+    function applySort(s){
+      sort=s;try{localStorage.setItem('sort',s)}catch(e){}
+      document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
+      document.querySelectorAll('.sort-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-sort')===s)});
+    }
+    document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
+    applySort(sort);
   })();
   </script>
 </body>
@@ -251,6 +262,11 @@ function buildPostPage(post, allPosts) {
   const readTime = estimateReadingTime(post.wordCount);
   const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
 
+  // Next story is always by date (chronological)
+  const byDate = [...allPosts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+  const dateIdx = byDate.findIndex(p => p.slug === post.slug);
+  const nextDate = dateIdx < byDate.length - 1 ? byDate[dateIdx + 1] : null;
+
   const content = `
     <article>
       <header class="post-header">
@@ -260,7 +276,9 @@ function buildPostPage(post, allPosts) {
       <div class="post-body">
         ${cleanHtml(post.htmlBody)}
       </div>
-      <footer class="post-footer">
+      <footer class="post-footer post-nav">
+        <a href="index.html" class="post-nav-link" onclick="try{localStorage.setItem('sort','date')}catch(e){}">Home</a>
+        ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next">Next: ${nextDate.title}</a>` : ''}
       </footer>
     </article>`;
 
@@ -375,6 +393,36 @@ body {
   margin-top: 0.2rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.sort-toggle {
+  display: flex;
+  gap: 0;
+  padding: 0.6rem 1.4rem 0.5rem;
+}
+
+.sort-btn {
+  flex: 1;
+  padding: 0.3rem 0;
+  font-family: var(--sans);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-light);
+  background: none;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.sort-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.sort-btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; border-left: none; }
+.sort-btn.active {
+  background: var(--active-bg);
+  color: var(--accent);
+}
+.sort-btn:hover:not(.active) {
+  background: var(--active-bg);
 }
 
 .nav-section h3 {
@@ -623,6 +671,21 @@ article, .index-page {
 }
 .post-footer a:hover {
   text-decoration-color: var(--link);
+}
+
+.post-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.post-nav-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.post-nav-next {
+  text-align: right;
 }
 
 /* --- Index page --- */
