@@ -90,11 +90,39 @@ async function getUserPosts(userId) {
   return allPosts;
 }
 
+const EXCLUDED_SLUGS = ['offvermilion'];
+const KARMA_CUTOFF = 60;
+
 function filterFiction(posts) {
   return posts.filter(p =>
     p.tags && p.tags.some(t => t.slug === FICTION_TAG_SLUG) &&
-    p.htmlBody && p.htmlBody.length > 100 // skip link-only posts
+    p.htmlBody && p.htmlBody.length > 100 && // skip link-only posts
+    !EXCLUDED_SLUGS.includes(p.slug)
   );
+}
+
+function orderForCollection(posts) {
+  const sorted = [...posts].sort((a, b) => b.baseScore - a.baseScore);
+  const eligible = sorted.filter(p => p.baseScore >= KARMA_CUTOFF);
+
+  // Hardcoded anchors
+  const first = eligible.find(p => p.slug === 'the-company-man');
+  const last = eligible.find(p => p.slug === 'the-origami-men');
+  const middle = eligible.filter(p => p !== first && p !== last);
+
+  // Editorial middle: alternate long and short pieces for pacing
+  // Split into longer and shorter halves, then interleave
+  middle.sort((a, b) => (b.wordCount || 0) - (a.wordCount || 0));
+  const half = Math.ceil(middle.length / 2);
+  const longer = middle.slice(0, half);
+  const shorter = middle.slice(half);
+  const interleaved = [];
+  for (let i = 0; i < Math.max(longer.length, shorter.length); i++) {
+    if (i < longer.length) interleaved.push(longer[i]);
+    if (i < shorter.length) interleaved.push(shorter[i]);
+  }
+
+  return [first, ...interleaved, last].filter(Boolean);
 }
 
 function formatDate(dateStr) {
@@ -147,8 +175,7 @@ function buildSidebar(posts, currentSlug) {
         <span class="site-subtitle">${SITE_SUBTITLE}</span>
         <a href="${SUBSTACK_URL}" class="subscribe-button">Subscribe by email</a>
         <div class="header-links">
-          <a href="fiction-by-karma.epub">EPUB by karma</a>
-          <a href="fiction-by-date.epub">EPUB by date</a>
+          <a href="fiction.epub">EPUB</a>
           <a href="feed.xml">RSS</a>
         </div>
       </div>
@@ -973,24 +1000,18 @@ async function main() {
     console.log(`Wrote ${filename}`);
   }
 
-  // Generate EPUBs
-  const byKarma = [...fiction].sort((a, b) => b.baseScore - a.baseScore);
-  const byDate = [...fiction].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  const bookTitle = `${byKarma[0].title} and Other Stories by Tom\u00e1s Bjartur`;
-
-  const epubKarma = buildEpub(byKarma, 'karma', bookTitle);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-karma.epub'), epubKarma);
-  console.log('Wrote fiction-by-karma.epub');
-
-  const epubDate = buildEpub(byDate, 'date', bookTitle);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-date.epub'), epubDate);
-  console.log('Wrote fiction-by-date.epub');
+  // Generate EPUB
+  const collection = orderForCollection(fiction);
+  const bookTitle = 'The Company Man and Other Stories by Tom\u00e1s Bjartur';
+  const epub = buildEpub(collection, 'collection', bookTitle);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction.epub'), epub);
+  console.log(`Wrote fiction.epub (${collection.length} stories)`);
 
   // Generate RSS feed
   fs.writeFileSync(path.join(OUTPUT_DIR, 'feed.xml'), buildRssFeed(fiction));
   console.log('Wrote feed.xml');
 
-  console.log(`\nDone! ${fiction.length} pages + 2 EPUBs + RSS generated in ${OUTPUT_DIR}/`);
+  console.log(`\nDone! ${fiction.length} pages + EPUB + RSS generated in ${OUTPUT_DIR}/`);
 }
 
 // Export for testing, run if called directly
