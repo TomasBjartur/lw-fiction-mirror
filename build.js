@@ -757,6 +757,14 @@ article, .index-page {
   }
 }
 
+/* Low-res screens: swap serif for more legible sans */
+@media (max-resolution: 1.5dppx) {
+  :root {
+    --serif: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  body { line-height: 1.7; }
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
