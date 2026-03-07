@@ -913,7 +913,7 @@ function htmlToXhtml(html) {
     .replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
     .replace(/<p>\s*<\/p>/g, '')
     .replace(/class="[^"]*"/g, '')
-    .replace(/style="[^"]*"/g, '');
+    .replace(/(<(?!img\b)[^>]*)\s+style="[^"]*"/gi, '$1');
 }
 
 function hashStr(str) {
@@ -1255,9 +1255,36 @@ ${elements.join('\n')}
 </svg>`;
 }
 
-function buildEpub(posts, sortLabel, bookTitle) {
+async function downloadImage(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    const buf = Buffer.from(await res.arrayBuffer());
+    let ext = 'png';
+    let mediaType = 'image/png';
+    if (contentType.includes('jpeg') || contentType.includes('jpg') || url.match(/\.jpe?g/i)) {
+      ext = 'jpg'; mediaType = 'image/jpeg';
+    } else if (contentType.includes('gif') || url.match(/\.gif/i)) {
+      ext = 'gif'; mediaType = 'image/gif';
+    } else if (contentType.includes('svg') || url.match(/\.svg/i)) {
+      ext = 'svg'; mediaType = 'image/svg+xml';
+    } else if (contentType.includes('webp') || url.match(/\.webp/i)) {
+      ext = 'webp'; mediaType = 'image/webp';
+    } else if (contentType.includes('png') || url.match(/\.png/i)) {
+      ext = 'png'; mediaType = 'image/png';
+    }
+    return { data: buf, ext, mediaType };
+  } catch (e) {
+    console.warn(`  Warning: failed to download ${url}: ${e.message}`);
+    return null;
+  }
+}
+
+async function buildEpub(posts, sortLabel, bookTitle) {
   const bookId = `tomas-b-fiction-by-${sortLabel}`;
   const entries = [];
+  const allImages = []; // { id, filename, mediaType, data }
 
   // mimetype must be first and stored (not compressed)
   entries.push({ name: 'mimetype', data: Buffer.from('application/epub+zip'), store: true });
@@ -1317,20 +1344,41 @@ p { text-align: center; width: 100%; }
 </html>`;
   entries.push({ name: 'OEBPS/titlepage.xhtml', data: Buffer.from(titlePageXhtml) });
 
-  // Chapter XHTML files
-  const chapterFiles = posts.map((post, i) => {
+  // Chapter XHTML files — download and embed images
+  const chapterFiles = [];
+  for (let i = 0; i < posts.length; i++) {
+    const post = posts[i];
     const id = `chapter${i}`;
     const filename = `${id}.xhtml`;
     const readTime = estimateReadingTime(post.wordCount);
     const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' \u00b7 ');
+
+    // Find all image URLs in the post HTML and download them
+    let body = htmlToXhtml(post.htmlBody);
+    const imgRegex = /<img([^>]*?)src="([^"]+)"([^>]*?)\/?>/gi;
+    const imgMatches = [...body.matchAll(imgRegex)];
+    for (const match of imgMatches) {
+      const url = match[2];
+      if (url.startsWith('data:') || url.startsWith('images/')) continue;
+      console.log(`  Downloading image: ${url.slice(0, 80)}...`);
+      const img = await downloadImage(url);
+      if (!img) continue;
+      const imgId = `img-${allImages.length}`;
+      const imgFilename = `images/${imgId}.${img.ext}`;
+      allImages.push({ id: imgId, filename: imgFilename, mediaType: img.mediaType, data: img.data });
+      entries.push({ name: `OEBPS/${imgFilename}`, data: img.data });
+      body = body.split(match[2]).join(imgFilename);
+    }
+
     const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>${post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title>
 <style>
-body { font-family: serif; line-height: 1.6; margin: 1em; }
+body { font-family: serif; margin: 1em; }
 h1 { font-size: 1.6em; margin-bottom: 0.3em; }
 .meta { font-size: 0.85em; color: #666; margin-bottom: 1.5em; }
+img { max-width: 100%; height: auto; }
 blockquote { border-left: 2px solid #999; padding-left: 1em; margin: 1em 0; font-style: italic; color: #555; }
 hr { border: none; text-align: center; margin: 2em 0; }
 hr::before { content: "\\2022\\2003\\2022\\2003\\2022"; color: #999; }
@@ -1339,12 +1387,12 @@ hr::before { content: "\\2022\\2003\\2022\\2003\\2022"; color: #999; }
 <body>
 <h1>${post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</h1>
 <p class="meta">${meta}</p>
-${htmlToXhtml(post.htmlBody)}
+${body}
 </body>
 </html>`;
     entries.push({ name: `OEBPS/${filename}`, data: Buffer.from(xhtml) });
-    return { id, filename, title: post.title };
-  });
+    chapterFiles.push({ id, filename, title: post.title });
+  }
 
   // Table of contents XHTML
   const tocXhtml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1381,6 +1429,7 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
     <item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 ${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
+${allImages.map(img => `    <item id="${img.id}" href="${img.filename}" media-type="${img.mediaType}"/>`).join('\n')}
   </manifest>
   <spine>
     <itemref idref="cover" linear="no"/>
@@ -1435,7 +1484,7 @@ async function main() {
   // Generate EPUB
   const collection = orderForCollection(fiction);
   const bookTitle = 'The Company Man and Other Stories by Tom\u00e1s Bjartur';
-  const epub = buildEpub(collection, 'collection', bookTitle);
+  const epub = await buildEpub(collection, 'collection', bookTitle);
   fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction.epub'), epub);
   console.log(`Wrote fiction.epub (${collection.length} stories)`);
 
