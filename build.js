@@ -1181,17 +1181,55 @@ function encodePng(buf) {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', compressed), chunk('IEND', Buffer.alloc(0))]);
 }
 
+function perlinNoise() {
+  // Classic Perlin noise implementation
+  const perm = new Uint8Array(512);
+  const grad = [
+    [1,1],[-1,1],[1,-1],[-1,-1],
+    [1,0],[-1,0],[0,1],[0,-1],
+  ];
+  // Initialize permutation table
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  // Fisher-Yates shuffle with deterministic seed
+  let seed = 42;
+  const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return seed / 2147483647; };
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function lerp(a, b, t) { return a + t * (b - a); }
+  function dot(g, x, y) { return g[0] * x + g[1] * y; }
+
+  return function noise(x, y) {
+    const xi = Math.floor(x) & 255, yi = Math.floor(y) & 255;
+    const xf = x - Math.floor(x), yf = y - Math.floor(y);
+    const u = fade(xf), v = fade(yf);
+    const aa = perm[perm[xi] + yi] & 7;
+    const ab = perm[perm[xi] + yi + 1] & 7;
+    const ba = perm[perm[xi + 1] + yi] & 7;
+    const bb = perm[perm[xi + 1] + yi + 1] & 7;
+    return lerp(
+      lerp(dot(grad[aa], xf, yf), dot(grad[ba], xf - 1, yf), u),
+      lerp(dot(grad[ab], xf, yf - 1), dot(grad[bb], xf - 1, yf - 1), u),
+      v
+    );
+  };
+}
+
+// Cover style: 'flow', 'stipple', 'hatch'
+let COVER_STYLE = 'flow';
+
 function buildCoverPng(posts, bookTitle) {
   const W = 1200;
   const H = 1800;
   const n = posts.length;
-  const PHI = (1 + Math.sqrt(5)) / 2;
-  const GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI);
 
   // Art occupies top ~70% of cover
   const artH = Math.round(H * 0.70);
-  const cx0 = W * 0.5;
-  const cy0 = artH * 0.48;
 
   const buf = createPixelBuffer(W, H);
   // Fill background — warm cream
@@ -1199,50 +1237,273 @@ function buildCoverPng(posts, bookTitle) {
     buf.data[i] = 252; buf.data[i + 1] = 249; buf.data[i + 2] = 242;
   }
 
-  // Story attractors that warp the flow field
-  const attractors = posts.map((post, i) => {
-    const words = post.wordCount || 3000;
-    const angle = i * GOLDEN_ANGLE;
-    const spiralR = 130 + i * 55;
-    return {
-      x: cx0 + Math.cos(angle) * spiralR,
-      y: cy0 + Math.sin(angle) * spiralR * 0.7,
-      strength: 65 + (words / 60),
-    };
-  });
+  // Seed Perlin noise from story data
+  const noise = perlinNoise();
 
-  // Draw flowing horizontal lines warped by attractors
-  const numLines = 80;
-  const margin = 60;
-  for (let li = 0; li < numLines; li++) {
-    const baseY = margin + (li / (numLines - 1)) * (artH - 2 * margin);
-    const t = li / numLines;
-    const op = 0.15 + 0.35 * Math.sin(t * Math.PI); // fade at top/bottom edges
-    const r = Math.round(55 + (1 - t) * 30);
-    const g = Math.round(48 + (1 - t) * 25);
-    const b = Math.round(42 + (1 - t) * 15);
+  // Multi-octave noise for richer detail
+  function fbm(x, y, octaves) {
+    let val = 0, amp = 1, freq = 1, max = 0;
+    for (let i = 0; i < octaves; i++) {
+      val += noise(x * freq, y * freq) * amp;
+      max += amp;
+      amp *= 0.5;
+      freq *= 2;
+    }
+    return val / max;
+  }
 
-    let prevX = -10, prevY = baseY;
-    const step = 2;
-    for (let x = -10; x <= W + 10; x += step) {
-      let dy = 0;
-      for (const a of attractors) {
-        const dx = x - a.x;
-        const ddy = baseY - a.y;
-        const dist2 = dx * dx + ddy * ddy;
-        const sigma = 120;
-        // Smooth gaussian deflection away from attractor
-        dy += -a.strength * ddy / (sigma) * Math.exp(-dist2 / (2 * sigma * sigma));
+  // --- Ridge style: displaced horizontal lines creating a terrain effect ---
+  if (COVER_STYLE === 'ridge') {
+    const lineCount = 120 + n * 3;
+    const lineSpacing = artH / (lineCount + 1);
+    const amplitude = lineSpacing * 10;
+    const nScale = 0.0018;
+    const xStep = 1;
+
+    // Draw from top to bottom — each line's fill occludes lines above (behind)
+    for (let li = 0; li <= lineCount; li++) {
+      const baseY = (li + 1) * lineSpacing;
+      const yNorm = li / lineCount; // 0=top, 1=bottom
+      const vertEnv = Math.pow(Math.sin(yNorm * Math.PI), 0.5);
+
+      // Build polyline with noise displacement
+      const pts = [];
+      for (let x = 0; x <= W; x += xStep) {
+        // Use different noise octaves for varied terrain
+        const nVal = fbm(x * nScale, baseY * nScale * 0.5, 5);
+        // Add a secondary bump at a different scale
+        const bump = fbm(x * nScale * 3, baseY * nScale * 2, 3) * 0.3;
+        // Taper at horizontal edges
+        const xNorm = x / W;
+        const horzEnv = Math.pow(Math.sin(xNorm * Math.PI), 0.3);
+        const disp = (nVal + bump) * amplitude * vertEnv * horzEnv;
+        pts.push({ x, y: baseY - Math.abs(disp) });
       }
-      const curY = baseY + dy;
-      if (x > -10) {
-        drawLine(buf, prevX, prevY, x, curY, r, g, b, op, 1.5);
+
+      // Fill below the polyline with background color to occlude lines behind
+      // Draw a filled polygon: polyline + bottom-right + bottom-left
+      const bgR = 252, bgG = 249, bgB = 242;
+      const fillBottom = baseY + amplitude + 5;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const x0 = pts[i].x, y0 = pts[i].y;
+        const x1 = pts[i + 1].x, y1 = pts[i + 1].y;
+        // Fill vertical strips from the curve down to fillBottom
+        const xMin = Math.floor(Math.min(x0, x1));
+        const xMax = Math.ceil(Math.max(x0, x1));
+        for (let fx = xMin; fx <= xMax && fx < W; fx++) {
+          if (fx < 0) continue;
+          const t = x1 !== x0 ? (fx - x0) / (x1 - x0) : 0;
+          const topY = Math.floor(y0 + (y1 - y0) * Math.max(0, Math.min(1, t)));
+          const botY = Math.min(Math.floor(fillBottom), artH);
+          for (let fy = Math.max(0, topY); fy < botY; fy++) {
+            const idx = (fy * W + fx) * 3;
+            buf.data[idx] = bgR;
+            buf.data[idx + 1] = bgG;
+            buf.data[idx + 2] = bgB;
+          }
+        }
       }
-      prevX = x;
-      prevY = curY;
+
+      // Draw the polyline — lines get thicker and darker toward the front (bottom)
+      const depth = yNorm; // 0=back(top), 1=front(bottom)
+      const lineR = Math.round(70 - depth * 35);
+      const lineG = Math.round(60 - depth * 30);
+      const lineB = Math.round(52 - depth * 25);
+      const weight = 0.8 + depth * 1.5;
+      for (let i = 1; i < pts.length; i++) {
+        drawLine(buf, pts[i-1].x, pts[i-1].y, pts[i].x, pts[i].y,
+          lineR, lineG, lineB, 0.9, weight);
+      }
+    }
+
+    // Skip the flow field code below — jump to text rendering
+  } else {
+
+  // Build angle field using Perlin noise
+  // Scale and offset influenced by number of stories
+  const noiseScale = 0.0008 + n * 0.00005; // very low frequency = big sweeping forms
+  const octaves = 2;                        // smooth, minimal detail
+
+  function getAngle(x, y) {
+    return fbm(x * noiseScale, y * noiseScale, octaves) * Math.PI * 3;
+  }
+
+  // Distance grid to enforce minimum spacing between curves
+  const cellSize = 4;
+  const gridW = Math.ceil(W / cellSize);
+  const gridH = Math.ceil(artH / cellSize);
+  const occupied = new Uint8Array(gridW * gridH);
+  const minSpacing = 10; // minimum pixels between curves
+
+  function isOccupied(x, y) {
+    const gx = Math.floor(x / cellSize);
+    const gy = Math.floor(y / cellSize);
+    if (gx < 0 || gx >= gridW || gy < 0 || gy >= gridH) return false;
+    return occupied[gy * gridW + gx];
+  }
+
+  function markOccupied(x, y) {
+    const r = Math.ceil(minSpacing / cellSize);
+    const gx = Math.floor(x / cellSize);
+    const gy = Math.floor(y / cellSize);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = gx + dx, ny = gy + dy;
+        if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) {
+          occupied[ny * gridW + nx] = 1;
+        }
+      }
     }
   }
 
+  // Generate seed points distributed across the art area
+  const seedPoints = [];
+  const seedSpacing = 20;
+  for (let y = seedSpacing; y < artH - seedSpacing; y += seedSpacing) {
+    for (let x = seedSpacing; x < W - seedSpacing; x += seedSpacing) {
+      seedPoints.push({ x, y });
+    }
+  }
+  // Shuffle for random draw order (deterministic)
+  let shuffleSeed = 137;
+  const srand = () => { shuffleSeed = (shuffleSeed * 16807) % 2147483647; return shuffleSeed / 2147483647; };
+  for (let i = seedPoints.length - 1; i > 0; i--) {
+    const j = Math.floor(srand() * (i + 1));
+    [seedPoints[i], seedPoints[j]] = [seedPoints[j], seedPoints[i]];
+  }
+
+  // Trace curves through the flow field
+  const stepLen = 2;
+  const maxSteps = 600;
+  const pad = 5;
+
+  for (const seed of seedPoints) {
+    if (isOccupied(seed.x, seed.y)) continue;
+
+    // Trace in both directions from seed
+    const segments = [];
+    for (const dir of [1, -1]) {
+      let x = seed.x, y = seed.y;
+      const pts = [{ x, y }];
+      for (let s = 0; s < maxSteps; s++) {
+        const angle = getAngle(x, y);
+        const nx = x + Math.cos(angle) * stepLen * dir;
+        const ny = y + Math.sin(angle) * stepLen * dir;
+        if (nx < -pad || nx > W + pad || ny < -pad || ny > artH + pad) break;
+        if (isOccupied(nx, ny) && s > 3) break;
+        x = nx; y = ny;
+        pts.push({ x, y });
+      }
+      segments.push(pts);
+    }
+
+    // Combine: reverse the backward segment + forward segment
+    const curve = [...segments[1].reverse(), ...segments[0].slice(1)];
+    if (curve.length < 15) continue;
+
+    // Mark all points as occupied
+    for (const p of curve) markOccupied(p.x, p.y);
+
+    const len = curve.length;
+
+    if (COVER_STYLE === 'stipple') {
+      // Dots placed along the curve, density varies with noise
+      for (let i = 0; i < len; i++) {
+        const px = curve[i].x, py = curve[i].y;
+        const density = 0.3 + Math.abs(noise(px * 0.004, py * 0.004)) * 0.7;
+        // Skip dots based on density — sparser in quiet areas
+        if ((i % Math.max(1, Math.round(8 * (1 - density)))) !== 0) continue;
+        const endFade = Math.min(i / len * 8, (1 - i / len) * 8, 1);
+        const radius = 1.0 + density * 2.0;
+        const op = 0.4 * endFade * density;
+        drawFilledCircle(buf, px, py, radius, 55, 45, 38, op);
+      }
+    } else if (COVER_STYLE === 'hatch') {
+      // Draw the curve, but also draw a second layer at a different noise offset
+      for (let i = 1; i < len; i++) {
+        const t = i / len;
+        const px = curve[i].x, py = curve[i].y;
+        const endFade = Math.min(t * 8, (1 - t) * 8, 1);
+        const density = Math.abs(noise(px * 0.005, py * 0.005));
+        const weight = 0.8 + density * 0.8;
+        const op = 0.35 * endFade;
+        drawLine(buf, curve[i - 1].x, curve[i - 1].y, px, py, 55, 45, 38, op, weight);
+      }
+    } else {
+      // 'flow' — original flowing lines with variable weight
+      for (let i = 1; i < len; i++) {
+        const t = i / len;
+        const px = curve[i].x, py = curve[i].y;
+        const endFade = Math.min(t * 8, (1 - t) * 8, 1);
+        const op = 0.45 * endFade;
+        const density = Math.abs(noise(px * 0.005, py * 0.005));
+        const weight = 1.0 + density * 1.2;
+        const r = 60, g = 50, b = 42;
+        drawLine(buf, curve[i - 1].x, curve[i - 1].y, px, py, r, g, b, op, weight);
+      }
+    }
+  }
+
+  // Hatch style: draw a second pass with a different noise field rotated ~60°
+  if (COVER_STYLE === 'hatch') {
+    const occupied2 = new Uint8Array(gridW * gridH);
+    function isOcc2(x, y) {
+      const gx = Math.floor(x / cellSize), gy = Math.floor(y / cellSize);
+      if (gx < 0 || gx >= gridW || gy < 0 || gy >= gridH) return false;
+      return occupied2[gy * gridW + gx] || occupied[gy * gridW + gx];
+    }
+    function markOcc2(x, y) {
+      const r2 = Math.ceil(minSpacing / cellSize);
+      const gx = Math.floor(x / cellSize), gy = Math.floor(y / cellSize);
+      for (let dy = -r2; dy <= r2; dy++) {
+        for (let dx = -r2; dx <= r2; dx++) {
+          const nx = gx + dx, ny = gy + dy;
+          if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) occupied2[ny * gridW + nx] = 1;
+        }
+      }
+    }
+    function getAngle2(x, y) {
+      return fbm((x + 500) * noiseScale * 1.3, (y + 500) * noiseScale * 1.3, octaves) * Math.PI * 3 + Math.PI * 0.6;
+    }
+    // Reuse shuffled seeds in different order
+    let ss2 = 293;
+    const sr2 = () => { ss2 = (ss2 * 16807) % 2147483647; return ss2 / 2147483647; };
+    const seeds2 = [...seedPoints];
+    for (let i = seeds2.length - 1; i > 0; i--) {
+      const j = Math.floor(sr2() * (i + 1));
+      [seeds2[i], seeds2[j]] = [seeds2[j], seeds2[i]];
+    }
+    for (const seed of seeds2) {
+      if (isOcc2(seed.x, seed.y)) continue;
+      const segs = [];
+      for (const dir of [1, -1]) {
+        let x = seed.x, y = seed.y;
+        const pts = [{ x, y }];
+        for (let s = 0; s < maxSteps; s++) {
+          const angle = getAngle2(x, y);
+          const nx2 = x + Math.cos(angle) * stepLen * dir;
+          const ny2 = y + Math.sin(angle) * stepLen * dir;
+          if (nx2 < -pad || nx2 > W + pad || ny2 < -pad || ny2 > artH + pad) break;
+          if (isOcc2(nx2, ny2) && s > 3) break;
+          x = nx2; y = ny2;
+          pts.push({ x, y });
+        }
+        segs.push(pts);
+      }
+      const crv = [...segs[1].reverse(), ...segs[0].slice(1)];
+      if (crv.length < 15) continue;
+      for (const p of crv) markOcc2(p.x, p.y);
+      for (let i = 1; i < crv.length; i++) {
+        const t = i / crv.length;
+        const endFade = Math.min(t * 8, (1 - t) * 8, 1);
+        const density = Math.abs(noise(crv[i].x * 0.005, crv[i].y * 0.005));
+        const weight = 0.8 + density * 0.8;
+        drawLine(buf, crv[i-1].x, crv[i-1].y, crv[i].x, crv[i].y, 55, 45, 38, 0.25 * endFade, weight);
+      }
+    }
+  }
+
+  } // end else (non-ridge styles)
 
   // Composite pixel buffer onto canvas, then add text with proper fonts
   const canvas = createCanvas(W, H);
@@ -1532,7 +1793,8 @@ async function main() {
 }
 
 // Export for testing, run if called directly
-module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng };
+function setCoverStyle(s) { COVER_STYLE = s; }
+module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng, setCoverStyle };
 
 if (require.main === module) {
   main().catch(err => {
