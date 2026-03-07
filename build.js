@@ -1414,28 +1414,30 @@ function perlinNoise() {
 // Cover style: 'flow', 'stipple', 'hatch', 'ridge'
 let COVER_STYLE = 'ridge';
 // Ridge color palette: 'warm', 'navy', 'teal', 'ink', 'ember'
-let RIDGE_PALETTE = 'navy';
+let RIDGE_PALETTE = 'noir';
 
 const RIDGE_PALETTES = {
-  warm:  { bg: [252, 249, 242], front: [35, 28, 22],  back: [70, 60, 52]  },  // current warm brown
-  navy:  { bg: [240, 243, 250], front: [15, 30, 75],  back: [80, 100, 150] },  // deep blue
-  teal:  { bg: [240, 250, 248], front: [10, 50, 50],  back: [70, 130, 120] },  // sea green
-  ink:   { bg: [248, 248, 248], front: [10, 10, 10],  back: [90, 90, 90]  },  // pure B&W
-  ember: { bg: [252, 246, 240], front: [80, 20, 10],  back: [160, 80, 50] },  // burnt orange/red
+  warm:  { bg: [252, 249, 242], front: [35, 28, 22],  back: [70, 60, 52],  title: 'rgba(30,25,20,0.95)',  sub: 'rgba(100,85,70,0.6)',   author: 'rgba(70,55,40,0.8)' },
+  navy:  { bg: [240, 243, 250], front: [15, 30, 75],  back: [80, 100, 150], title: 'rgba(15,30,75,0.95)', sub: 'rgba(60,75,120,0.6)',   author: 'rgba(30,50,100,0.8)' },
+  teal:  { bg: [240, 250, 248], front: [10, 50, 50],  back: [70, 130, 120], title: 'rgba(10,50,50,0.95)', sub: 'rgba(50,100,90,0.6)',   author: 'rgba(30,70,60,0.8)' },
+  ink:   { bg: [248, 248, 248], front: [10, 10, 10],  back: [90, 90, 90],  title: 'rgba(10,10,10,0.95)',  sub: 'rgba(80,80,80,0.6)',    author: 'rgba(40,40,40,0.8)' },
+  ember: { bg: [252, 246, 240], front: [80, 20, 10],  back: [160, 80, 50], title: 'rgba(80,20,10,0.95)',  sub: 'rgba(140,70,40,0.6)',   author: 'rgba(100,40,20,0.8)' },
+  noir:  { bg: [18, 18, 22],    front: [240, 240, 235], back: [100, 100, 110], title: 'rgba(240,240,235,0.95)', sub: 'rgba(180,180,175,0.6)', author: 'rgba(210,210,205,0.8)' },
 };
 
 function buildCoverPng(posts, bookTitle) {
   const W = 1200;
   const H = 1800;
   const n = posts.length;
+  const coverPal = RIDGE_PALETTES[RIDGE_PALETTE] || RIDGE_PALETTES.warm;
 
   // Art occupies top ~70% of cover
   const artH = Math.round(H * 0.70);
 
   const buf = createPixelBuffer(W, H);
-  // Fill background — warm cream
+  // Fill background with palette color
   for (let i = 0; i < buf.data.length; i += 3) {
-    buf.data[i] = 252; buf.data[i + 1] = 249; buf.data[i + 2] = 242;
+    buf.data[i] = coverPal.bg[0]; buf.data[i + 1] = coverPal.bg[1]; buf.data[i + 2] = coverPal.bg[2];
   }
 
   // Seed Perlin noise from story data
@@ -1735,17 +1737,17 @@ function buildCoverPng(posts, bookTitle) {
 
   // Main title
   ctx.font = '300 72px "Georgia", "Noto Serif", "DejaVu Serif", serif';
-  ctx.fillStyle = 'rgba(30, 25, 20, 0.95)';
+  ctx.fillStyle = coverPal.title;
   ctx.fillText(mainTitle, W / 2, H * 0.735);
 
   // Subtitle
   ctx.font = '300 26px "Georgia", "Noto Serif", "DejaVu Serif", serif';
-  ctx.fillStyle = 'rgba(100, 85, 70, 0.6)';
+  ctx.fillStyle = coverPal.sub;
   ctx.fillText(subtitle.toLowerCase(), W / 2, H * 0.735 + 90);
 
   // Author
   ctx.font = '300 34px "Georgia", "Noto Serif", "DejaVu Serif", serif';
-  ctx.fillStyle = 'rgba(70, 55, 40, 0.8)';
+  ctx.fillStyle = coverPal.author;
   ctx.fillText(author, W / 2, H * 0.865);
 
   return canvas.toBuffer('image/png');
