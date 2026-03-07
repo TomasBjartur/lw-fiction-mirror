@@ -880,6 +880,264 @@ function hashStr(str) {
   return Math.abs(h);
 }
 
+// --- Minimal PNG rasterizer (no dependencies) ---
+
+function createPixelBuffer(w, h) {
+  return { w, h, data: new Uint8Array(w * h * 3) };
+}
+
+function setPixel(buf, x, y, r, g, b, a) {
+  x = Math.round(x); y = Math.round(y);
+  if (x < 0 || x >= buf.w || y < 0 || y >= buf.h) return;
+  const i = (y * buf.w + x) * 3;
+  const inv = 1 - a;
+  buf.data[i]     = Math.round(buf.data[i] * inv + r * a);
+  buf.data[i + 1] = Math.round(buf.data[i + 1] * inv + g * a);
+  buf.data[i + 2] = Math.round(buf.data[i + 2] * inv + b * a);
+}
+
+function drawCircleRing(buf, cx, cy, radius, r, g, b, a, strokeW) {
+  const rOuter = radius + strokeW / 2;
+  const rInner = radius - strokeW / 2;
+  const x0 = Math.max(0, Math.floor(cx - rOuter - 1));
+  const x1 = Math.min(buf.w - 1, Math.ceil(cx + rOuter + 1));
+  const y0 = Math.max(0, Math.floor(cy - rOuter - 1));
+  const y1 = Math.min(buf.h - 1, Math.ceil(cy + rOuter + 1));
+  for (let py = y0; py <= y1; py++) {
+    for (let px = x0; px <= x1; px++) {
+      const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+      // Antialiased ring
+      const outer = Math.max(0, Math.min(1, rOuter - dist + 0.5));
+      const inner = Math.max(0, Math.min(1, dist - rInner + 0.5));
+      const coverage = outer * inner;
+      if (coverage > 0) setPixel(buf, px, py, r, g, b, a * coverage);
+    }
+  }
+}
+
+function drawFilledCircle(buf, cx, cy, radius, r, g, b, a) {
+  const x0 = Math.max(0, Math.floor(cx - radius - 1));
+  const x1 = Math.min(buf.w - 1, Math.ceil(cx + radius + 1));
+  const y0 = Math.max(0, Math.floor(cy - radius - 1));
+  const y1 = Math.min(buf.h - 1, Math.ceil(cy + radius + 1));
+  for (let py = y0; py <= y1; py++) {
+    for (let px = x0; px <= x1; px++) {
+      const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+      const coverage = Math.max(0, Math.min(1, radius - dist + 0.5));
+      if (coverage > 0) setPixel(buf, px, py, r, g, b, a * coverage);
+    }
+  }
+}
+
+function drawLine(buf, x1, y1, x2, y2, r, g, b, a, w) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return;
+  const steps = Math.ceil(len * 2);
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const cx = x1 + dx * t, cy = y1 + dy * t;
+    drawFilledCircle(buf, cx, cy, w / 2, r, g, b, a);
+  }
+}
+
+function drawText(buf, text, cx, baseY, fontSize, r, g, b, a) {
+  // Simple bitmap font — 5x7 pixel glyphs scaled up
+  const glyphs = {
+    'A': ['01110','10001','10001','11111','10001','10001','10001'],
+    'B': ['11110','10001','10001','11110','10001','10001','11110'],
+    'C': ['01110','10001','10000','10000','10000','10001','01110'],
+    'D': ['11100','10010','10001','10001','10001','10010','11100'],
+    'E': ['11111','10000','10000','11110','10000','10000','11111'],
+    'F': ['11111','10000','10000','11110','10000','10000','10000'],
+    'G': ['01110','10001','10000','10111','10001','10001','01110'],
+    'H': ['10001','10001','10001','11111','10001','10001','10001'],
+    'I': ['11111','00100','00100','00100','00100','00100','11111'],
+    'J': ['00111','00010','00010','00010','00010','10010','01100'],
+    'K': ['10001','10010','10100','11000','10100','10010','10001'],
+    'L': ['10000','10000','10000','10000','10000','10000','11111'],
+    'M': ['10001','11011','10101','10101','10001','10001','10001'],
+    'N': ['10001','11001','10101','10011','10001','10001','10001'],
+    'O': ['01110','10001','10001','10001','10001','10001','01110'],
+    'P': ['11110','10001','10001','11110','10000','10000','10000'],
+    'Q': ['01110','10001','10001','10001','10101','10010','01101'],
+    'R': ['11110','10001','10001','11110','10100','10010','10001'],
+    'S': ['01111','10000','10000','01110','00001','00001','11110'],
+    'T': ['11111','00100','00100','00100','00100','00100','00100'],
+    'U': ['10001','10001','10001','10001','10001','10001','01110'],
+    'V': ['10001','10001','10001','10001','01010','01010','00100'],
+    'W': ['10001','10001','10001','10101','10101','10101','01010'],
+    'X': ['10001','10001','01010','00100','01010','10001','10001'],
+    'Y': ['10001','10001','01010','00100','00100','00100','00100'],
+    'Z': ['11111','00001','00010','00100','01000','10000','11111'],
+    ' ': ['00000','00000','00000','00000','00000','00000','00000'],
+    '.': ['00000','00000','00000','00000','00000','00000','00100'],
+    ',': ['00000','00000','00000','00000','00000','00100','01000'],
+    '-': ['00000','00000','00000','11111','00000','00000','00000'],
+    '\'':['00100','00100','00000','00000','00000','00000','00000'],
+    '\u00e1':['00010','00100','01110','00001','01111','10001','01111'], // á
+    '0': ['01110','10001','10011','10101','11001','10001','01110'],
+    '1': ['00100','01100','00100','00100','00100','00100','01110'],
+    '2': ['01110','10001','00001','00010','00100','01000','11111'],
+    '3': ['01110','10001','00001','00110','00001','10001','01110'],
+    '4': ['00010','00110','01010','10010','11111','00010','00010'],
+    '5': ['11111','10000','11110','00001','00001','10001','01110'],
+    '6': ['01110','10001','10000','11110','10001','10001','01110'],
+    '7': ['11111','00001','00010','00100','01000','01000','01000'],
+    '8': ['01110','10001','10001','01110','10001','10001','01110'],
+    '9': ['01110','10001','10001','01111','00001','10001','01110'],
+    'a': ['00000','00000','01110','00001','01111','10001','01111'],
+    'b': ['10000','10000','11110','10001','10001','10001','11110'],
+    'c': ['00000','00000','01110','10000','10000','10001','01110'],
+    'd': ['00001','00001','01111','10001','10001','10001','01111'],
+    'e': ['00000','00000','01110','10001','11111','10000','01110'],
+    'f': ['00110','01001','01000','11100','01000','01000','01000'],
+    'g': ['00000','00000','01111','10001','01111','00001','01110'],
+    'h': ['10000','10000','10110','11001','10001','10001','10001'],
+    'i': ['00100','00000','01100','00100','00100','00100','01110'],
+    'j': ['00010','00000','00110','00010','00010','10010','01100'],
+    'k': ['10000','10000','10010','10100','11000','10100','10010'],
+    'l': ['01100','00100','00100','00100','00100','00100','01110'],
+    'm': ['00000','00000','11010','10101','10101','10001','10001'],
+    'n': ['00000','00000','10110','11001','10001','10001','10001'],
+    'o': ['00000','00000','01110','10001','10001','10001','01110'],
+    'p': ['00000','00000','11110','10001','11110','10000','10000'],
+    'q': ['00000','00000','01111','10001','01111','00001','00001'],
+    'r': ['00000','00000','10110','11001','10000','10000','10000'],
+    's': ['00000','00000','01110','10000','01110','00001','11110'],
+    't': ['01000','01000','11100','01000','01000','01001','00110'],
+    'u': ['00000','00000','10001','10001','10001','10011','01101'],
+    'v': ['00000','00000','10001','10001','10001','01010','00100'],
+    'w': ['00000','00000','10001','10001','10101','10101','01010'],
+    'x': ['00000','00000','10001','01010','00100','01010','10001'],
+    'y': ['00000','00000','10001','10001','01111','00001','01110'],
+    'z': ['00000','00000','11111','00010','00100','01000','11111'],
+  };
+  const scale = Math.max(1, Math.round(fontSize / 7));
+  const charW = 6 * scale;
+  const totalW = text.length * charW;
+  const startX = Math.round(cx - totalW / 2);
+  for (let ci = 0; ci < text.length; ci++) {
+    const ch = text[ci];
+    const glyph = glyphs[ch] || glyphs[ch.toUpperCase()] || glyphs[ch.toLowerCase()] || glyphs[' '];
+    const ox = startX + ci * charW;
+    for (let gy = 0; gy < 7; gy++) {
+      for (let gx = 0; gx < 5; gx++) {
+        if (glyph[gy][gx] === '1') {
+          for (let sy = 0; sy < scale; sy++) {
+            for (let sx = 0; sx < scale; sx++) {
+              setPixel(buf, ox + gx * scale + sx, baseY + gy * scale + sy, r, g, b, a);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function encodePng(buf) {
+  const { w, h, data } = buf;
+  // Build raw scanlines with filter byte (0 = None)
+  const raw = Buffer.alloc(h * (1 + w * 3));
+  for (let y = 0; y < h; y++) {
+    raw[y * (1 + w * 3)] = 0; // filter: None
+    data.copy ? Buffer.from(data).copy(raw, y * (1 + w * 3) + 1, y * w * 3, (y + 1) * w * 3)
+      : raw.set(data.subarray(y * w * 3, (y + 1) * w * 3), y * (1 + w * 3) + 1);
+  }
+  const compressed = zlib.deflateSync(Buffer.from(raw), { level: 9 });
+
+  function chunk(type, data) {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const typeData = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(typeData) >>> 0);
+    return Buffer.concat([len, typeData, crc]);
+  }
+
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;  // bit depth
+  ihdr[9] = 2;  // color type: RGB
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', compressed), chunk('IEND', Buffer.alloc(0))]);
+}
+
+function buildCoverPng(posts, bookTitle) {
+  const W = 600;
+  const H = 900;
+  const n = posts.length;
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI);
+  const cx0 = W * 0.5;
+  const cy0 = H * 0.35;
+
+  const buf = createPixelBuffer(W, H);
+  // Fill background
+  for (let i = 0; i < buf.data.length; i += 3) {
+    buf.data[i] = 12; buf.data[i + 1] = 15; buf.data[i + 2] = 20;
+  }
+
+  // Scale factor from original 1200x1800 design
+  const S = W / 1200;
+
+  // Draw connection lines first (behind everything)
+  for (let i = 0; i < n - 1; i++) {
+    const a1 = i * GOLDEN_ANGLE;
+    const r1 = (100 + i * 45) * S;
+    const a2 = (i + 1) * GOLDEN_ANGLE;
+    const r2 = (100 + (i + 1) * 45) * S;
+    const x1 = cx0 + Math.cos(a1) * r1;
+    const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
+    const x2 = cx0 + Math.cos(a2) * r2;
+    const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
+    drawLine(buf, x1, y1, x2, y2, 160, 185, 220, 0.1, 1);
+  }
+
+  // Draw ripples and source points for each story
+  posts.forEach((post, i) => {
+    const seed = hashStr(post.title);
+    const words = post.wordCount || 3000;
+    const angle = i * GOLDEN_ANGLE;
+    const spiralR = (100 + i * 45) * S;
+    const cx = cx0 + Math.cos(angle) * spiralR;
+    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
+
+    const maxR = (100 + words / 25) * S;
+    const rings = 3 + Math.floor(words / 1500);
+
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * maxR;
+      const op = 0.3 - (r / rings) * 0.18;
+      const sw = Math.max((2 - r * 0.3) * S, 0.8);
+      drawCircleRing(buf, cx, cy, radius, 190, 210, 235, op, sw);
+    }
+
+    // Source point
+    drawFilledCircle(buf, cx, cy, 4 * S, 170, 195, 225, 0.2);
+    drawFilledCircle(buf, cx, cy, 2 * S, 220, 232, 248, 0.8);
+  });
+
+  // Divider line
+  drawLine(buf, W * 0.25, H * 0.73, W * 0.75, H * 0.73, 180, 200, 225, 0.4, 1);
+
+  // Title
+  const titleParts = bookTitle.split(' and Other Stories by ');
+  const mainTitle = titleParts[0] || bookTitle;
+  const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
+  const author = titleParts.length > 1 ? titleParts[1] : '';
+
+  drawText(buf, mainTitle, W / 2, Math.round(H * 0.76), 28, 220, 228, 240, 0.9);
+  drawText(buf, subtitle.toLowerCase(), W / 2, Math.round(H * 0.76 + 38), 14, 160, 180, 210, 0.45);
+  drawText(buf, author, W / 2, Math.round(H * 0.88), 16, 180, 195, 220, 0.55);
+  drawText(buf, n + ' stories', W / 2, Math.round(H * 0.94), 10, 140, 160, 190, 0.25);
+
+  return encodePng(buf);
+}
+
 function buildCoverSvg(posts, bookTitle) {
   const W = 1200;
   const H = 1800;
@@ -982,20 +1240,18 @@ function buildEpub(posts, sortLabel, bookTitle) {
 </container>`)
   });
 
-  // Cover — inline SVG in XHTML for maximum reader compatibility
-  const coverSvg = buildCoverSvg(posts, bookTitle);
-  // Strip the XML declaration from SVG since it'll be inside XHTML
-  const inlineSvg = coverSvg.replace(/<\?xml[^?]*\?>/, '').trim();
-  entries.push({ name: 'OEBPS/cover.svg', data: Buffer.from(coverSvg) });
+  // Cover — rasterized PNG for universal reader compatibility
+  const coverPng = buildCoverPng(posts, bookTitle);
+  entries.push({ name: 'OEBPS/cover.png', data: coverPng });
 
   const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head><title>Cover</title>
-<style>body { margin: 0; padding: 0; text-align: center; background: #0c0f14; } svg { width: 100%; height: 100vh; }</style>
+<style>body { margin: 0; padding: 0; text-align: center; background: #0c0f14; } img { max-width: 100%; max-height: 100vh; }</style>
 </head>
 <body epub:type="cover">
-${inlineSvg}
+<img src="cover.png" alt="Cover"/>
 </body>
 </html>`;
   entries.push({ name: 'OEBPS/cover.xhtml', data: Buffer.from(coverXhtml) });
@@ -1060,7 +1316,7 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
   </metadata>
   <manifest>
     <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
-    <item id="cover-image" href="cover.svg" media-type="image/svg+xml" properties="cover-image"/>
+    <item id="cover-image" href="cover.png" media-type="image/png" properties="cover-image"/>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 ${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
   </manifest>
