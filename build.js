@@ -110,16 +110,18 @@ function orderForCollection(posts) {
   const last = eligible.find(p => p.slug === 'the-origami-men');
   const middle = eligible.filter(p => p !== first && p !== last);
 
-  // Editorial middle: alternate long and short pieces for pacing
-  // Split into longer and shorter halves, then interleave
-  middle.sort((a, b) => (b.wordCount || 0) - (a.wordCount || 0));
-  const half = Math.ceil(middle.length / 2);
-  const longer = middle.slice(0, half);
-  const shorter = middle.slice(half);
+  // Editorial middle: quality wave with length variation
+  // Sort by karma (quality proxy), then deal to alternating slots
+  // so stronger pieces are spread evenly — reader keeps hitting highlights.
+  // Within each slot pair, put the longer piece first for pacing.
+  middle.sort((a, b) => b.baseScore - a.baseScore);
+  const peaks = []; // odd positions (stronger)
+  const valleys = []; // even positions (weaker)
+  middle.forEach((p, i) => (i % 2 === 0 ? peaks : valleys).push(p));
   const interleaved = [];
-  for (let i = 0; i < Math.max(longer.length, shorter.length); i++) {
-    if (i < longer.length) interleaved.push(longer[i]);
-    if (i < shorter.length) interleaved.push(shorter[i]);
+  for (let i = 0; i < Math.max(peaks.length, valleys.length); i++) {
+    if (i < peaks.length) interleaved.push(peaks[i]);
+    if (i < valleys.length) interleaved.push(valleys[i]);
   }
 
   return [first, ...interleaved, last].filter(Boolean);
