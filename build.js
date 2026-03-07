@@ -135,9 +135,7 @@ function buildNav(posts, currentSlug, sortBy) {
 
   return sorted.map(p => {
     const active = p.slug === currentSlug ? ' class="active"' : '';
-    const score = sortBy === 'karma' ? `<span class="nav-score">${p.baseScore}</span>` : '';
-    const date = sortBy === 'date' ? `<span class="nav-date">${formatDate(p.postedAt).replace(/\d{4}$/, m => `'${m.slice(2)}`)}</span>` : '';
-    return `<li><a href="${p.slug}.html"${active}>${score}${date}<span class="nav-title">${p.title}</span></a></li>`;
+    return `<li><a href="${p.slug}.html"${active}><span class="nav-title">${p.title}</span></a></li>`;
   }).join('\n');
 }
 
@@ -386,22 +384,6 @@ body {
   background: var(--active-bg);
   font-weight: 600;
   color: var(--accent);
-}
-
-.nav-score {
-  min-width: 2.2em;
-  text-align: right;
-  color: var(--text-light);
-  font-size: 0.72rem;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.nav-date {
-  min-width: 5.5em;
-  color: var(--text-light);
-  font-size: 0.72rem;
-  flex-shrink: 0;
 }
 
 .nav-title {
@@ -926,7 +908,7 @@ function htmlToXhtml(html) {
     .replace(/style="[^"]*"/g, '');
 }
 
-function buildEpub(posts, sortLabel) {
+function buildEpub(posts, sortLabel, bookTitle) {
   const bookId = `tomas-b-fiction-by-${sortLabel}`;
   const entries = [];
 
@@ -996,8 +978,8 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="bookid">${bookId}</dc:identifier>
-    <dc:title>${SITE_TITLE} — ${SITE_SUBTITLE} (by ${sortLabel})</dc:title>
-    <dc:creator>Tom\u00e1s B.</dc:creator>
+    <dc:title>${bookTitle}</dc:title>
+    <dc:creator>Tom\u00e1s Bjartur</dc:creator>
     <dc:language>en</dc:language>
     <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z/, 'Z')}</meta>
   </metadata>
@@ -1056,12 +1038,13 @@ async function main() {
   // Generate EPUBs
   const byKarma = [...fiction].sort((a, b) => b.baseScore - a.baseScore);
   const byDate = [...fiction].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+  const bookTitle = `${byKarma[0].title} and Other Stories by Tom\u00e1s Bjartur`;
 
-  const epubKarma = buildEpub(byKarma, 'karma');
+  const epubKarma = buildEpub(byKarma, 'karma', bookTitle);
   fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-karma.epub'), epubKarma);
   console.log('Wrote fiction-by-karma.epub');
 
-  const epubDate = buildEpub(byDate, 'date');
+  const epubDate = buildEpub(byDate, 'date', bookTitle);
   fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction-by-date.epub'), epubDate);
   console.log('Wrote fiction-by-date.epub');
 
