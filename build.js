@@ -867,6 +867,7 @@ function htmlToXhtml(html) {
     .replace(/<br\s*>/gi, '<br/>')
     .replace(/<hr\s*>/gi, '<hr/>')
     .replace(/<img([^>]*?)(?<!\/)>/gi, '<img$1/>')
+    .replace(/&nbsp;/g, '\u00a0')
     .replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
     .replace(/<p>\s*<\/p>/g, '')
     .replace(/class="[^"]*"/g, '')
