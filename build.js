@@ -13,6 +13,8 @@ const SITE_SUBTITLE = 'Fiction';
 const SITE_DESCRIPTION = 'Fiction by Tom\u00e1s Bjartur.';
 const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
+const BOOK_TITLE = 'The Company Man and Other Stories by Tom\u00e1s Bjartur';
+const EPUB_FILENAME = BOOK_TITLE.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/_+$/, '') + '.epub';
 
 async function gqlQuery(query, variables = {}) {
   const res = await fetch(LW_GRAPHQL, {
@@ -218,7 +220,7 @@ function pageShell(content, title, posts, currentSlug) {
     <label for="menu-toggle" class="menu-button" aria-label="Toggle menu">☰</label>
     <a href="index.html" class="top-bar-title">${SITE_TITLE}</a>
     <div class="top-bar-actions">
-      <a href="fiction.epub" class="top-bar-btn">Download EPUB</a>
+      <a href="${EPUB_FILENAME}" class="top-bar-btn">Download EPUB</a>
       <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
     </div>
   </header>
@@ -1483,10 +1485,9 @@ async function main() {
 
   // Generate EPUB
   const collection = orderForCollection(fiction);
-  const bookTitle = 'The Company Man and Other Stories by Tom\u00e1s Bjartur';
-  const epub = await buildEpub(collection, 'collection', bookTitle);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'fiction.epub'), epub);
-  console.log(`Wrote fiction.epub (${collection.length} stories)`);
+  const epub = await buildEpub(collection, 'collection', BOOK_TITLE);
+  fs.writeFileSync(path.join(OUTPUT_DIR, EPUB_FILENAME), epub);
+  console.log(`Wrote ${EPUB_FILENAME} (${collection.length} stories)`);
 
   // Generate RSS feed
   fs.writeFileSync(path.join(OUTPUT_DIR, 'feed.xml'), buildRssFeed(fiction));
