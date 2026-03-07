@@ -1109,8 +1109,8 @@ function encodePng(buf) {
 }
 
 function buildCoverPng(posts, bookTitle) {
-  const W = 600;
-  const H = 900;
+  const W = 1200;
+  const H = 1800;
   const n = posts.length;
   const PHI = (1 + Math.sqrt(5)) / 2;
   const GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI);
@@ -1118,53 +1118,49 @@ function buildCoverPng(posts, bookTitle) {
   const cy0 = H * 0.35;
 
   const buf = createPixelBuffer(W, H);
-  // Fill background
+  // Fill background — warm cream, e-ink friendly
   for (let i = 0; i < buf.data.length; i += 3) {
-    buf.data[i] = 12; buf.data[i + 1] = 15; buf.data[i + 2] = 20;
+    buf.data[i] = 252; buf.data[i + 1] = 249; buf.data[i + 2] = 242;
   }
-
-  // Scale factor from original 1200x1800 design
-  const S = W / 1200;
 
   // Draw connection lines first (behind everything)
   for (let i = 0; i < n - 1; i++) {
     const a1 = i * GOLDEN_ANGLE;
-    const r1 = (100 + i * 45) * S;
+    const r1 = 100 + i * 45;
     const a2 = (i + 1) * GOLDEN_ANGLE;
-    const r2 = (100 + (i + 1) * 45) * S;
+    const r2 = 100 + (i + 1) * 45;
     const x1 = cx0 + Math.cos(a1) * r1;
     const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
     const x2 = cx0 + Math.cos(a2) * r2;
     const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
-    drawLine(buf, x1, y1, x2, y2, 160, 185, 220, 0.1, 1);
+    drawLine(buf, x1, y1, x2, y2, 90, 75, 60, 0.15, 1.5);
   }
 
   // Draw ripples and source points for each story
   posts.forEach((post, i) => {
-    const seed = hashStr(post.title);
     const words = post.wordCount || 3000;
     const angle = i * GOLDEN_ANGLE;
-    const spiralR = (100 + i * 45) * S;
+    const spiralR = 100 + i * 45;
     const cx = cx0 + Math.cos(angle) * spiralR;
     const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
 
-    const maxR = (100 + words / 25) * S;
+    const maxR = 100 + words / 25;
     const rings = 3 + Math.floor(words / 1500);
 
     for (let r = 1; r <= rings; r++) {
       const radius = (r / rings) * maxR;
-      const op = 0.3 - (r / rings) * 0.18;
-      const sw = Math.max((2 - r * 0.3) * S, 0.8);
-      drawCircleRing(buf, cx, cy, radius, 190, 210, 235, op, sw);
+      const op = 0.55 - (r / rings) * 0.3;
+      const sw = Math.max(2.5 - r * 0.3, 1.2);
+      drawCircleRing(buf, cx, cy, radius, 80, 65, 50, op, sw);
     }
 
-    // Source point
-    drawFilledCircle(buf, cx, cy, 4 * S, 170, 195, 225, 0.2);
-    drawFilledCircle(buf, cx, cy, 2 * S, 220, 232, 248, 0.8);
+    // Source point — solid dark dots
+    drawFilledCircle(buf, cx, cy, 8, 100, 80, 60, 0.35);
+    drawFilledCircle(buf, cx, cy, 4, 50, 40, 30, 0.9);
   });
 
   // Divider line
-  drawLine(buf, W * 0.25, H * 0.73, W * 0.75, H * 0.73, 180, 200, 225, 0.4, 1);
+  drawLine(buf, W * 0.25, H * 0.73, W * 0.75, H * 0.73, 60, 50, 40, 0.5, 1.5);
 
   // Title
   const titleParts = bookTitle.split(' and Other Stories by ');
@@ -1172,10 +1168,10 @@ function buildCoverPng(posts, bookTitle) {
   const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
   const author = titleParts.length > 1 ? titleParts[1] : '';
 
-  drawText(buf, mainTitle, W / 2, Math.round(H * 0.76), 28, 220, 228, 240, 0.9);
-  drawText(buf, subtitle.toLowerCase(), W / 2, Math.round(H * 0.76 + 38), 14, 160, 180, 210, 0.45);
-  drawText(buf, author, W / 2, Math.round(H * 0.88), 16, 180, 195, 220, 0.55);
-  drawText(buf, n + ' stories', W / 2, Math.round(H * 0.94), 10, 140, 160, 190, 0.25);
+  drawText(buf, mainTitle, W / 2, Math.round(H * 0.76), 64, 30, 25, 20, 0.95);
+  drawText(buf, subtitle.toLowerCase(), W / 2, Math.round(H * 0.76 + 90), 24, 100, 85, 70, 0.6);
+  drawText(buf, author, W / 2, Math.round(H * 0.88), 32, 70, 55, 40, 0.8);
+  drawText(buf, n + ' stories', W / 2, Math.round(H * 0.94), 16, 130, 115, 100, 0.4);
 
   return encodePng(buf);
 }
@@ -1191,35 +1187,6 @@ function buildCoverSvg(posts, bookTitle) {
   const cy0 = H * 0.35;
   const elements = [];
 
-  // Each story is a point that emits concentric ripples
-  // Where ripples overlap, interference patterns emerge naturally
-  posts.forEach((post, i) => {
-    const seed = hashStr(post.title);
-    const karma = post.baseScore || 50;
-    const words = post.wordCount || 3000;
-
-    // Position via golden angle spiral — wide, even distribution
-    const angle = i * GOLDEN_ANGLE;
-    const spiralR = 100 + i * 45;
-    const cx = cx0 + Math.cos(angle) * spiralR;
-    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
-
-    // Concentric rings
-    const maxR = 100 + words / 25;
-    const rings = 3 + Math.floor(words / 1500);
-
-    for (let r = 1; r <= rings; r++) {
-      const radius = (r / rings) * maxR;
-      const op = 0.3 - (r / rings) * 0.18;
-      const sw = 2 - r * 0.3;
-      elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${radius.toFixed(1)}" fill="none" stroke="rgba(190,210,235,${op.toFixed(2)})" stroke-width="${Math.max(sw, 1).toFixed(1)}" />`);
-    }
-
-    // Source point
-    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="8" fill="rgba(170,195,225,0.2)" />`);
-    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="rgba(220,232,248,0.8)" />`);
-  });
-
   // Fine connection lines between adjacent stories — like a quiet network
   for (let i = 0; i < n - 1; i++) {
     const a1 = i * GOLDEN_ANGLE;
@@ -1230,11 +1197,35 @@ function buildCoverSvg(posts, bookTitle) {
     const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
     const x2 = cx0 + Math.cos(a2) * r2;
     const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
-    elements.push(`    <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(160,185,220,0.1)" stroke-width="1" />`);
+    elements.push(`    <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(90,75,60,0.15)" stroke-width="1.5" />`);
   }
 
+  // Each story is a point that emits concentric ripples
+  posts.forEach((post, i) => {
+    const words = post.wordCount || 3000;
+
+    const angle = i * GOLDEN_ANGLE;
+    const spiralR = 100 + i * 45;
+    const cx = cx0 + Math.cos(angle) * spiralR;
+    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
+
+    const maxR = 100 + words / 25;
+    const rings = 3 + Math.floor(words / 1500);
+
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * maxR;
+      const op = 0.55 - (r / rings) * 0.3;
+      const sw = Math.max(2.5 - r * 0.3, 1.2);
+      elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${radius.toFixed(1)}" fill="none" stroke="rgba(80,65,50,${op.toFixed(2)})" stroke-width="${sw.toFixed(1)}" />`);
+    }
+
+    // Source point
+    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="8" fill="rgba(100,80,60,0.35)" />`);
+    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="rgba(50,40,30,0.9)" />`);
+  });
+
   // Single thin rule above the title
-  elements.push(`    <line x1="${W * 0.25}" y1="${H * 0.73}" x2="${W * 0.75}" y2="${H * 0.73}" stroke="rgba(180,200,225,0.4)" stroke-width="1.5" />`);
+  elements.push(`    <line x1="${W * 0.25}" y1="${H * 0.73}" x2="${W * 0.75}" y2="${H * 0.73}" stroke="rgba(60,50,40,0.5)" stroke-width="1.5" />`);
 
   // Title
   const titleParts = bookTitle.split(' and Other Stories by ');
@@ -1244,8 +1235,8 @@ function buildCoverSvg(posts, bookTitle) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-  <!-- Background — very dark blue-gray -->
-  <rect width="${W}" height="${H}" fill="#0c0f14"/>
+  <!-- Background — warm cream -->
+  <rect width="${W}" height="${H}" fill="#fcf9f2"/>
 
   <!-- Interference pattern -->
   <g>
@@ -1253,14 +1244,14 @@ ${elements.join('\n')}
   </g>
 
   <!-- Title -->
-  <text x="${W / 2}" y="${H * 0.78}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="64" fill="rgba(220,228,240,0.9)" letter-spacing="1">${mainTitle}</text>
-  <text x="${W / 2}" y="${H * 0.78 + 50}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="24" fill="rgba(160,180,210,0.45)" letter-spacing="5">${subtitle.toLowerCase()}</text>
+  <text x="${W / 2}" y="${H * 0.78}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="64" fill="rgba(30,25,20,0.95)" letter-spacing="1">${mainTitle}</text>
+  <text x="${W / 2}" y="${H * 0.78 + 50}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="24" fill="rgba(100,85,70,0.6)" letter-spacing="5">${subtitle.toLowerCase()}</text>
 
   <!-- Author -->
-  <text x="${W / 2}" y="${H * 0.91}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="28" fill="rgba(180,195,220,0.55)" letter-spacing="3">${author}</text>
+  <text x="${W / 2}" y="${H * 0.91}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="28" fill="rgba(70,55,40,0.8)" letter-spacing="3">${author}</text>
 
-  <!-- Story count — barely there -->
-  <text x="${W / 2}" y="${H * 0.955}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="13" fill="rgba(140,160,190,0.25)">${n} stories</text>
+  <!-- Story count -->
+  <text x="${W / 2}" y="${H * 0.955}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="13" fill="rgba(130,115,100,0.4)">${n} stories</text>
 </svg>`;
 }
 
@@ -1290,7 +1281,7 @@ function buildEpub(posts, sortLabel, bookTitle) {
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head><title>Cover</title>
-<style>body { margin: 0; padding: 0; text-align: center; background: #0c0f14; } img { max-width: 100%; max-height: 100vh; }</style>
+<style>body { margin: 0; padding: 0; text-align: center; background: #fcf9f2; } img { max-width: 100%; max-height: 100vh; }</style>
 </head>
 <body epub:type="cover">
 <img src="cover.png" alt="Cover"/>
