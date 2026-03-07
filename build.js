@@ -1263,8 +1263,9 @@ function buildEpub(posts, sortLabel, bookTitle) {
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>Title Page</title>
 <style>
-body { font-family: serif; margin: 2em; text-align: center; }
-h1 { font-size: 2em; margin-top: 3em; margin-bottom: 0.3em; }
+body { font-family: serif; margin: 2em; text-align: center; display: flex; flex-direction: column; align-items: center; }
+h1 { font-size: 2em; margin-top: 3em; margin-bottom: 0.3em; text-align: center; width: 100%; }
+p { text-align: center; width: 100%; }
 .subtitle { font-size: 1.1em; color: #666; margin-bottom: 2em; }
 .author { font-size: 1.3em; margin-bottom: 3em; }
 .dedication { font-style: italic; color: #555; margin: 3em auto; max-width: 20em; }
@@ -1276,7 +1277,7 @@ h1 { font-size: 2em; margin-top: 3em; margin-bottom: 0.3em; }
 <h1>${bookTitle.split(' and Other Stories')[0]}</h1>
 <p class="subtitle">and Other Stories</p>
 <p class="author">Tom\u00e1s Bjartur</p>
-<p class="dedication">To my friends \u2014 you know who you are.</p>
+<p class="dedication">Dedicated to my friends.</p>
 <p class="copyright">\u00a9 ${year} Tom\u00e1s Bjartur. All rights reserved.</p>
 <p class="copyright"><a href="${SUBSTACK_URL}">tomasbjartur.substack.com</a></p>
 </body>
