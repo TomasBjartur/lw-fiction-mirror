@@ -876,6 +876,99 @@ function htmlToXhtml(html) {
     .replace(/style="[^"]*"/g, '');
 }
 
+function hashStr(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function buildCoverSvg(posts, bookTitle) {
+  const W = 1200;
+  const H = 1800;
+  const n = posts.length;
+
+  // Warm earth palette — each story picks a color based on its title
+  const palette = [
+    [163, 107, 72],   // warm brown
+    [139, 90, 60],    // deeper brown
+    [180, 140, 100],  // tan
+    [120, 80, 55],    // dark wood
+    [200, 160, 120],  // sand
+    [150, 115, 85],   // leather
+    [170, 130, 95],   // caramel
+    [140, 100, 70],   // walnut
+  ];
+
+  // Generate circles — each story contributes one
+  const circles = posts.map((post, i) => {
+    const seed = hashStr(post.title);
+    const karma = post.baseScore || 50;
+    const words = post.wordCount || 3000;
+
+    // Position: distributed across the cover using title hash + index
+    const angle = (i / n) * Math.PI * 2 + (seed % 100) / 100;
+    const radius = 0.15 + (seed % 200) / 1000;
+    const cx = W * 0.5 + Math.cos(angle) * W * radius;
+    const cy = H * 0.42 + Math.sin(angle) * H * radius * 0.6;
+
+    // Size: word count drives radius (longer stories = bigger circles)
+    const r = 60 + (words / 200);
+
+    // Color from palette, opacity from karma
+    const color = palette[seed % palette.length];
+    const opacity = 0.15 + Math.min(karma / 800, 0.4);
+
+    return `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(${color.join(',')},${opacity.toFixed(2)})" />`;
+  });
+
+  // Add some smaller accent circles for visual richness
+  const accents = posts.map((post, i) => {
+    const seed = hashStr(post.title + 'accent');
+    const cx = W * 0.2 + (seed % (W * 0.6));
+    const cy = H * 0.15 + (seed % (H * 0.5));
+    const r = 15 + (seed % 40);
+    const color = palette[(seed + 3) % palette.length];
+    return `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(${color.join(',')},0.08)" />`;
+  });
+
+  // Title split into main + subtitle
+  const titleParts = bookTitle.split(' and Other Stories by ');
+  const mainTitle = titleParts[0] || bookTitle;
+  const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
+  const author = titleParts.length > 1 ? titleParts[1] : '';
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700');
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="${W}" height="${H}" fill="#f5f0e8"/>
+
+  <!-- Story circles -->
+  <g>
+${accents.join('\n')}
+${circles.join('\n')}
+  </g>
+
+  <!-- Border frame -->
+  <rect x="40" y="40" width="${W - 80}" height="${H - 80}" fill="none" stroke="rgba(139,90,60,0.2)" stroke-width="1"/>
+
+  <!-- Title block -->
+  <text x="${W / 2}" y="${H * 0.78}" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-weight="700" font-size="72" fill="#2a1a0e" letter-spacing="-1">${mainTitle}</text>
+  <text x="${W / 2}" y="${H * 0.78 + 60}" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#7a6a5a" letter-spacing="3">${subtitle.toUpperCase()}</text>
+
+  <!-- Author -->
+  <text x="${W / 2}" y="${H * 0.92}" text-anchor="middle" font-family="Georgia, serif" font-size="36" fill="#5a4a3a" letter-spacing="2">${author}</text>
+
+  <!-- Story count mark -->
+  <text x="${W / 2}" y="${H * 0.96}" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="rgba(122,106,90,0.5)">${n} stories</text>
+</svg>`;
+}
+
 function buildEpub(posts, sortLabel, bookTitle) {
   const bookId = `tomas-b-fiction-by-${sortLabel}`;
   const entries = [];
@@ -893,6 +986,22 @@ function buildEpub(posts, sortLabel, bookTitle) {
   </rootfiles>
 </container>`)
   });
+
+  // Cover
+  const coverSvg = buildCoverSvg(posts, bookTitle);
+  entries.push({ name: 'OEBPS/cover.svg', data: Buffer.from(coverSvg) });
+
+  const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Cover</title>
+<style>body { margin: 0; padding: 0; text-align: center; } img { max-width: 100%; max-height: 100vh; }</style>
+</head>
+<body>
+<img src="cover.svg" alt="Cover"/>
+</body>
+</html>`;
+  entries.push({ name: 'OEBPS/cover.xhtml', data: Buffer.from(coverXhtml) });
 
   // Chapter XHTML files
   const chapterFiles = posts.map((post, i) => {
@@ -952,10 +1061,13 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
     <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z/, 'Z')}</meta>
   </metadata>
   <manifest>
+    <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover-image" href="cover.svg" media-type="image/svg+xml" properties="cover-image"/>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 ${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
   </manifest>
   <spine>
+    <itemref idref="cover" linear="no"/>
     <itemref idref="toc"/>
 ${chapterFiles.map(c => `    <itemref idref="${c.id}"/>`).join('\n')}
   </spine>
