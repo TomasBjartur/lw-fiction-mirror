@@ -884,52 +884,59 @@ function buildCoverSvg(posts, bookTitle) {
   const W = 1200;
   const H = 1800;
   const n = posts.length;
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI);
 
-  // Warm earth palette — each story picks a color based on its title
-  const palette = [
-    [163, 107, 72],   // warm brown
-    [139, 90, 60],    // deeper brown
-    [180, 140, 100],  // tan
-    [120, 80, 55],    // dark wood
-    [200, 160, 120],  // sand
-    [150, 115, 85],   // leather
-    [170, 130, 95],   // caramel
-    [140, 100, 70],   // walnut
-  ];
+  const cx0 = W * 0.5;
+  const cy0 = H * 0.35;
+  const elements = [];
 
-  // Generate circles — each story contributes one
-  const circles = posts.map((post, i) => {
+  // Each story is a point that emits concentric ripples
+  // Where ripples overlap, interference patterns emerge naturally
+  posts.forEach((post, i) => {
     const seed = hashStr(post.title);
     const karma = post.baseScore || 50;
     const words = post.wordCount || 3000;
 
-    // Position: distributed across the cover using title hash + index
-    const angle = (i / n) * Math.PI * 2 + (seed % 100) / 100;
-    const radius = 0.15 + (seed % 200) / 1000;
-    const cx = W * 0.5 + Math.cos(angle) * W * radius;
-    const cy = H * 0.42 + Math.sin(angle) * H * radius * 0.6;
+    // Position via golden angle spiral — wide, even distribution
+    const angle = i * GOLDEN_ANGLE;
+    const spiralR = 100 + i * 45;
+    const cx = cx0 + Math.cos(angle) * spiralR;
+    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
 
-    // Size: word count drives radius (longer stories = bigger circles)
-    const r = 60 + (words / 200);
+    // Concentric rings
+    const maxR = 100 + words / 25;
+    const rings = 3 + Math.floor(words / 1500);
 
-    // Color from palette, opacity from karma
-    const color = palette[seed % palette.length];
-    const opacity = 0.15 + Math.min(karma / 800, 0.4);
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * maxR;
+      const op = 0.3 - (r / rings) * 0.18;
+      const sw = 2 - r * 0.3;
+      elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${radius.toFixed(1)}" fill="none" stroke="rgba(190,210,235,${op.toFixed(2)})" stroke-width="${Math.max(sw, 1).toFixed(1)}" />`);
+    }
 
-    return `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(${color.join(',')},${opacity.toFixed(2)})" />`;
+    // Source point
+    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="8" fill="rgba(170,195,225,0.2)" />`);
+    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="rgba(220,232,248,0.8)" />`);
   });
 
-  // Add some smaller accent circles for visual richness
-  const accents = posts.map((post, i) => {
-    const seed = hashStr(post.title + 'accent');
-    const cx = W * 0.2 + (seed % (W * 0.6));
-    const cy = H * 0.15 + (seed % (H * 0.5));
-    const r = 15 + (seed % 40);
-    const color = palette[(seed + 3) % palette.length];
-    return `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(${color.join(',')},0.08)" />`;
-  });
+  // Fine connection lines between adjacent stories — like a quiet network
+  for (let i = 0; i < n - 1; i++) {
+    const a1 = i * GOLDEN_ANGLE;
+    const r1 = 100 + i * 45;
+    const a2 = (i + 1) * GOLDEN_ANGLE;
+    const r2 = 100 + (i + 1) * 45;
+    const x1 = cx0 + Math.cos(a1) * r1;
+    const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
+    const x2 = cx0 + Math.cos(a2) * r2;
+    const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
+    elements.push(`    <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(160,185,220,0.1)" stroke-width="1" />`);
+  }
 
-  // Title split into main + subtitle
+  // Single thin rule above the title
+  elements.push(`    <line x1="${W * 0.25}" y1="${H * 0.73}" x2="${W * 0.75}" y2="${H * 0.73}" stroke="rgba(180,200,225,0.4)" stroke-width="1.5" />`);
+
+  // Title
   const titleParts = bookTitle.split(' and Other Stories by ');
   const mainTitle = titleParts[0] || bookTitle;
   const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
@@ -937,33 +944,23 @@ function buildCoverSvg(posts, bookTitle) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700');
-    </style>
-  </defs>
+  <!-- Background — very dark blue-gray -->
+  <rect width="${W}" height="${H}" fill="#0c0f14"/>
 
-  <!-- Background -->
-  <rect width="${W}" height="${H}" fill="#f5f0e8"/>
-
-  <!-- Story circles -->
+  <!-- Interference pattern -->
   <g>
-${accents.join('\n')}
-${circles.join('\n')}
+${elements.join('\n')}
   </g>
 
-  <!-- Border frame -->
-  <rect x="40" y="40" width="${W - 80}" height="${H - 80}" fill="none" stroke="rgba(139,90,60,0.2)" stroke-width="1"/>
-
-  <!-- Title block -->
-  <text x="${W / 2}" y="${H * 0.78}" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-weight="700" font-size="72" fill="#2a1a0e" letter-spacing="-1">${mainTitle}</text>
-  <text x="${W / 2}" y="${H * 0.78 + 60}" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#7a6a5a" letter-spacing="3">${subtitle.toUpperCase()}</text>
+  <!-- Title -->
+  <text x="${W / 2}" y="${H * 0.78}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="64" fill="rgba(220,228,240,0.9)" letter-spacing="1">${mainTitle}</text>
+  <text x="${W / 2}" y="${H * 0.78 + 50}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="24" fill="rgba(160,180,210,0.45)" letter-spacing="5">${subtitle.toLowerCase()}</text>
 
   <!-- Author -->
-  <text x="${W / 2}" y="${H * 0.92}" text-anchor="middle" font-family="Georgia, serif" font-size="36" fill="#5a4a3a" letter-spacing="2">${author}</text>
+  <text x="${W / 2}" y="${H * 0.91}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="28" fill="rgba(180,195,220,0.55)" letter-spacing="3">${author}</text>
 
-  <!-- Story count mark -->
-  <text x="${W / 2}" y="${H * 0.96}" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="rgba(122,106,90,0.5)">${n} stories</text>
+  <!-- Story count — barely there -->
+  <text x="${W / 2}" y="${H * 0.955}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="13" fill="rgba(140,160,190,0.25)">${n} stories</text>
 </svg>`;
 }
 
