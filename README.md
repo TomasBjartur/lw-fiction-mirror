@@ -1,7 +1,6 @@
 # Tomás B. Fiction Mirror
 
-A static site that mirrors fiction posts from [LessWrong](https://www.lesswrong.com/users/bjartur-tomas), designed for accessibility from mainland China.
-
+A static site that mirrors fiction posts from [LessWrong](https://www.lesswrong.com/users/bjartur-tomas).
 ## How it works
 
 - `build.js` queries the LessWrong GraphQL API for posts tagged "Fiction"
