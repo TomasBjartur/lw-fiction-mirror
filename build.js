@@ -10,8 +10,7 @@ const FICTION_TAG_SLUG = 'fiction';
 // Site config - edit these
 const SITE_TITLE = 'Tomás B.';
 const SITE_SUBTITLE = 'Fiction';
-const SITE_DESCRIPTION = 'Fiction by Tomás B., mirrored from LessWrong.';
-const LW_PROFILE = `https://www.lesswrong.com/users/${USER_SLUG}`;
+const SITE_DESCRIPTION = 'Fiction by Tom\u00e1s Bjartur.';
 const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
 
@@ -197,7 +196,7 @@ function buildSidebar(posts, currentSlug) {
       </div>
 
       <div class="sidebar-footer">
-        <a href="${LW_PROFILE}" class="lw-link">LessWrong Profile</a>
+        <a href="${SUBSTACK_URL}" class="lw-link">${SITE_TITLE}</a>
       </div>
     </nav>`;
 }
@@ -245,7 +244,6 @@ function buildPostPage(post, allPosts) {
         ${cleanHtml(post.htmlBody)}
       </div>
       <footer class="post-footer">
-        <p>Originally published on <a href="https://www.lesswrong.com/posts/${post._id}/${post.slug}">LessWrong</a>.</p>
       </footer>
     </article>`;
 
