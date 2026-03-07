@@ -1688,9 +1688,6 @@ p { text-align: center; width: 100%; }
     const post = posts[i];
     const id = `chapter${i}`;
     const filename = `${id}.xhtml`;
-    const readTime = estimateReadingTime(post.wordCount);
-    const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' \u00b7 ');
-
     // Find all image URLs in the post HTML and download them
     let body = htmlToXhtml(post.htmlBody);
     const imgRegex = /<img([^>]*?)src="([^"]+)"([^>]*?)\/?>/gi;
@@ -1708,14 +1705,38 @@ p { text-align: center; width: 100%; }
       body = body.split(match[2]).join(imgFilename);
     }
 
+    const safeTitle = post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+    // Half-title page — story title centered on its own page
+    const halfTitleId = `halftitle${i}`;
+    const halfTitleFile = `${halfTitleId}.xhtml`;
+    const halfTitleXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>${safeTitle}</title>
+<style>
+body { font-family: serif; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 90vh; text-align: center; }
+.half-title { font-size: 1.8em; font-weight: normal; font-style: italic; letter-spacing: 0.02em; }
+.ornament { margin-top: 0.8em; font-size: 0.9em; color: #999; letter-spacing: 0.3em; }
+</style>
+</head>
+<body>
+<div>
+<p class="half-title">${safeTitle}</p>
+<p class="ornament">\u2022 \u2022 \u2022</p>
+</div>
+</body>
+</html>`;
+    entries.push({ name: `OEBPS/${halfTitleFile}`, data: Buffer.from(halfTitleXhtml) });
+
+    // Story body — no date or read time
     const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head><title>${post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title>
+<head><title>${safeTitle}</title>
 <style>
 body { font-family: serif; margin: 1em; }
-h1 { font-size: 1.6em; margin-bottom: 0.3em; }
-.meta { font-size: 0.85em; color: #666; margin-bottom: 1.5em; }
+h1 { font-size: 1.6em; margin-bottom: 1.5em; }
 img { max-width: 100%; height: auto; }
 blockquote { border-left: 2px solid #999; padding-left: 1em; margin: 1em 0; font-style: italic; color: #555; }
 hr { border: none; text-align: center; margin: 2em 0; }
@@ -1723,13 +1744,12 @@ hr::before { content: "\\2022\\2003\\2022\\2003\\2022"; color: #999; }
 </style>
 </head>
 <body>
-<h1>${post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</h1>
-<p class="meta">${meta}</p>
+<h1>${safeTitle}</h1>
 ${body}
 </body>
 </html>`;
     entries.push({ name: `OEBPS/${filename}`, data: Buffer.from(xhtml) });
-    chapterFiles.push({ id, filename, title: post.title });
+    chapterFiles.push({ halfTitleId, halfTitleFile, id, filename, title: post.title });
   }
 
   // Table of contents XHTML
@@ -1769,14 +1789,16 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
     <item id="cover-image" href="cover.png" media-type="image/png" properties="cover-image"/>
     <item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
+${chapterFiles.map(c => `    <item id="${c.halfTitleId}" href="${c.halfTitleFile}" media-type="application/xhtml+xml"/>
+    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
 ${allImages.map(img => `    <item id="${img.id}" href="${img.filename}" media-type="${img.mediaType}"/>`).join('\n')}
   </manifest>
   <spine>
     <itemref idref="cover" linear="no"/>
     <itemref idref="titlepage"/>
     <itemref idref="toc"/>
-${chapterFiles.map(c => `    <itemref idref="${c.id}"/>`).join('\n')}
+${chapterFiles.map(c => `    <itemref idref="${c.halfTitleId}"/>
+    <itemref idref="${c.id}"/>`).join('\n')}
   </spine>
 </package>`;
   entries.push({ name: 'OEBPS/content.opf', data: Buffer.from(opf) });
