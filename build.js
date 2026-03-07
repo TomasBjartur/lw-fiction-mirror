@@ -1902,7 +1902,6 @@ hr::before { content: "\\2022\\2003\\2022\\2003\\2022"; color: #999; }
 </style>
 </head>
 <body>
-<h1>${safeTitle}</h1>
 ${body}
 </body>
 </html>`;
