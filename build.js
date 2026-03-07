@@ -13,7 +13,7 @@ const SITE_SUBTITLE = 'Fiction';
 const SITE_DESCRIPTION = 'Fiction by Tomás B., mirrored from LessWrong.';
 const LW_PROFILE = `https://www.lesswrong.com/users/${USER_SLUG}`;
 const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
-const SUBSTACK_URL = 'https://tomasbjartur.substack.com/';
+const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
 
 async function gqlQuery(query, variables = {}) {
   const res = await fetch(LW_GRAPHQL, {
@@ -409,7 +409,7 @@ body {
   text-align: center;
   padding: 0.5rem 1rem;
   margin-top: 0.9rem;
-  background: var(--accent);
+  background: #a0734f;
   color: #fff;
   font-size: 0.78rem;
   font-weight: 600;
@@ -418,7 +418,7 @@ body {
   transition: background 0.15s;
 }
 .subscribe-button:hover {
-  background: #6b3a2e;
+  background: #8b6243;
 }
 
 .header-links {
