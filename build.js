@@ -203,7 +203,7 @@ function pageShell(content, title, posts, currentSlug) {
   const pageTitle = title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`;
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -211,6 +211,7 @@ function pageShell(content, title, posts, currentSlug) {
   <meta name="description" content="${SITE_DESCRIPTION}">
   <link rel="stylesheet" href="style.css">
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
+  <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -221,7 +222,8 @@ function pageShell(content, title, posts, currentSlug) {
     <label for="menu-toggle" class="menu-button" aria-label="Toggle menu">☰</label>
     <a href="index.html" class="top-bar-title">${SITE_TITLE}</a>
     <div class="top-bar-actions">
-      <a href="${EPUB_FILENAME}" class="top-bar-btn">Download EPUB</a>
+      <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
+      <a href="${EPUB_FILENAME}" class="top-bar-btn">EPUB</a>
       <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
     </div>
   </header>
@@ -232,6 +234,15 @@ function pageShell(content, title, posts, currentSlug) {
     ${content}
   </main>
 
+  <script>
+  (function(){
+    var h=document.documentElement,b=document.getElementById('theme-btn');
+    function isDark(){var t=h.getAttribute('data-theme');return t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches)}
+    function update(){b.textContent=isDark()?'\u2600\uFE0E':'\u263D\uFE0E'}
+    b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}update()});
+    update();
+  })();
+  </script>
 </body>
 </html>`;
 }
@@ -766,6 +777,90 @@ article, .index-page {
     --serif: 'Segoe UI', system-ui, -apple-system, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
   }
   body { line-height: 1.7; }
+}
+
+/* --- Dark mode --- */
+[data-theme="dark"] {
+  --bg: #1a1a1e;
+  --text: #e0ddd8;
+  --text-light: #9a9590;
+  --accent: #c8956a;
+  --border: #2e2e33;
+  --sidebar-bg: #222226;
+  --active-bg: #2a2a2f;
+  --link: #c8956a;
+}
+
+[data-theme="dark"] ::selection {
+  background: rgba(200, 149, 106, 0.25);
+}
+
+[data-theme="dark"] .top-bar-btn-primary {
+  background: #a0734f;
+  border-color: #a0734f;
+}
+[data-theme="dark"] .top-bar-btn-primary:hover {
+  background: #8b6243;
+  border-color: #8b6243;
+}
+
+[data-theme="dark"] .post-body a {
+  text-decoration-color: rgba(200, 149, 106, 0.3);
+}
+[data-theme="dark"] .post-body a:hover {
+  text-decoration-color: var(--link);
+}
+[data-theme="dark"] .post-footer a {
+  text-decoration-color: rgba(200, 149, 106, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --bg: #1a1a1e;
+    --text: #e0ddd8;
+    --text-light: #9a9590;
+    --accent: #c8956a;
+    --border: #2e2e33;
+    --sidebar-bg: #222226;
+    --active-bg: #2a2a2f;
+    --link: #c8956a;
+  }
+  [data-theme="auto"] ::selection {
+    background: rgba(200, 149, 106, 0.25);
+  }
+  [data-theme="auto"] .top-bar-btn-primary {
+    background: #a0734f;
+    border-color: #a0734f;
+  }
+  [data-theme="auto"] .top-bar-btn-primary:hover {
+    background: #8b6243;
+    border-color: #8b6243;
+  }
+  [data-theme="auto"] .post-body a {
+    text-decoration-color: rgba(200, 149, 106, 0.3);
+  }
+  [data-theme="auto"] .post-body a:hover {
+    text-decoration-color: var(--link);
+  }
+  [data-theme="auto"] .post-footer a {
+    text-decoration-color: rgba(200, 149, 106, 0.3);
+  }
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--text);
+  transition: background 0.15s, color 0.15s;
+}
+.theme-toggle:hover {
+  background: var(--sidebar-bg);
+  color: var(--accent);
 }
 
 /* Respect reduced motion */
