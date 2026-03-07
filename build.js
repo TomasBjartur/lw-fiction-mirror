@@ -1814,33 +1814,78 @@ async function buildEpub(posts, sortLabel, bookTitle) {
 </html>`;
   entries.push({ name: 'OEBPS/cover.xhtml', data: Buffer.from(coverXhtml) });
 
-  // Title page with copyright and dedication
+  // Half title page
+  const halfTitlePageXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>${bookTitle}</title>
+<style>
+body { font-family: serif; margin: 2em; text-align: center; }
+h1 { font-size: 2em; margin-top: 8em; }
+</style>
+</head>
+<body>
+<h1>${bookTitle.split(' and Other Stories')[0]}</h1>
+</body>
+</html>`;
+  entries.push({ name: 'OEBPS/halftitle.xhtml', data: Buffer.from(halfTitlePageXhtml) });
+
+  // Title page
   const year = new Date().getFullYear();
   const titlePageXhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>Title Page</title>
 <style>
-body { font-family: serif; margin: 2em; text-align: center; display: flex; flex-direction: column; align-items: center; }
-h1 { font-size: 2em; margin-top: 3em; margin-bottom: 0.3em; text-align: center; width: 100%; }
-p { text-align: center; width: 100%; }
+body { font-family: serif; margin: 2em; text-align: center; }
+h1 { font-size: 2em; margin-top: 6em; margin-bottom: 0.3em; }
+p { text-align: center; }
 .subtitle { font-size: 1.1em; color: #666; margin-bottom: 2em; }
-.author { font-size: 1.3em; margin-bottom: 3em; }
-.dedication { font-style: italic; color: #555; margin: 3em auto; max-width: 20em; }
-.copyright { font-size: 0.85em; color: #888; margin-top: 4em; }
-.copyright a { color: #555; }
+.author { font-size: 1.3em; }
 </style>
 </head>
 <body>
 <h1>${bookTitle.split(' and Other Stories')[0]}</h1>
 <p class="subtitle">and Other Stories</p>
 <p class="author">Tom\u00e1s Bjartur</p>
-<p class="dedication">To those who told me to write more, even the one who changed his mind.</p>
-<p class="copyright">\u00a9 ${year} Tom\u00e1s Bjartur. All rights reserved.</p>
-<p class="copyright"><a href="${SUBSTACK_URL}">tomasbjartur.substack.com</a></p>
 </body>
 </html>`;
   entries.push({ name: 'OEBPS/titlepage.xhtml', data: Buffer.from(titlePageXhtml) });
+
+  // Copyright page
+  const copyrightPageXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Copyright</title>
+<style>
+body { font-family: serif; margin: 2em; text-align: center; }
+p { font-size: 0.85em; color: #888; margin-top: 0.5em; }
+p a { color: #555; }
+.spacer { margin-top: 20em; }
+</style>
+</head>
+<body>
+<p class="spacer">\u00a9 ${year} Tom\u00e1s Bjartur. All rights reserved.</p>
+<p><a href="${SUBSTACK_URL}">tomasbjartur.substack.com</a></p>
+</body>
+</html>`;
+  entries.push({ name: 'OEBPS/copyright.xhtml', data: Buffer.from(copyrightPageXhtml) });
+
+  // Dedication page
+  const dedicationPageXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Dedication</title>
+<style>
+body { font-family: serif; margin: 2em; text-align: center; }
+p { font-style: italic; margin-top: 8em; max-width: 20em; margin-left: auto; margin-right: auto; }
+</style>
+</head>
+<body epub:type="dedication">
+<p>To those who told me to write more, even the one who changed his mind.</p>
+</body>
+</html>`;
+  entries.push({ name: 'OEBPS/dedication.xhtml', data: Buffer.from(dedicationPageXhtml) });
 
   // Chapter XHTML files — download and embed images
   const chapterFiles = [];
@@ -1946,7 +1991,10 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
   <manifest>
     <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
     <item id="cover-image" href="cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="halftitle" href="halftitle.xhtml" media-type="application/xhtml+xml"/>
     <item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>
+    <item id="copyright" href="copyright.xhtml" media-type="application/xhtml+xml"/>
+    <item id="dedication" href="dedication.xhtml" media-type="application/xhtml+xml"/>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 ${chapterFiles.map(c => `    <item id="${c.halfTitleId}" href="${c.halfTitleFile}" media-type="application/xhtml+xml"/>
     <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
@@ -1954,7 +2002,10 @@ ${allImages.map(img => `    <item id="${img.id}" href="${img.filename}" media-ty
   </manifest>
   <spine>
     <itemref idref="cover" linear="no"/>
+    <itemref idref="halftitle"/>
     <itemref idref="titlepage"/>
+    <itemref idref="copyright"/>
+    <itemref idref="dedication"/>
     <itemref idref="toc"/>
 ${chapterFiles.map(c => `    <itemref idref="${c.halfTitleId}"/>
     <itemref idref="${c.id}"/>`).join('\n')}
