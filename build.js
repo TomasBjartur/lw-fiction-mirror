@@ -1125,20 +1125,7 @@ function buildCoverPng(posts, bookTitle) {
     buf.data[i] = 252; buf.data[i + 1] = 249; buf.data[i + 2] = 242;
   }
 
-  // Draw connection lines first (behind everything)
-  for (let i = 0; i < n - 1; i++) {
-    const a1 = i * GOLDEN_ANGLE;
-    const r1 = 100 + i * 45;
-    const a2 = (i + 1) * GOLDEN_ANGLE;
-    const r2 = 100 + (i + 1) * 45;
-    const x1 = cx0 + Math.cos(a1) * r1;
-    const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
-    const x2 = cx0 + Math.cos(a2) * r2;
-    const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
-    drawLine(buf, x1, y1, x2, y2, 90, 75, 60, 0.15, 1.5);
-  }
-
-  // Draw ripples and source points for each story
+  // Draw ripples for each story (behind edges)
   posts.forEach((post, i) => {
     const words = post.wordCount || 3000;
     const angle = i * GOLDEN_ANGLE;
@@ -1150,13 +1137,34 @@ function buildCoverPng(posts, bookTitle) {
     const rings = 3 + Math.floor(words / 1500);
 
     for (let r = 1; r <= rings; r++) {
-      const radius = (r / rings) * maxR;
-      const op = 0.55 - (r / rings) * 0.3;
-      const sw = Math.max(2.5 - r * 0.3, 1.2);
+      const t = r / rings; // 0 = inner, 1 = outer
+      const radius = t * maxR;
+      const op = 0.5 * Math.pow(1 - t, 2); // quadratic falloff
+      const sw = Math.max(2.5 - r * 0.3, 1.0);
       drawCircleRing(buf, cx, cy, radius, 80, 65, 50, op, sw);
     }
+  });
 
-    // Source point — solid dark dots
+  // Draw connection edges (on top, darker and thicker)
+  for (let i = 0; i < n - 1; i++) {
+    const a1 = i * GOLDEN_ANGLE;
+    const r1 = 100 + i * 45;
+    const a2 = (i + 1) * GOLDEN_ANGLE;
+    const r2 = 100 + (i + 1) * 45;
+    const x1 = cx0 + Math.cos(a1) * r1;
+    const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
+    const x2 = cx0 + Math.cos(a2) * r2;
+    const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
+    drawLine(buf, x1, y1, x2, y2, 50, 40, 30, 0.45, 2);
+  }
+
+  // Source points (on top of everything)
+  posts.forEach((post, i) => {
+    const angle = i * GOLDEN_ANGLE;
+    const spiralR = 100 + i * 45;
+    const cx = cx0 + Math.cos(angle) * spiralR;
+    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
+
     drawFilledCircle(buf, cx, cy, 8, 100, 80, 60, 0.35);
     drawFilledCircle(buf, cx, cy, 4, 50, 40, 30, 0.9);
   });
@@ -1176,85 +1184,6 @@ function buildCoverPng(posts, bookTitle) {
   drawText(buf, n + ' stories', W / 2, Math.round(H * 0.94), 16, 130, 115, 100, 0.4);
 
   return encodePng(buf);
-}
-
-function buildCoverSvg(posts, bookTitle) {
-  const W = 1200;
-  const H = 1800;
-  const n = posts.length;
-  const PHI = (1 + Math.sqrt(5)) / 2;
-  const GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI);
-
-  const cx0 = W * 0.5;
-  const cy0 = H * 0.35;
-  const elements = [];
-
-  // Fine connection lines between adjacent stories — like a quiet network
-  for (let i = 0; i < n - 1; i++) {
-    const a1 = i * GOLDEN_ANGLE;
-    const r1 = 100 + i * 45;
-    const a2 = (i + 1) * GOLDEN_ANGLE;
-    const r2 = 100 + (i + 1) * 45;
-    const x1 = cx0 + Math.cos(a1) * r1;
-    const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
-    const x2 = cx0 + Math.cos(a2) * r2;
-    const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
-    elements.push(`    <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(90,75,60,0.15)" stroke-width="1.5" />`);
-  }
-
-  // Each story is a point that emits concentric ripples
-  posts.forEach((post, i) => {
-    const words = post.wordCount || 3000;
-
-    const angle = i * GOLDEN_ANGLE;
-    const spiralR = 100 + i * 45;
-    const cx = cx0 + Math.cos(angle) * spiralR;
-    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
-
-    const maxR = 100 + words / 25;
-    const rings = 3 + Math.floor(words / 1500);
-
-    for (let r = 1; r <= rings; r++) {
-      const radius = (r / rings) * maxR;
-      const op = 0.55 - (r / rings) * 0.3;
-      const sw = Math.max(2.5 - r * 0.3, 1.2);
-      elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${radius.toFixed(1)}" fill="none" stroke="rgba(80,65,50,${op.toFixed(2)})" stroke-width="${sw.toFixed(1)}" />`);
-    }
-
-    // Source point
-    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="8" fill="rgba(100,80,60,0.35)" />`);
-    elements.push(`    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="rgba(50,40,30,0.9)" />`);
-  });
-
-  // Single thin rule above the title
-  elements.push(`    <line x1="${W * 0.25}" y1="${H * 0.73}" x2="${W * 0.75}" y2="${H * 0.73}" stroke="rgba(60,50,40,0.5)" stroke-width="1.5" />`);
-
-  // Title
-  const titleParts = bookTitle.split(' and Other Stories by ');
-  const mainTitle = titleParts[0] || bookTitle;
-  const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
-  const author = titleParts.length > 1 ? titleParts[1] : '';
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-  <!-- Background — warm cream -->
-  <rect width="${W}" height="${H}" fill="#fcf9f2"/>
-
-  <!-- Interference pattern -->
-  <g>
-${elements.join('\n')}
-  </g>
-
-  <!-- Title -->
-  <text x="${W / 2}" y="${H * 0.78}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="64" fill="rgba(30,25,20,0.95)" letter-spacing="1">${mainTitle}</text>
-  <text x="${W / 2}" y="${H * 0.78 + 50}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="24" fill="rgba(100,85,70,0.6)" letter-spacing="5">${subtitle.toLowerCase()}</text>
-
-  <!-- Author -->
-  <text x="${W / 2}" y="${H * 0.91}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="28" fill="rgba(70,55,40,0.8)" letter-spacing="3">${author}</text>
-
-  <!-- Story count -->
-  <text x="${W / 2}" y="${H * 0.955}" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="300" font-size="13" fill="rgba(130,115,100,0.4)">${n} stories</text>
-</svg>`;
 }
 
 async function downloadImage(url) {
