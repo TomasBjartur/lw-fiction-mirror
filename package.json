@@ -1,0 +1,11 @@
+{
+  "name": "lw-fiction-mirror",
+  "version": "1.0.0",
+  "description": "Static mirror of Tomás B.'s fiction from LessWrong",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
