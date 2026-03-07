@@ -978,11 +978,44 @@ function drawLine(buf, x1, y1, x2, y2, r, g, b, a, w) {
   const dx = x2 - x1, dy = y2 - y1;
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len === 0) return;
-  const steps = Math.ceil(len * 2);
-  for (let s = 0; s <= steps; s++) {
-    const t = s / steps;
-    const cx = x1 + dx * t, cy = y1 + dy * t;
-    drawFilledCircle(buf, cx, cy, w / 2, r, g, b, a);
+  const halfW = w / 2;
+
+  // For short or steep segments, stamp circles (original method)
+  if (len < 3) {
+    const steps = Math.ceil(len * 2);
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      drawFilledCircle(buf, x1 + dx * t, y1 + dy * t, halfW, r, g, b, a);
+    }
+    return;
+  }
+
+  // Anti-aliased line using perpendicular distance
+  const nx = -dy / len, ny = dx / len; // unit normal
+  const pad = Math.ceil(halfW + 1.5);
+  const pxMin = Math.max(0, Math.floor(Math.min(x1, x2) - pad));
+  const pxMax = Math.min(buf.w - 1, Math.ceil(Math.max(x1, x2) + pad));
+  const pyMin = Math.max(0, Math.floor(Math.min(y1, y2) - pad));
+  const pyMax = Math.min(buf.h - 1, Math.ceil(Math.max(y1, y2) + pad));
+
+  for (let py = pyMin; py <= pyMax; py++) {
+    for (let px = pxMin; px <= pxMax; px++) {
+      // Project onto line segment
+      const ex = px - x1, ey = py - y1;
+      let t = (ex * dx + ey * dy) / (len * len);
+      // Perpendicular distance
+      let dist;
+      if (t < 0) {
+        dist = Math.sqrt(ex * ex + ey * ey);
+      } else if (t > 1) {
+        const fx = px - x2, fy = py - y2;
+        dist = Math.sqrt(fx * fx + fy * fy);
+      } else {
+        dist = Math.abs(ex * nx + ey * ny);
+      }
+      const coverage = Math.max(0, Math.min(1, halfW - dist + 0.5));
+      if (coverage > 0) setPixel(buf, px, py, r, g, b, a * coverage);
+    }
   }
 }
 
@@ -1220,8 +1253,18 @@ function perlinNoise() {
   };
 }
 
-// Cover style: 'flow', 'stipple', 'hatch'
-let COVER_STYLE = 'flow';
+// Cover style: 'flow', 'stipple', 'hatch', 'ridge'
+let COVER_STYLE = 'ridge';
+// Ridge color palette: 'warm', 'navy', 'teal', 'ink', 'ember'
+let RIDGE_PALETTE = 'navy';
+
+const RIDGE_PALETTES = {
+  warm:  { bg: [252, 249, 242], front: [35, 28, 22],  back: [70, 60, 52]  },  // current warm brown
+  navy:  { bg: [240, 243, 250], front: [15, 30, 75],  back: [80, 100, 150] },  // deep blue
+  teal:  { bg: [240, 250, 248], front: [10, 50, 50],  back: [70, 130, 120] },  // sea green
+  ink:   { bg: [248, 248, 248], front: [10, 10, 10],  back: [90, 90, 90]  },  // pure B&W
+  ember: { bg: [252, 246, 240], front: [80, 20, 10],  back: [160, 80, 50] },  // burnt orange/red
+};
 
 function buildCoverPng(posts, bookTitle) {
   const W = 1200;
@@ -1254,11 +1297,17 @@ function buildCoverPng(posts, bookTitle) {
 
   // --- Ridge style: displaced horizontal lines creating a terrain effect ---
   if (COVER_STYLE === 'ridge') {
+    const pal = RIDGE_PALETTES[RIDGE_PALETTE] || RIDGE_PALETTES.warm;
     const lineCount = 120 + n * 3;
     const lineSpacing = artH / (lineCount + 1);
     const amplitude = lineSpacing * 10;
     const nScale = 0.0018;
     const xStep = 1;
+
+    // Fill background with palette color
+    for (let i = 0; i < buf.data.length; i += 3) {
+      buf.data[i] = pal.bg[0]; buf.data[i + 1] = pal.bg[1]; buf.data[i + 2] = pal.bg[2];
+    }
 
     // Draw from top to bottom — each line's fill occludes lines above (behind)
     for (let li = 0; li <= lineCount; li++) {
@@ -1269,11 +1318,8 @@ function buildCoverPng(posts, bookTitle) {
       // Build polyline with noise displacement
       const pts = [];
       for (let x = 0; x <= W; x += xStep) {
-        // Use different noise octaves for varied terrain
         const nVal = fbm(x * nScale, baseY * nScale * 0.5, 5);
-        // Add a secondary bump at a different scale
         const bump = fbm(x * nScale * 3, baseY * nScale * 2, 3) * 0.3;
-        // Taper at horizontal edges
         const xNorm = x / W;
         const horzEnv = Math.pow(Math.sin(xNorm * Math.PI), 0.3);
         const disp = (nVal + bump) * amplitude * vertEnv * horzEnv;
@@ -1281,13 +1327,10 @@ function buildCoverPng(posts, bookTitle) {
       }
 
       // Fill below the polyline with background color to occlude lines behind
-      // Draw a filled polygon: polyline + bottom-right + bottom-left
-      const bgR = 252, bgG = 249, bgB = 242;
       const fillBottom = baseY + amplitude + 5;
       for (let i = 0; i < pts.length - 1; i++) {
         const x0 = pts[i].x, y0 = pts[i].y;
         const x1 = pts[i + 1].x, y1 = pts[i + 1].y;
-        // Fill vertical strips from the curve down to fillBottom
         const xMin = Math.floor(Math.min(x0, x1));
         const xMax = Math.ceil(Math.max(x0, x1));
         for (let fx = xMin; fx <= xMax && fx < W; fx++) {
@@ -1297,18 +1340,18 @@ function buildCoverPng(posts, bookTitle) {
           const botY = Math.min(Math.floor(fillBottom), artH);
           for (let fy = Math.max(0, topY); fy < botY; fy++) {
             const idx = (fy * W + fx) * 3;
-            buf.data[idx] = bgR;
-            buf.data[idx + 1] = bgG;
-            buf.data[idx + 2] = bgB;
+            buf.data[idx] = pal.bg[0];
+            buf.data[idx + 1] = pal.bg[1];
+            buf.data[idx + 2] = pal.bg[2];
           }
         }
       }
 
-      // Draw the polyline — lines get thicker and darker toward the front (bottom)
-      const depth = yNorm; // 0=back(top), 1=front(bottom)
-      const lineR = Math.round(70 - depth * 35);
-      const lineG = Math.round(60 - depth * 30);
-      const lineB = Math.round(52 - depth * 25);
+      // Draw the polyline — interpolate color from back to front
+      const depth = yNorm;
+      const lineR = Math.round(pal.back[0] + (pal.front[0] - pal.back[0]) * depth);
+      const lineG = Math.round(pal.back[1] + (pal.front[1] - pal.back[1]) * depth);
+      const lineB = Math.round(pal.back[2] + (pal.front[2] - pal.back[2]) * depth);
       const weight = 0.8 + depth * 1.5;
       for (let i = 1; i < pts.length; i++) {
         drawLine(buf, pts[i-1].x, pts[i-1].y, pts[i].x, pts[i].y,
@@ -1794,7 +1837,8 @@ async function main() {
 
 // Export for testing, run if called directly
 function setCoverStyle(s) { COVER_STYLE = s; }
-module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng, setCoverStyle };
+function setRidgePalette(p) { RIDGE_PALETTE = p; }
+module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng, setCoverStyle, setRidgePalette };
 
 if (require.main === module) {
   main().catch(err => {

@@ -30,19 +30,22 @@ const allStories = [
 ];
 
 const count = parseInt(process.argv[2]) || 8;
-const style = process.argv[3] || 'all';
+const style = process.argv[3] || 'ridge';
+const palette = process.argv[4] || null;
 const posts = allStories.slice(0, count);
 const bookTitle = 'The Company Man and Other Stories by Tomás Bjartur';
 
-const styles = style === 'all' ? ['flow', 'stipple', 'hatch'] : [style];
+const styles = style === 'all' ? ['flow', 'stipple', 'hatch', 'ridge'] : [style];
+const palettes = palette === 'all' ? ['warm', 'navy', 'teal', 'ink', 'ember'] : palette ? [palette] : [null];
 
 for (const s of styles) {
   build.setCoverStyle(s);
-  const png = build.buildCoverPng(posts, bookTitle);
-  const outPath = `/tmp/cover-preview-${s}.png`;
-  fs.writeFileSync(outPath, png);
-  console.log(`Wrote ${outPath} (${count} stories, style: ${s})`);
-}
-if (styles.length === 1) {
-  fs.writeFileSync('/tmp/cover-preview.png', fs.readFileSync(`/tmp/cover-preview-${styles[0]}.png`));
+  for (const p of palettes) {
+    if (p) build.setRidgePalette(p);
+    const png = build.buildCoverPng(posts, bookTitle);
+    const suffix = p ? `${s}-${p}` : s;
+    const outPath = `/tmp/cover-preview-${suffix}.png`;
+    fs.writeFileSync(outPath, png);
+    console.log(`Wrote ${outPath} (${count} stories, style: ${s}${p ? ', palette: ' + p : ''})`);
+  }
 }
