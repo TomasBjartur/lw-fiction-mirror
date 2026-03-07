@@ -1256,6 +1256,33 @@ function buildEpub(posts, sortLabel, bookTitle) {
 </html>`;
   entries.push({ name: 'OEBPS/cover.xhtml', data: Buffer.from(coverXhtml) });
 
+  // Title page with copyright and dedication
+  const year = new Date().getFullYear();
+  const titlePageXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Title Page</title>
+<style>
+body { font-family: serif; margin: 2em; text-align: center; }
+h1 { font-size: 2em; margin-top: 3em; margin-bottom: 0.3em; }
+.subtitle { font-size: 1.1em; color: #666; margin-bottom: 2em; }
+.author { font-size: 1.3em; margin-bottom: 3em; }
+.dedication { font-style: italic; color: #555; margin: 3em auto; max-width: 20em; }
+.copyright { font-size: 0.85em; color: #888; margin-top: 4em; }
+.copyright a { color: #555; }
+</style>
+</head>
+<body>
+<h1>${bookTitle.split(' and Other Stories')[0]}</h1>
+<p class="subtitle">and Other Stories</p>
+<p class="author">Tom\u00e1s Bjartur</p>
+<p class="dedication">To my friends \u2014 you know who you are.</p>
+<p class="copyright">\u00a9 ${year} Tom\u00e1s Bjartur. All rights reserved.</p>
+<p class="copyright"><a href="${SUBSTACK_URL}">tomasbjartur.substack.com</a></p>
+</body>
+</html>`;
+  entries.push({ name: 'OEBPS/titlepage.xhtml', data: Buffer.from(titlePageXhtml) });
+
   // Chapter XHTML files
   const chapterFiles = posts.map((post, i) => {
     const id = `chapter${i}`;
@@ -1317,11 +1344,13 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
   <manifest>
     <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
     <item id="cover-image" href="cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>
     <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 ${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
   </manifest>
   <spine>
-    <itemref idref="cover"/>
+    <itemref idref="cover" linear="no"/>
+    <itemref idref="titlepage"/>
     <itemref idref="toc"/>
 ${chapterFiles.map(c => `    <itemref idref="${c.id}"/>`).join('\n')}
   </spine>
