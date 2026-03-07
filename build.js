@@ -1348,7 +1348,10 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="bookid">${bookId}</dc:identifier>
-    <dc:title>${bookTitle}</dc:title>
+    <dc:title id="main-title">${bookTitle.split(' and Other Stories')[0]}</dc:title>
+    <meta refines="#main-title" property="title-type">main</meta>
+    <dc:title id="subtitle">And Other Stories</dc:title>
+    <meta refines="#subtitle" property="title-type">subtitle</meta>
     <dc:creator>Tom\u00e1s Bjartur</dc:creator>
     <dc:language>en</dc:language>
     <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z/, 'Z')}</meta>
