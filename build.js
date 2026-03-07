@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { createCanvas } = require('canvas');
 
 const LW_GRAPHQL = 'https://www.lesswrong.com/graphql';
 const USER_SLUG = 'bjartur-tomas';
@@ -986,7 +987,7 @@ function drawLine(buf, x1, y1, x2, y2, r, g, b, a, w) {
 }
 
 function drawText(buf, text, cx, baseY, fontSize, r, g, b, a) {
-  // Simple bitmap font — 5x7 pixel glyphs scaled up
+  // 5x7 bitmap glyphs, rendered at 2x into temp buffer then downsampled for anti-aliasing
   const glyphs = {
     'A': ['01110','10001','10001','11111','10001','10001','10001'],
     'B': ['11110','10001','10001','11110','10001','10001','11110'],
@@ -1057,23 +1058,93 @@ function drawText(buf, text, cx, baseY, fontSize, r, g, b, a) {
     'y': ['00000','00000','10001','10001','01111','00001','01110'],
     'z': ['00000','00000','11111','00010','00100','01000','11111'],
   };
-  const scale = Math.max(1, Math.round(fontSize / 7));
+
+  // Render at 6x, blur, then downsample for smooth bookish text
+  const SS = 6;
+  const scale = Math.max(1, Math.round(fontSize / 7)) * SS;
   const charW = 6 * scale;
+  const glyphH = 7 * scale;
   const totalW = text.length * charW;
-  const startX = Math.round(cx - totalW / 2);
+  const tw = totalW;
+  const th = glyphH;
+  const tmp = new Float32Array(tw * th);
+
+  // Render crisp glyphs into temp buffer
   for (let ci = 0; ci < text.length; ci++) {
     const ch = text[ci];
     const glyph = glyphs[ch] || glyphs[ch.toUpperCase()] || glyphs[ch.toLowerCase()] || glyphs[' '];
-    const ox = startX + ci * charW;
+    const ox = ci * charW;
     for (let gy = 0; gy < 7; gy++) {
       for (let gx = 0; gx < 5; gx++) {
         if (glyph[gy][gx] === '1') {
           for (let sy = 0; sy < scale; sy++) {
             for (let sx = 0; sx < scale; sx++) {
-              setPixel(buf, ox + gx * scale + sx, baseY + gy * scale + sy, r, g, b, a);
+              const px = ox + gx * scale + sx;
+              const py = gy * scale + sy;
+              if (px >= 0 && px < tw && py >= 0 && py < th) {
+                tmp[py * tw + px] = 1;
+              }
             }
           }
         }
+      }
+    }
+  }
+
+  // Gaussian blur (separable, radius scales with SS)
+  const blurR = Math.round(SS * 0.9);
+  const kernel = [];
+  let kSum = 0;
+  for (let i = -blurR; i <= blurR; i++) {
+    const v = Math.exp(-(i * i) / (2 * (blurR * 0.45) * (blurR * 0.45)));
+    kernel.push(v);
+    kSum += v;
+  }
+  for (let i = 0; i < kernel.length; i++) kernel[i] /= kSum;
+
+  // Horizontal pass
+  const tmp2 = new Float32Array(tw * th);
+  for (let y = 0; y < th; y++) {
+    for (let x = 0; x < tw; x++) {
+      let v = 0;
+      for (let k = -blurR; k <= blurR; k++) {
+        const sx = Math.min(tw - 1, Math.max(0, x + k));
+        v += tmp[y * tw + sx] * kernel[k + blurR];
+      }
+      tmp2[y * tw + x] = v;
+    }
+  }
+  // Vertical pass
+  const tmp3 = new Float32Array(tw * th);
+  for (let y = 0; y < th; y++) {
+    for (let x = 0; x < tw; x++) {
+      let v = 0;
+      for (let k = -blurR; k <= blurR; k++) {
+        const sy = Math.min(th - 1, Math.max(0, y + k));
+        v += tmp2[sy * tw + x] * kernel[k + blurR];
+      }
+      tmp3[y * tw + x] = v;
+    }
+  }
+
+  // Downsample blurred buffer into main buffer
+  const outW = Math.ceil(tw / SS);
+  const outH = Math.ceil(th / SS);
+  const startX = Math.round(cx - outW / 2);
+  for (let oy = 0; oy < outH; oy++) {
+    for (let ox = 0; ox < outW; ox++) {
+      let sum = 0;
+      let count = 0;
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const px = ox * SS + sx;
+          const py = oy * SS + sy;
+          if (px < tw && py < th) { sum += tmp3[py * tw + px]; count++; }
+        }
+      }
+      const coverage = sum / count;
+      if (coverage > 0.01) {
+        setPixel(buf, startX + ox, baseY + oy, r, g, b, a * Math.min(1, coverage * 1.8));
       }
     }
   }
@@ -1116,74 +1187,106 @@ function buildCoverPng(posts, bookTitle) {
   const n = posts.length;
   const PHI = (1 + Math.sqrt(5)) / 2;
   const GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI);
+
+  // Art occupies top ~70% of cover
+  const artH = Math.round(H * 0.70);
   const cx0 = W * 0.5;
-  const cy0 = H * 0.35;
+  const cy0 = artH * 0.48;
 
   const buf = createPixelBuffer(W, H);
-  // Fill background — warm cream, e-ink friendly
+  // Fill background — warm cream
   for (let i = 0; i < buf.data.length; i += 3) {
     buf.data[i] = 252; buf.data[i + 1] = 249; buf.data[i + 2] = 242;
   }
 
-  // Draw ripples for each story (behind edges)
-  posts.forEach((post, i) => {
+  // Story attractors that warp the flow field
+  const attractors = posts.map((post, i) => {
     const words = post.wordCount || 3000;
     const angle = i * GOLDEN_ANGLE;
-    const spiralR = 100 + i * 45;
-    const cx = cx0 + Math.cos(angle) * spiralR;
-    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
-
-    const maxR = 100 + words / 25;
-    const rings = 3 + Math.floor(words / 1500);
-
-    for (let r = 1; r <= rings; r++) {
-      const t = r / rings; // 0 = inner, 1 = outer
-      const radius = t * maxR;
-      const op = 0.5 * Math.pow(1 - t, 2); // quadratic falloff
-      const sw = Math.max(2.5 - r * 0.3, 1.0);
-      drawCircleRing(buf, cx, cy, radius, 80, 65, 50, op, sw);
-    }
+    const spiralR = 130 + i * 55;
+    return {
+      x: cx0 + Math.cos(angle) * spiralR,
+      y: cy0 + Math.sin(angle) * spiralR * 0.7,
+      strength: 65 + (words / 60),
+    };
   });
 
-  // Draw connection edges (on top, darker and thicker)
-  for (let i = 0; i < n - 1; i++) {
-    const a1 = i * GOLDEN_ANGLE;
-    const r1 = 100 + i * 45;
-    const a2 = (i + 1) * GOLDEN_ANGLE;
-    const r2 = 100 + (i + 1) * 45;
-    const x1 = cx0 + Math.cos(a1) * r1;
-    const y1 = cy0 + Math.sin(a1) * r1 * 0.65;
-    const x2 = cx0 + Math.cos(a2) * r2;
-    const y2 = cy0 + Math.sin(a2) * r2 * 0.65;
-    drawLine(buf, x1, y1, x2, y2, 50, 40, 30, 0.45, 2);
+  // Draw flowing horizontal lines warped by attractors
+  const numLines = 80;
+  const margin = 60;
+  for (let li = 0; li < numLines; li++) {
+    const baseY = margin + (li / (numLines - 1)) * (artH - 2 * margin);
+    const t = li / numLines;
+    const op = 0.15 + 0.35 * Math.sin(t * Math.PI); // fade at top/bottom edges
+    const r = Math.round(55 + (1 - t) * 30);
+    const g = Math.round(48 + (1 - t) * 25);
+    const b = Math.round(42 + (1 - t) * 15);
+
+    let prevX = -10, prevY = baseY;
+    const step = 2;
+    for (let x = -10; x <= W + 10; x += step) {
+      let dy = 0;
+      for (const a of attractors) {
+        const dx = x - a.x;
+        const ddy = baseY - a.y;
+        const dist2 = dx * dx + ddy * ddy;
+        const sigma = 120;
+        // Smooth gaussian deflection away from attractor
+        dy += -a.strength * ddy / (sigma) * Math.exp(-dist2 / (2 * sigma * sigma));
+      }
+      const curY = baseY + dy;
+      if (x > -10) {
+        drawLine(buf, prevX, prevY, x, curY, r, g, b, op, 1.5);
+      }
+      prevX = x;
+      prevY = curY;
+    }
   }
 
-  // Source points (on top of everything)
-  posts.forEach((post, i) => {
-    const angle = i * GOLDEN_ANGLE;
-    const spiralR = 100 + i * 45;
-    const cx = cx0 + Math.cos(angle) * spiralR;
-    const cy = cy0 + Math.sin(angle) * spiralR * 0.65;
 
-    drawFilledCircle(buf, cx, cy, 8, 100, 80, 60, 0.35);
-    drawFilledCircle(buf, cx, cy, 4, 50, 40, 30, 0.9);
-  });
+  // Composite pixel buffer onto canvas, then add text with proper fonts
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
 
-  // Divider line
-  drawLine(buf, W * 0.25, H * 0.73, W * 0.75, H * 0.73, 60, 50, 40, 0.5, 1.5);
+  // Paint pixel buffer onto canvas
+  const imgData = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const si = (y * W + x) * 3;
+      const di = (y * W + x) * 4;
+      imgData.data[di] = buf.data[si];
+      imgData.data[di + 1] = buf.data[si + 1];
+      imgData.data[di + 2] = buf.data[si + 2];
+      imgData.data[di + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
 
-  // Title
+  // Title text with system fonts
   const titleParts = bookTitle.split(' and Other Stories by ');
   const mainTitle = titleParts[0] || bookTitle;
   const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
   const author = titleParts.length > 1 ? titleParts[1] : '';
 
-  drawText(buf, mainTitle, W / 2, Math.round(H * 0.76), 64, 30, 25, 20, 0.95);
-  drawText(buf, subtitle.toLowerCase(), W / 2, Math.round(H * 0.76 + 90), 24, 100, 85, 70, 0.6);
-  drawText(buf, author, W / 2, Math.round(H * 0.88), 32, 70, 55, 40, 0.8);
-  drawText(buf, n + ' stories', W / 2, Math.round(H * 0.94), 16, 130, 115, 100, 0.4);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
 
-  return encodePng(buf);
+  // Main title
+  ctx.font = '300 72px "Georgia", "Noto Serif", "DejaVu Serif", serif';
+  ctx.fillStyle = 'rgba(30, 25, 20, 0.95)';
+  ctx.fillText(mainTitle, W / 2, H * 0.735);
+
+  // Subtitle
+  ctx.font = '300 26px "Georgia", "Noto Serif", "DejaVu Serif", serif';
+  ctx.fillStyle = 'rgba(100, 85, 70, 0.6)';
+  ctx.fillText(subtitle.toLowerCase(), W / 2, H * 0.735 + 90);
+
+  // Author
+  ctx.font = '300 34px "Georgia", "Noto Serif", "DejaVu Serif", serif';
+  ctx.fillStyle = 'rgba(70, 55, 40, 0.8)';
+  ctx.fillText(author, W / 2, H * 0.865);
+
+  return canvas.toBuffer('image/png');
 }
 
 async function downloadImage(url) {
@@ -1429,7 +1532,7 @@ async function main() {
 }
 
 // Export for testing, run if called directly
-module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar };
+module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng };
 
 if (require.main === module) {
   main().catch(err => {
