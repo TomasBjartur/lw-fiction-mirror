@@ -982,18 +982,20 @@ function buildEpub(posts, sortLabel, bookTitle) {
 </container>`)
   });
 
-  // Cover
+  // Cover — inline SVG in XHTML for maximum reader compatibility
   const coverSvg = buildCoverSvg(posts, bookTitle);
+  // Strip the XML declaration from SVG since it'll be inside XHTML
+  const inlineSvg = coverSvg.replace(/<\?xml[^?]*\?>/, '').trim();
   entries.push({ name: 'OEBPS/cover.svg', data: Buffer.from(coverSvg) });
 
   const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head><title>Cover</title>
-<style>body { margin: 0; padding: 0; text-align: center; } img { max-width: 100%; max-height: 100vh; }</style>
+<style>body { margin: 0; padding: 0; text-align: center; background: #0c0f14; } svg { width: 100%; height: 100vh; }</style>
 </head>
-<body>
-<img src="cover.svg" alt="Cover"/>
+<body epub:type="cover">
+${inlineSvg}
 </body>
 </html>`;
   entries.push({ name: 'OEBPS/cover.xhtml', data: Buffer.from(coverXhtml) });
@@ -1054,6 +1056,7 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
     <dc:creator>Tom\u00e1s Bjartur</dc:creator>
     <dc:language>en</dc:language>
     <meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d+Z/, 'Z')}</meta>
+    <meta name="cover" content="cover-image"/>
   </metadata>
   <manifest>
     <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
@@ -1062,7 +1065,7 @@ ${chapterFiles.map(c => `  <li><a href="${c.filename}">${c.title.replace(/&/g, '
 ${chapterFiles.map(c => `    <item id="${c.id}" href="${c.filename}" media-type="application/xhtml+xml"/>`).join('\n')}
   </manifest>
   <spine>
-    <itemref idref="cover" linear="no"/>
+    <itemref idref="cover"/>
     <itemref idref="toc"/>
 ${chapterFiles.map(c => `    <itemref idref="${c.id}"/>`).join('\n')}
   </spine>
