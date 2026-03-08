@@ -314,6 +314,7 @@ function pageShell(content, title, posts, currentSlug) {
       sort=s;try{localStorage.setItem('sort',s)}catch(e){}
       document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
       document.querySelectorAll('.sort-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-sort')===s)});
+      document.querySelectorAll('.post-nav-next').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
     }
     document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
     applySort(sort);
@@ -327,7 +328,16 @@ function buildPostPage(post, allPosts) {
   const readTime = estimateReadingTime(post.wordCount);
   const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
 
-  // Next story is always by date (chronological)
+  // Next story by book order
+  const byBook = [...allPosts].sort((a, b) => {
+    const ai = COLLECTION_ORDER.indexOf(a.slug);
+    const bi = COLLECTION_ORDER.indexOf(b.slug);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+  const bookIdx = byBook.findIndex(p => p.slug === post.slug);
+  const nextBook = bookIdx < byBook.length - 1 ? byBook[bookIdx + 1] : null;
+
+  // Next story by date
   const byDate = [...allPosts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
   const dateIdx = byDate.findIndex(p => p.slug === post.slug);
   const nextDate = dateIdx < byDate.length - 1 ? byDate[dateIdx + 1] : null;
@@ -342,8 +352,9 @@ function buildPostPage(post, allPosts) {
         ${cleanHtml(post.htmlBody)}
       </div>
       <footer class="post-footer post-nav">
-        <a href="index.html" class="post-nav-link" onclick="try{localStorage.setItem('sort','date')}catch(e){}">Home</a>
-        ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next">Next: ${nextDate.title}</a>` : ''}
+        <a href="index.html" class="post-nav-link">Home</a>
+        ${nextBook ? `<a href="${nextBook.slug}.html" class="post-nav-link post-nav-next" data-sort="book">Next</a>` : ''}
+        ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next" data-sort="date">Next</a>` : ''}
       </footer>
     </article>`;
 
