@@ -220,8 +220,12 @@ function cleanHtml(html) {
 
 function buildNav(posts, currentSlug, sortBy) {
   const sorted = [...posts];
-  if (sortBy === 'karma') {
-    sorted.sort((a, b) => b.baseScore - a.baseScore);
+  if (sortBy === 'book') {
+    sorted.sort((a, b) => {
+      const ai = COLLECTION_ORDER.indexOf(a.slug);
+      const bi = COLLECTION_ORDER.indexOf(b.slug);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
   } else {
     sorted.sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
   }
@@ -242,11 +246,11 @@ function buildSidebar(posts, currentSlug) {
 
       <div class="nav-section">
         <div class="sort-toggle">
-          <button class="sort-btn active" data-sort="karma">Popular</button>
+          <button class="sort-btn active" data-sort="book">Book Order</button>
           <button class="sort-btn" data-sort="date">Recent</button>
         </div>
-        <ul class="nav-list" data-sort="karma">
-          ${buildNav(posts, currentSlug, 'karma')}
+        <ul class="nav-list" data-sort="book">
+          ${buildNav(posts, currentSlug, 'book')}
         </ul>
         <ul class="nav-list" data-sort="date" style="display:none">
           ${buildNav(posts, currentSlug, 'date')}
@@ -305,7 +309,7 @@ function pageShell(content, title, posts, currentSlug) {
 
     // Sort toggle
     var sort;try{sort=localStorage.getItem('sort')}catch(e){}
-    if(!sort)sort='karma';
+    if(!sort)sort='book';
     function applySort(s){
       sort=s;try{localStorage.setItem('sort',s)}catch(e){}
       document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
