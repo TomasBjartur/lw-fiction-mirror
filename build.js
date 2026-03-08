@@ -11,7 +11,7 @@ const FICTION_TAG_SLUG = 'fiction';
 // Site config - edit these
 const SITE_TITLE = 'The Origami Men and Other Stories';
 const SITE_SUBTITLE = 'by Tomás Bjartur';
-const SITE_DESCRIPTION = 'The Origami Men and Other Stories — fiction by Tomás Bjartur.';
+const SITE_DESCRIPTION = 'Fiction by Tomás Bjartur.';
 const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
 const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
