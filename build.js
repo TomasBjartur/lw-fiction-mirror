@@ -9,13 +9,13 @@ const OUTPUT_DIR = path.join(__dirname, 'dist');
 const FICTION_TAG_SLUG = 'fiction';
 
 // Site config - edit these
-const SITE_TITLE = 'Tomás B.';
-const SITE_SUBTITLE = 'Fiction';
-const SITE_DESCRIPTION = 'Fiction by Tom\u00e1s Bjartur.';
+const SITE_TITLE = 'The Origami Men and Other Stories';
+const SITE_SUBTITLE = 'by Tomás Bjartur';
+const SITE_DESCRIPTION = 'The Origami Men and Other Stories — fiction by Tomás Bjartur.';
 const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
-const BOOK_TITLE = 'The Company Man and Other Stories by Tom\u00e1s Bjartur';
-const EPUB_FILENAME = BOOK_TITLE.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/_+$/, '') + '.epub';
+const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
+const EPUB_FILENAME = 'The_Origami_Men_and_Other_Stories.epub';
 
 async function gqlQuery(query, variables = {}) {
   const res = await fetch(LW_GRAPHQL, {
@@ -95,6 +95,62 @@ async function getUserPosts(userId) {
 const EXCLUDED_SLUGS = ['offvermilion'];
 const KARMA_CUTOFF = 60;
 
+// External stories hosted outside LessWrong
+const EXTERNAL_STORIES = [
+  {
+    url: 'https://tomasbjartur.bearblog.dev/remembering-aubrey-chang/',
+    slug: 'remembering-aubrey-chang',
+    title: 'Remembering Aubrey Chang',
+    postedAt: '2025-11-15T00:00:00Z',
+  },
+  {
+    url: 'https://tomasbjartur.bearblog.dev/goldfish/',
+    slug: 'goldfish',
+    title: 'Goldfish',
+    postedAt: '2025-12-28T00:00:00Z',
+  },
+];
+
+async function fetchExternalStories() {
+  const stories = [];
+  for (const ext of EXTERNAL_STORIES) {
+    console.log(`Fetching external story: ${ext.title}...`);
+    const res = await fetch(ext.url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; fiction-mirror-build)' },
+    });
+    if (!res.ok) {
+      console.error(`Failed to fetch ${ext.url}: ${res.status}`);
+      continue;
+    }
+    const html = await res.text();
+    // Extract content from bearblog <main> or <article> tag
+    const match = html.match(/<main[^>]*>([\s\S]*?)<\/main>/i)
+      || html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    let body = match ? match[1] : '';
+    // Strip title headings, date wrapper, nav links, upvote form
+    body = body.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, '').trim();
+    body = body.replace(/<p>\s*<i>\s*<time[\s\S]*?<\/time>\s*<\/i>\s*<\/p>/i, '').trim();
+    body = body.replace(/<a class="(previous|next)-post"[^>]*>[^<]*<\/a>/gi, '').trim();
+    body = body.replace(/<form[\s\S]*?<\/form>/gi, '').trim();
+    body = body.replace(/<script[\s\S]*?<\/script>/gi, '').trim();
+    const wordCount = body.replace(/<[^>]+>/g, '').split(/\s+/).filter(Boolean).length;
+    stories.push({
+      _id: ext.slug,
+      title: ext.title,
+      slug: ext.slug,
+      postedAt: ext.postedAt,
+      baseScore: KARMA_CUTOFF, // ensure it passes the cutoff
+      voteCount: 0,
+      commentCount: 0,
+      tags: [{ _id: 'fiction', name: 'Fiction', slug: 'fiction' }],
+      htmlBody: body,
+      wordCount,
+      external: true,
+    });
+  }
+  return stories;
+}
+
 function filterFiction(posts) {
   return posts.filter(p =>
     p.tags && p.tags.some(t => t.slug === FICTION_TAG_SLUG) &&
@@ -108,8 +164,10 @@ const COLLECTION_ORDER = [
   'our-beloved-monsters',
   'that-mad-olympiad-1',
   'the-maker-of-mind',
+  'remembering-aubrey-chang',
   'the-liar-and-the-scold',
   'the-elect-2',
+  'goldfish',
   'penny-s-hands',
   'the-origami-men',
 ];
@@ -2027,7 +2085,9 @@ async function main() {
   console.log(`Fetched ${allPosts.length} total posts`);
 
   const fiction = filterFiction(allPosts);
-  console.log(`Found ${fiction.length} fiction posts`);
+  const external = await fetchExternalStories();
+  fiction.push(...external);
+  console.log(`Found ${fiction.length} fiction posts (${external.length} external)`);
 
   if (fiction.length === 0) {
     console.error('No fiction posts found! Check that posts are tagged with "Fiction".');
