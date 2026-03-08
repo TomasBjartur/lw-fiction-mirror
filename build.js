@@ -284,7 +284,7 @@ function pageShell(content, title, posts, currentSlug) {
 
   <header class="top-bar">
     <label for="menu-toggle" class="menu-button" aria-label="Toggle menu">☰</label>
-    <a href="index.html" class="top-bar-title">${SITE_TITLE}</a>
+    <a href="index.html" class="top-bar-title">Tomás Bjartur</a>
     <div class="top-bar-actions">
       <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
       <a href="${EPUB_FILENAME}" class="top-bar-btn">EPUB</a>
