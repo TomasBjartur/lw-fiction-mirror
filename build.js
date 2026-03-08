@@ -103,30 +103,31 @@ function filterFiction(posts) {
   );
 }
 
+const COLLECTION_ORDER = [
+  'the-company-man',
+  'our-beloved-monsters',
+  'that-mad-olympiad-1',
+  'the-maker-of-mind',
+  'the-liar-and-the-scold',
+  'the-elect-2',
+  'penny-s-hands',
+  'the-origami-men',
+];
+
 function orderForCollection(posts) {
-  const sorted = [...posts].sort((a, b) => b.baseScore - a.baseScore);
-  const eligible = sorted.filter(p => p.baseScore >= KARMA_CUTOFF);
-
-  // Hardcoded anchors
-  const first = eligible.find(p => p.slug === 'the-company-man');
-  const last = eligible.find(p => p.slug === 'the-origami-men');
-  const middle = eligible.filter(p => p !== first && p !== last);
-
-  // Editorial middle: quality wave with length variation
-  // Sort by karma (quality proxy), then deal to alternating slots
-  // so stronger pieces are spread evenly — reader keeps hitting highlights.
-  // Within each slot pair, put the longer piece first for pacing.
-  middle.sort((a, b) => b.baseScore - a.baseScore);
-  const peaks = []; // odd positions (stronger)
-  const valleys = []; // even positions (weaker)
-  middle.forEach((p, i) => (i % 2 === 0 ? peaks : valleys).push(p));
-  const interleaved = [];
-  for (let i = 0; i < Math.max(peaks.length, valleys.length); i++) {
-    if (i < peaks.length) interleaved.push(peaks[i]);
-    if (i < valleys.length) interleaved.push(valleys[i]);
+  const eligible = posts.filter(p => p.baseScore >= KARMA_CUTOFF);
+  const ordered = [];
+  // Place stories in hardcoded order
+  for (const slug of COLLECTION_ORDER) {
+    const post = eligible.find(p => p.slug === slug);
+    if (post) ordered.push(post);
   }
-
-  return [first, ...interleaved, last].filter(Boolean);
+  // Append any new stories not yet in the hardcoded list, sorted by karma
+  const remaining = eligible
+    .filter(p => !COLLECTION_ORDER.includes(p.slug))
+    .sort((a, b) => b.baseScore - a.baseScore);
+  ordered.push(...remaining);
+  return ordered;
 }
 
 function formatDate(dateStr) {
