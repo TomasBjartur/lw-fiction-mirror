@@ -92,8 +92,8 @@ async function getUserPosts(userId) {
   return allPosts;
 }
 
-const EXCLUDED_SLUGS = ['offvermilion'];
-const KARMA_CUTOFF = 60;
+const EXCLUDED_SLUGS = ['beauty-and-the-beast'];
+const KARMA_CUTOFF = 30;
 
 // External stories hosted outside LessWrong
 const EXTERNAL_STORIES = [
@@ -165,9 +165,11 @@ const COLLECTION_ORDER = [
   'that-mad-olympiad-1',
   'the-maker-of-mind',
   'remembering-aubrey-chang',
+  'lobsang-s-children-1',
   'the-liar-and-the-scold',
   'the-elect-2',
   'goldfish',
+  'offvermilion',
   'penny-s-hands',
   'the-origami-men',
 ];
