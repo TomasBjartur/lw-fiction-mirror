@@ -2142,6 +2142,13 @@ async function main() {
   fs.writeFileSync(path.join(OUTPUT_DIR, 'feed.xml'), buildRssFeed(fiction));
   console.log('Wrote feed.xml');
 
+  // Create /rss redirect to feed.xml
+  const rssDir = path.join(OUTPUT_DIR, 'rss');
+  fs.mkdirSync(rssDir, { recursive: true });
+  fs.writeFileSync(path.join(rssDir, 'index.html'),
+    '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=../feed.xml"/></head><body></body></html>');
+  console.log('Wrote rss/index.html (redirect to feed.xml)');
+
   console.log(`\nDone! ${fiction.length} pages + EPUB + RSS generated in ${OUTPUT_DIR}/`);
 }
 
