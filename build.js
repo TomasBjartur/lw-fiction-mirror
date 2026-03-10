@@ -303,7 +303,7 @@ function pageShell(content, title, posts, currentSlug) {
     // Theme toggle
     var h=document.documentElement,b=document.getElementById('theme-btn');
     function isDark(){var t=h.getAttribute('data-theme');return t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches)}
-    function updateTheme(){b.textContent=isDark()?'\u2600\uFE0E':'\u263D\uFE0E'}
+    function updateTheme(){b.textContent=isDark()?'\u2600\uFE0F':'\uD83C\uDF19'}
     b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}updateTheme()});
     updateTheme();
 
