@@ -215,7 +215,9 @@ function cleanHtml(html) {
     // Remove LW internal link styling classes but keep links
     .replace(/class="[^"]*"/g, '')
     // Remove style attributes
-    .replace(/style="[^"]*"/g, '');
+    .replace(/style="[^"]*"/g, '')
+    // Replace <hr> scene breaks with visible separator for RSS readers
+    .replace(/<hr\s*\/?>/gi, '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>');
 }
 
 function buildNav(posts, currentSlug, sortBy) {
@@ -287,9 +289,9 @@ function pageShell(content, title, posts, currentSlug) {
     <a href="index.html" class="top-bar-title">Tomás Bjartur</a>
     <div class="top-bar-actions">
       <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
-      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS Feed">RSS</a>
       <a href="${EPUB_FILENAME}" class="top-bar-btn">EPUB</a>
       <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
+      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS Feed">RSS</a>
     </div>
   </header>
 
