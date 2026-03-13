@@ -1044,7 +1044,7 @@ function buildRssFeed(posts) {
       <guid isPermaLink="true">${link}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(p.title)} — ${estimateReadingTime(p.wordCount)}</description>
-      <content:encoded><![CDATA[${cleanHtml(p.htmlBody)}]]></content:encoded>
+      <content:encoded><![CDATA[${cleanHtml(p.htmlBody)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
     </item>`;
   }).join('\n');
 
