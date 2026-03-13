@@ -12,7 +12,7 @@ const FICTION_TAG_SLUG = 'fiction';
 const SITE_TITLE = 'The Origami Men and Other Stories';
 const SITE_SUBTITLE = 'by Tomás Bjartur';
 const SITE_DESCRIPTION = 'Fiction by Tomás Bjartur.';
-const SITE_URL = 'https://tomasbjartur.github.io/lw-fiction-mirror';
+const SITE_URL = 'https://tomasbjartur.com';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
 const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
 const EPUB_FILENAME = 'The_Origami_Men_and_Other_Stories.epub';
@@ -287,6 +287,7 @@ function pageShell(content, title, posts, currentSlug) {
     <a href="index.html" class="top-bar-title">Tomás Bjartur</a>
     <div class="top-bar-actions">
       <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
+      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS Feed">RSS</a>
       <a href="${EPUB_FILENAME}" class="top-bar-btn">EPUB</a>
       <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
     </div>
@@ -590,6 +591,14 @@ body {
   background: var(--sidebar-bg);
   color: var(--accent);
 }
+
+.top-bar-btn-rss {
+  font-size: 0.65rem;
+  padding: 0.25rem 0.55rem;
+  opacity: 0.45;
+  border-color: transparent;
+}
+.top-bar-btn-rss:hover { opacity: 0.85; border-color: var(--border); }
 
 .top-bar-btn-primary {
   background: #a0734f;
@@ -2139,10 +2148,11 @@ async function main() {
   console.log(`Wrote ${EPUB_FILENAME} (${collection.length} stories)`);
 
   // Generate RSS feed
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'feed.xml'), buildRssFeed(fiction));
+  const feedXml = buildRssFeed(fiction);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'feed.xml'), feedXml);
   console.log('Wrote feed.xml');
 
-  // Create /rss redirect to feed.xml
+  // /rss redirect for browsers (RSS readers should use feed.xml directly)
   const rssDir = path.join(OUTPUT_DIR, 'rss');
   fs.mkdirSync(rssDir, { recursive: true });
   fs.writeFileSync(path.join(rssDir, 'index.html'),
