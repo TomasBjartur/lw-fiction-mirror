@@ -353,6 +353,8 @@ function buildPostPage(post, allPosts) {
       </header>
       <div class="post-body">
         ${cleanHtml(post.htmlBody)}
+        <p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>
+        <p style="text-align:center;margin:1em 0"><a href="${SUBSTACK_URL}" style="color:#a0734f;text-decoration:none;font-size:0.9em">Subscribe on Substack</a></p>
       </div>
       <footer class="post-footer post-nav">
         <a href="index.html" class="post-nav-link">Home</a>
@@ -2160,6 +2162,13 @@ async function main() {
   fs.writeFileSync(path.join(rssDir, 'index.html'),
     '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=../feed.xml"/></head><body></body></html>');
   console.log('Wrote rss/index.html (redirect to feed.xml)');
+
+  // /subscribe redirect to Substack (useful for sharing on platforms that downweight Substack links)
+  const subscribeDir = path.join(OUTPUT_DIR, 'subscribe');
+  fs.mkdirSync(subscribeDir, { recursive: true });
+  fs.writeFileSync(path.join(subscribeDir, 'index.html'),
+    `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${SUBSTACK_URL}"/></head><body></body></html>`);
+  console.log('Wrote subscribe/index.html (redirect to Substack)');
 
   console.log(`\nDone! ${fiction.length} pages + EPUB + RSS generated in ${OUTPUT_DIR}/`);
 }
