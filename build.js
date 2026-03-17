@@ -319,7 +319,7 @@ function pageShell(content, title, posts, currentSlug) {
       document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
       document.querySelectorAll('.index-list[data-sort]').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
       document.querySelectorAll('.sort-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-sort')===s)});
-      document.querySelectorAll('.post-nav-next').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
+      document.querySelectorAll('.post-nav-next,.post-nav-prev').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
     }
     document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
     applySort(sort);
@@ -340,11 +340,13 @@ function buildPostPage(post, allPosts) {
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
   const bookIdx = byBook.findIndex(p => p.slug === post.slug);
+  const prevBook = bookIdx > 0 ? byBook[bookIdx - 1] : null;
   const nextBook = bookIdx < byBook.length - 1 ? byBook[bookIdx + 1] : null;
 
-  // Next story by date
+  // Next/prev story by date
   const byDate = [...allPosts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
   const dateIdx = byDate.findIndex(p => p.slug === post.slug);
+  const prevDate = dateIdx > 0 ? byDate[dateIdx - 1] : null;
   const nextDate = dateIdx < byDate.length - 1 ? byDate[dateIdx + 1] : null;
 
   const content = `
@@ -360,9 +362,13 @@ function buildPostPage(post, allPosts) {
         <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
       </div>
       <footer class="post-footer post-nav">
+        ${prevBook ? `<a href="${prevBook.slug}.html" class="post-nav-link post-nav-prev" data-sort="book">Prev</a>` : ''}
+        ${prevDate ? `<a href="${prevDate.slug}.html" class="post-nav-link post-nav-prev" data-sort="date">Prev</a>` : ''}
+        ${!prevBook && !prevDate ? '<span></span>' : ''}
         <a href="index.html" class="post-nav-link">Home</a>
         ${nextBook ? `<a href="${nextBook.slug}.html" class="post-nav-link post-nav-next" data-sort="book">Next</a>` : ''}
         ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next" data-sort="date">Next</a>` : ''}
+        ${!nextBook && !nextDate ? '<span></span>' : ''}
       </footer>
     </article>`;
 
