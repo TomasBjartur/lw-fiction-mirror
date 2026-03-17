@@ -170,6 +170,7 @@ const COLLECTION_ORDER = [
   'the-elect-2',
   'goldfish',
   'offvermilion',
+  'customer-satisfaction-opportunities-1',
   'penny-s-hands',
   'the-origami-men',
 ];
