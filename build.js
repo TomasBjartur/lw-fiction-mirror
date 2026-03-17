@@ -316,6 +316,7 @@ function pageShell(content, title, posts, currentSlug) {
     function applySort(s){
       sort=s;try{localStorage.setItem('sort',s)}catch(e){}
       document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
+      document.querySelectorAll('.index-list[data-sort]').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
       document.querySelectorAll('.sort-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-sort')===s)});
       document.querySelectorAll('.post-nav-next').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
     }
@@ -368,25 +369,35 @@ function buildPostPage(post, allPosts) {
 
 function buildIndexPage(posts) {
   const byDate = [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+  const byBook = [...posts].sort((a, b) => {
+    const ai = COLLECTION_ORDER.indexOf(a.slug);
+    const bi = COLLECTION_ORDER.indexOf(b.slug);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 
-  const listing = byDate.map(p => {
-    const readTime = estimateReadingTime(p.wordCount);
-    const meta = [formatDate(p.postedAt), readTime].filter(Boolean).join(' · ');
-    return `
+  function buildListing(sorted) {
+    return sorted.map(p => {
+      const readTime = estimateReadingTime(p.wordCount);
+      const meta = [formatDate(p.postedAt), readTime].filter(Boolean).join(' · ');
+      return `
       <li class="index-item">
         <a href="${p.slug}.html">
           <span class="index-title">${p.title}</span>
           <span class="index-meta">${meta}</span>
         </a>
       </li>`;
-  }).join('\n');
+    }).join('\n');
+  }
 
   const content = `
     <div class="index-page">
       <h1>${SITE_TITLE}</h1>
       <p class="index-intro">${SITE_DESCRIPTION}</p>
-      <ul class="index-list">
-        ${listing}
+      <ul class="index-list" data-sort="book">
+        ${buildListing(byBook)}
+      </ul>
+      <ul class="index-list" data-sort="date" style="display:none">
+        ${buildListing(byDate)}
       </ul>
     </div>`;
 
