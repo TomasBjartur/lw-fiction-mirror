@@ -357,6 +357,7 @@ function buildPostPage(post, allPosts) {
         ${cleanHtml(post.htmlBody)}
         <p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>
         <p style="text-align:center;margin:1em 0"><a href="${SUBSTACK_URL}" style="color:#a0734f;text-decoration:none;font-size:0.9em">Subscribe on Substack</a></p>
+        <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
       </div>
       <footer class="post-footer post-nav">
         <a href="index.html" class="post-nav-link">Home</a>
