@@ -1176,12 +1176,12 @@ function htmlToXhtml(html) {
   if (!html) return '';
   return html
     .replace(/<br\s*>/gi, '<br/>')
-    .replace(/<hr\s*\/?>/gi, '<p style="text-align:center;margin:2em 0;color:#999">&#x2022;&#x2003;&#x2022;&#x2003;&#x2022;</p>')
+    .replace(/<hr[^>]*\/?>/gi, '<p class="scene-break">&#x2022;&#x2003;&#x2022;&#x2003;&#x2022;</p>')
     .replace(/<img([^>]*?)(?<!\/)>/gi, '<img$1/>')
     .replace(/&nbsp;/g, '\u00a0')
     .replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
     .replace(/<p>\s*<\/p>/g, '')
-    .replace(/class="[^"]*"/g, '')
+    .replace(/class="(?!scene-break")[^"]*"/g, '')
     .replace(/(<(?!img\b)[^>]*)\s+style="[^"]*"/gi, '$1');
 }
 
@@ -2052,6 +2052,7 @@ body { font-family: serif; margin: 1em; }
 h1 { font-size: 1.6em; margin-bottom: 1.5em; }
 img { max-width: 100%; height: auto; }
 blockquote { border-left: 2px solid #999; padding-left: 1em; margin: 1em 0; font-style: italic; color: #555; }
+.scene-break { text-align: center; margin: 2em 0; color: #999; }
 </style>
 </head>
 <body>
