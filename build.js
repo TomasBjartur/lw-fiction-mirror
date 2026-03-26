@@ -92,7 +92,7 @@ async function getUserPosts(userId) {
   return allPosts;
 }
 
-const EXCLUDED_SLUGS = ['beauty-and-the-beast'];
+const EXCLUDED_SLUGS = ['beauty-and-the-beast', 'offvermilion'];
 const KARMA_CUTOFF = 30;
 
 // External stories hosted outside LessWrong
