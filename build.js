@@ -94,6 +94,8 @@ async function getUserPosts(userId) {
 
 const EXCLUDED_SLUGS = ['beauty-and-the-beast', 'offvermilion'];
 const KARMA_CUTOFF = 30;
+// Stories to always include in the collection even if they're under KARMA_CUTOFF.
+const FORCE_INCLUDE_SLUGS = ['san-silvestro'];
 
 // External stories hosted outside LessWrong
 const EXTERNAL_STORIES = [
@@ -172,11 +174,14 @@ const COLLECTION_ORDER = [
   'offvermilion',
   'customer-satisfaction-opportunities-1',
   'penny-s-hands',
+  'san-silvestro',
   'the-origami-men',
 ];
 
 function orderForCollection(posts) {
-  const eligible = posts.filter(p => p.baseScore >= KARMA_CUTOFF);
+  const eligible = posts.filter(p =>
+    p.baseScore >= KARMA_CUTOFF || FORCE_INCLUDE_SLUGS.includes(p.slug)
+  );
   const ordered = [];
   // Place stories in hardcoded order
   for (const slug of COLLECTION_ORDER) {
