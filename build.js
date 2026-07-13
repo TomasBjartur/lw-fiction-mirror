@@ -92,10 +92,10 @@ async function getUserPosts(userId) {
   return allPosts;
 }
 
-const EXCLUDED_SLUGS = ['beauty-and-the-beast', 'offvermilion'];
+const EXCLUDED_SLUGS = ['beauty-and-the-beast', 'offvermilion', 'harry-potter-and-the-rules-of-quidditch-1'];
 const KARMA_CUTOFF = 30;
 // Stories to always include in the collection even if they're under KARMA_CUTOFF.
-const FORCE_INCLUDE_SLUGS = ['san-silvestro'];
+const FORCE_INCLUDE_SLUGS = ['san-silvestro', 'the-distaff-texts'];
 
 // External stories hosted outside LessWrong
 const EXTERNAL_STORIES = [
@@ -110,6 +110,12 @@ const EXTERNAL_STORIES = [
     slug: 'goldfish',
     title: 'Goldfish',
     postedAt: '2025-12-28T00:00:00Z',
+  },
+  {
+    url: 'https://tomasbjartur.bearblog.dev/ontological-ardor/',
+    slug: 'ontological-ardor',
+    title: 'Ontological Ardor',
+    postedAt: '2025-11-29T19:16:00Z',
   },
 ];
 
@@ -166,6 +172,8 @@ const COLLECTION_ORDER = [
   'our-beloved-monsters',
   'that-mad-olympiad-1',
   'the-maker-of-mind',
+  'san-silvestro',
+  'ontological-ardor',
   'remembering-aubrey-chang',
   'lobsang-s-children-1',
   'the-liar-and-the-scold',
@@ -174,7 +182,7 @@ const COLLECTION_ORDER = [
   'offvermilion',
   'customer-satisfaction-opportunities-1',
   'penny-s-hands',
-  'san-silvestro',
+  'the-distaff-texts',
   'the-origami-men',
 ];
 
