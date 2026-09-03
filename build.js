@@ -16,6 +16,9 @@ const SITE_URL = 'https://tomasbjartur.com';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
 const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
 const EPUB_FILENAME = 'The_Origami_Men_and_Other_Stories.epub';
+// Variant EPUB served to readers matched by GEO_HIDDEN: same cover and title,
+// minus the hidden stories.
+const EPUB_FILENAME_ALT = 'The_Origami_Men_and_Other_Stories_b.epub';
 
 async function gqlQuery(query, variables = {}) {
   const res = await fetch(LW_GRAPHQL, {
@@ -97,6 +100,16 @@ const KARMA_CUTOFF = 30;
 // Stories to always include in the collection even if they're under KARMA_CUTOFF.
 const FORCE_INCLUDE_SLUGS = ['san-silvestro', 'the-distaff-texts'];
 
+// Stories hidden from readers who appear to be in a given place, checked in the
+// browser against a geo-IP lookup. This is a curtain, not a block: the full HTML
+// is served to everyone before the check runs, so view-source, JS off, curl, a
+// VPN, the EPUB and the RSS feed all bypass it. Each rule matches on whichever
+// of city/region/country it specifies; omitted fields are ignored.
+const GEO_HIDDEN = [
+  { slug: 'our-beloved-monsters', region: 'BC', country: 'CA' },
+];
+const GEO_LOOKUP_URL = 'https://ipapi.co/json/';
+
 // External stories hosted outside LessWrong
 const EXTERNAL_STORIES = [
   {
@@ -172,29 +185,36 @@ const COLLECTION_ORDER = [
   'the-liar-and-the-scold',
   'the-elect-2',
   'goldfish',
-  'offvermilion',
   'customer-satisfaction-opportunities-1',
   'penny-s-hands',
   'the-distaff-texts',
   'the-origami-men',
 ];
 
+// Arrange posts in collection order. Stories not yet in COLLECTION_ORDER are
+// inserted (sorted by karma) before the final entry, so the title story keeps
+// closing the book.
+function bookOrder(posts) {
+  const closer = COLLECTION_ORDER[COLLECTION_ORDER.length - 1];
+  const bySlug = new Map(posts.map(p => [p.slug, p]));
+  const ordered = [];
+  for (const slug of COLLECTION_ORDER) {
+    if (slug === closer) continue;
+    if (bySlug.has(slug)) ordered.push(bySlug.get(slug));
+  }
+  const remaining = posts
+    .filter(p => !COLLECTION_ORDER.includes(p.slug))
+    .sort((a, b) => b.baseScore - a.baseScore);
+  ordered.push(...remaining);
+  if (bySlug.has(closer)) ordered.push(bySlug.get(closer));
+  return ordered;
+}
+
 function orderForCollection(posts) {
   const eligible = posts.filter(p =>
     p.baseScore >= KARMA_CUTOFF || FORCE_INCLUDE_SLUGS.includes(p.slug)
   );
-  const ordered = [];
-  // Place stories in hardcoded order
-  for (const slug of COLLECTION_ORDER) {
-    const post = eligible.find(p => p.slug === slug);
-    if (post) ordered.push(post);
-  }
-  // Append any new stories not yet in the hardcoded list, sorted by karma
-  const remaining = eligible
-    .filter(p => !COLLECTION_ORDER.includes(p.slug))
-    .sort((a, b) => b.baseScore - a.baseScore);
-  ordered.push(...remaining);
-  return ordered;
+  return bookOrder(eligible);
 }
 
 function formatDate(dateStr) {
@@ -212,13 +232,32 @@ function estimateReadingTime(wordCount) {
   return `${minutes} min read`;
 }
 
+function extractExcerpt(html, maxLen = 160) {
+  const text = (html || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-zA-Z]+;|&#\d+;|&#x[0-9a-fA-F]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  return cut.slice(0, cut.lastIndexOf(' ')) + '…';
+}
+
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
 function cleanHtml(html) {
   if (!html) return '';
   // Remove LW-specific widgets, voting buttons, etc.
   // Keep the prose clean
   return html
-    // Remove empty paragraphs
+    // Remove empty paragraphs and headings
     .replace(/<p>\s*<\/p>/g, '')
+    .replace(/<h[1-6][^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/h[1-6]>/gi, '')
     // Remove LW internal link styling classes but keep links
     .replace(/class="[^"]*"/g, '')
     // Remove style attributes
@@ -228,20 +267,13 @@ function cleanHtml(html) {
 }
 
 function buildNav(posts, currentSlug, sortBy) {
-  const sorted = [...posts];
-  if (sortBy === 'book') {
-    sorted.sort((a, b) => {
-      const ai = COLLECTION_ORDER.indexOf(a.slug);
-      const bi = COLLECTION_ORDER.indexOf(b.slug);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-    });
-  } else {
-    sorted.sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  }
+  const sorted = sortBy === 'book'
+    ? bookOrder(posts)
+    : [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
 
   return sorted.map(p => {
     const active = p.slug === currentSlug ? ' class="active"' : '';
-    return `<li><a href="${p.slug}.html"${active}><span class="nav-title">${p.title}</span></a></li>`;
+    return `<li data-slug="${p.slug}"><a href="${p.slug}.html"${active}><span class="nav-title">${p.title}</span></a></li>`;
   }).join('\n');
 }
 
@@ -267,13 +299,19 @@ function buildSidebar(posts, currentSlug) {
       </div>
 
       <div class="sidebar-footer">
-        <a href="${SUBSTACK_URL}" class="lw-link">${SITE_TITLE}</a>
+        <a href="${SUBSTACK_URL}" class="lw-link">Subscribe on Substack</a>
       </div>
     </nav>`;
 }
 
-function pageShell(content, title, posts, currentSlug) {
+const FAVICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23a0734f'/%3E%3Ctext x='50' y='73' font-size='62' text-anchor='middle' font-family='Georgia,serif' fill='%23fff'%3ET%3C/text%3E%3C/svg%3E";
+
+function pageShell(content, title, posts, currentSlug, opts = {}) {
   const pageTitle = title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`;
+  const description = opts.description || SITE_DESCRIPTION;
+  const canonicalUrl = currentSlug ? `${SITE_URL}/${currentSlug}.html` : `${SITE_URL}/`;
+  const ogType = currentSlug ? 'article' : 'website';
+  const ogTitle = title || `${SITE_TITLE} · ${SITE_SUBTITLE}`;
 
   return `<!DOCTYPE html>
 <html lang="en" data-theme="auto">
@@ -281,7 +319,19 @@ function pageShell(content, title, posts, currentSlug) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${pageTitle}</title>
-  <meta name="description" content="${SITE_DESCRIPTION}">
+  <meta name="description" content="${escapeAttr(description)}">
+  <link rel="canonical" href="${canonicalUrl}">
+  <link rel="icon" href="${FAVICON_SVG}">
+  <meta property="og:type" content="${ogType}">
+  <meta property="og:site_name" content="${escapeAttr(SITE_TITLE)}">
+  <meta property="og:title" content="${escapeAttr(ogTitle)}">
+  <meta property="og:description" content="${escapeAttr(description)}">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:image" content="${SITE_URL}/cover.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
+  <meta name="twitter:description" content="${escapeAttr(description)}">
+  <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <link rel="stylesheet" href="style.css">
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
   <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
@@ -292,11 +342,11 @@ function pageShell(content, title, posts, currentSlug) {
   <label for="menu-toggle" class="menu-overlay" aria-hidden="true"></label>
 
   <header class="top-bar">
-    <label for="menu-toggle" class="menu-button" aria-label="Toggle menu">☰</label>
+    <label for="menu-toggle" class="menu-button" role="button" tabindex="0" aria-label="Toggle menu">☰</label>
     <a href="index.html" class="top-bar-title">Tomás Bjartur</a>
     <div class="top-bar-actions">
       <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
-      <a href="${EPUB_FILENAME}" class="top-bar-btn">EPUB</a>
+      <a href="${EPUB_FILENAME}" class="top-bar-btn epub-link">EPUB</a>
       <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
       <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS Feed">RSS</a>
     </div>
@@ -307,6 +357,45 @@ function pageShell(content, title, posts, currentSlug) {
   <main>
     ${content}
   </main>
+
+  <script>
+  (function(){
+    // Geo curtain for GEO_HIDDEN. The page HTML is already delivered by the time
+    // this runs, so it is a curtain, not a block: view-source, JS off, curl, a
+    // VPN, the EPUB and the RSS feed all bypass it. Fails open by design — if the
+    // lookup errors, times out or is blocked, nothing is hidden.
+    var RULES=${JSON.stringify(GEO_HIDDEN)},CUR=${JSON.stringify(currentSlug)};
+    var ALT_EPUB=${JSON.stringify(EPUB_FILENAME_ALT)};
+    if(!RULES.length)return;
+    var KEY='geo',TTL=864e5;
+    function eq(a,b){return !b||String(a||'').toLowerCase()===String(b).toLowerCase()}
+    function apply(loc){
+      RULES.forEach(function(r){
+        if(!(eq(loc.city,r.city)&&eq(loc.region,r.region)&&eq(loc.country,r.country)))return;
+        var els=document.querySelectorAll('[data-slug="'+r.slug+'"]');
+        for(var i=0;i<els.length;i++)els[i].remove();
+        var eps=document.querySelectorAll('.epub-link');
+        for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
+        if(CUR===r.slug)location.replace('index.html');
+      });
+    }
+    var cached=null;
+    try{var raw=localStorage.getItem(KEY),o=raw&&JSON.parse(raw);
+      if(o&&Date.now()-o.t<TTL)cached=o.loc}catch(e){}
+    if(cached){apply(cached);return}
+    var ctl=typeof AbortController!=='undefined'?new AbortController():null;
+    var timer=setTimeout(function(){ctl&&ctl.abort()},2500);
+    fetch(${JSON.stringify(GEO_LOOKUP_URL)},ctl?{signal:ctl.signal}:{})
+      .then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(d){
+        clearTimeout(timer);
+        var loc={city:d.city,region:d.region_code,country:d.country_code};
+        try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),loc:loc}))}catch(e){}
+        apply(loc);
+      })
+      .catch(function(){clearTimeout(timer)});
+  })();
+  </script>
 
   <script>
   (function(){
@@ -329,6 +418,10 @@ function pageShell(content, title, posts, currentSlug) {
     }
     document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
     applySort(sort);
+
+    // Keyboard support for the hamburger label
+    var m=document.querySelector('.menu-button'),c=document.getElementById('menu-toggle');
+    if(m&&c){m.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();c.checked=!c.checked}})}
   })();
   </script>
 </body>
@@ -340,11 +433,7 @@ function buildPostPage(post, allPosts) {
   const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
 
   // Next story by book order
-  const byBook = [...allPosts].sort((a, b) => {
-    const ai = COLLECTION_ORDER.indexOf(a.slug);
-    const bi = COLLECTION_ORDER.indexOf(b.slug);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
+  const byBook = bookOrder(allPosts);
   const bookIdx = byBook.findIndex(p => p.slug === post.slug);
   const prevBook = bookIdx > 0 ? byBook[bookIdx - 1] : null;
   const nextBook = bookIdx < byBook.length - 1 ? byBook[bookIdx + 1] : null;
@@ -365,36 +454,32 @@ function buildPostPage(post, allPosts) {
         ${cleanHtml(post.htmlBody)}
         <p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>
         <p style="text-align:center;margin:1em 0"><a href="${SUBSTACK_URL}" style="color:#a0734f;text-decoration:none;font-size:0.9em">Subscribe on Substack</a></p>
-        <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
+        <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" class="epub-link" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
       </div>
       <footer class="post-footer post-nav">
-        ${prevBook ? `<a href="${prevBook.slug}.html" class="post-nav-link post-nav-prev" data-sort="book">Prev</a>` : ''}
-        ${prevDate ? `<a href="${prevDate.slug}.html" class="post-nav-link post-nav-prev" data-sort="date">Prev</a>` : ''}
-        ${!prevBook && !prevDate ? '<span></span>' : ''}
+        ${prevBook ? `<a href="${prevBook.slug}.html" class="post-nav-link post-nav-prev" data-sort="book">← ${prevBook.title}</a>` : '<span class="post-nav-prev" data-sort="book"></span>'}
+        ${prevDate ? `<a href="${prevDate.slug}.html" class="post-nav-link post-nav-prev" data-sort="date" style="display:none">← ${prevDate.title}</a>` : '<span class="post-nav-prev" data-sort="date" style="display:none"></span>'}
         <a href="index.html" class="post-nav-link">Home</a>
-        ${nextBook ? `<a href="${nextBook.slug}.html" class="post-nav-link post-nav-next" data-sort="book">Next</a>` : ''}
-        ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next" data-sort="date">Next</a>` : ''}
-        ${!nextBook && !nextDate ? '<span></span>' : ''}
+        ${nextBook ? `<a href="${nextBook.slug}.html" class="post-nav-link post-nav-next" data-sort="book">${nextBook.title} →</a>` : '<span class="post-nav-next" data-sort="book"></span>'}
+        ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next" data-sort="date" style="display:none">${nextDate.title} →</a>` : '<span class="post-nav-next" data-sort="date" style="display:none"></span>'}
       </footer>
     </article>`;
 
-  return pageShell(content, post.title, allPosts, post.slug);
+  return pageShell(content, post.title, allPosts, post.slug, {
+    description: extractExcerpt(post.htmlBody),
+  });
 }
 
 function buildIndexPage(posts) {
   const byDate = [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  const byBook = [...posts].sort((a, b) => {
-    const ai = COLLECTION_ORDER.indexOf(a.slug);
-    const bi = COLLECTION_ORDER.indexOf(b.slug);
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
+  const byBook = bookOrder(posts);
 
   function buildListing(sorted) {
     return sorted.map(p => {
       const readTime = estimateReadingTime(p.wordCount);
       const meta = [formatDate(p.postedAt), readTime].filter(Boolean).join(' · ');
       return `
-      <li class="index-item">
+      <li class="index-item" data-slug="${p.slug}">
         <a href="${p.slug}.html">
           <span class="index-title">${p.title}</span>
           <span class="index-meta">${meta}</span>
@@ -597,6 +682,10 @@ body {
   text-decoration: none;
   margin-right: auto;
   display: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .top-bar-actions {
@@ -791,11 +880,17 @@ article, .index-page {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 1rem;
 }
 
 .post-nav-link {
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.post-nav-prev,
+.post-nav-next {
+  max-width: 40%;
 }
 
 .post-nav-next {
@@ -923,7 +1018,10 @@ article, .index-page {
 @media (max-width: 520px) {
   html { font-size: 17px; }
 
+  .top-bar { padding: 0 0.75rem; gap: 0.5rem; }
+  .top-bar-actions { gap: 0.35rem; }
   .top-bar-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+  .top-bar-btn-rss { display: none; }
 
   main {
     padding: 1.5rem 1.2rem 3rem;
@@ -946,14 +1044,6 @@ article, .index-page {
     padding: 0.8rem 0.6rem;
     margin: 0 -0.6rem;
   }
-}
-
-/* Low-res screens: swap serif for more legible sans */
-@media (max-resolution: 1.5dppx) {
-  :root {
-    --serif: 'Segoe UI', system-ui, -apple-system, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
-  }
-  body { line-height: 1.7; }
 }
 
 /* --- Dark mode --- */
@@ -1073,7 +1163,7 @@ function buildRssFeed(posts) {
       <guid isPermaLink="true">${link}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(p.title)} — ${estimateReadingTime(p.wordCount)}</description>
-      <content:encoded><![CDATA[${cleanHtml(p.htmlBody)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
+      <content:encoded><![CDATA[${cleanHtml(p.htmlBody).replace(/src="images\//g, `src="${SITE_URL}/images/`)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
     </item>`;
   }).join('\n');
 
@@ -1187,6 +1277,7 @@ function htmlToXhtml(html) {
     .replace(/&nbsp;/g, '\u00a0')
     .replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
     .replace(/<p>\s*<\/p>/g, '')
+    .replace(/<h[1-6][^>]*>(?:\s| |<br\s*\/?>)*<\/h[1-6]>/gi, '')
     .replace(/class="(?!scene-break")[^"]*"/g, '')
     .replace(/(<(?!img\b)[^>]*)\s+style="[^"]*"/gi, '$1');
 }
@@ -1893,10 +1984,36 @@ async function downloadImage(url) {
   }
 }
 
-async function buildEpub(posts, sortLabel, bookTitle) {
+// Local copies of story images, keyed by site-relative path ('images/…').
+// Filled by localizeImages(); used for dist/, the EPUB, and RSS absolutization.
+const LOCAL_IMAGES = new Map();
+
+// Download every remote image referenced in post bodies and rewrite the srcs
+// to site-relative paths, so the site doesn't hotlink LessWrong's CDN.
+async function localizeImages(posts) {
+  const urlToPath = new Map();
+  for (const post of posts) {
+    const urls = [...post.htmlBody.matchAll(/<img[^>]*?src="([^"]+)"/gi)].map(m => m[1]);
+    for (const url of urls) {
+      if (url.startsWith('data:') || url.startsWith('images/')) continue;
+      if (!urlToPath.has(url)) {
+        console.log(`  Localizing image: ${url.slice(0, 80)}...`);
+        const img = await downloadImage(url);
+        if (!img) continue;
+        const name = `images/img-${hashStr(url).toString(36)}.${img.ext}`;
+        LOCAL_IMAGES.set(name, { data: img.data, mediaType: img.mediaType });
+        urlToPath.set(url, name);
+      }
+      post.htmlBody = post.htmlBody.split(url).join(urlToPath.get(url));
+    }
+  }
+}
+
+async function buildEpub(posts, sortLabel, bookTitle, coverPng = null) {
   const bookId = `tomas-b-fiction-by-${sortLabel}`;
   const entries = [];
   const allImages = []; // { id, filename, mediaType, data }
+  const embeddedLocal = new Set();
 
   // mimetype must be first and stored (not compressed)
   entries.push({ name: 'mimetype', data: Buffer.from('application/epub+zip'), store: true });
@@ -1913,7 +2030,7 @@ async function buildEpub(posts, sortLabel, bookTitle) {
   });
 
   // Cover — rasterized PNG for universal reader compatibility
-  const coverPng = buildCoverPng(posts, bookTitle);
+  if (!coverPng) coverPng = buildCoverPng(posts, bookTitle);
   entries.push({ name: 'OEBPS/cover.png', data: coverPng });
 
   const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -2007,13 +2124,23 @@ p { font-style: italic; margin-top: 8em; max-width: 20em; margin-left: auto; mar
     const post = posts[i];
     const id = `chapter${i}`;
     const filename = `${id}.xhtml`;
-    // Find all image URLs in the post HTML and download them
+    // Find all image URLs in the post HTML and embed them
     let body = htmlToXhtml(post.htmlBody);
     const imgRegex = /<img([^>]*?)src="([^"]+)"([^>]*?)\/?>/gi;
     const imgMatches = [...body.matchAll(imgRegex)];
     for (const match of imgMatches) {
       const url = match[2];
-      if (url.startsWith('data:') || url.startsWith('images/')) continue;
+      if (url.startsWith('data:')) continue;
+      if (url.startsWith('images/')) {
+        // Already localized by localizeImages() — embed the cached copy
+        if (embeddedLocal.has(url)) continue;
+        const local = LOCAL_IMAGES.get(url);
+        if (!local) continue;
+        allImages.push({ id: `img-${allImages.length}`, filename: url, mediaType: local.mediaType, data: local.data });
+        entries.push({ name: `OEBPS/${url}`, data: local.data });
+        embeddedLocal.add(url);
+        continue;
+      }
       console.log(`  Downloading image: ${url.slice(0, 80)}...`);
       const img = await downloadImage(url);
       if (!img) continue;
@@ -2154,6 +2281,16 @@ async function main() {
   // Prevent Jekyll processing on GitHub Pages
   fs.writeFileSync(path.join(OUTPUT_DIR, '.nojekyll'), '');
 
+  // Self-host story images instead of hotlinking LessWrong's CDN
+  await localizeImages(fiction);
+  if (LOCAL_IMAGES.size > 0) {
+    fs.mkdirSync(path.join(OUTPUT_DIR, 'images'), { recursive: true });
+    for (const [name, img] of LOCAL_IMAGES) {
+      fs.writeFileSync(path.join(OUTPUT_DIR, name), img.data);
+    }
+    console.log(`Wrote ${LOCAL_IMAGES.size} images to images/`);
+  }
+
   // Write stylesheet
   fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
   console.log('Wrote style.css');
@@ -2169,11 +2306,26 @@ async function main() {
     console.log(`Wrote ${filename}`);
   }
 
-  // Generate EPUB
+  // Generate cover (shared by the EPUB and og:image)
   const collection = orderForCollection(fiction);
-  const epub = await buildEpub(collection, 'collection', BOOK_TITLE);
+  const coverPng = buildCoverPng(collection, BOOK_TITLE);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
+  console.log('Wrote cover.png');
+
+  // Generate EPUB
+  const epub = await buildEpub(collection, 'collection', BOOK_TITLE, coverPng);
   fs.writeFileSync(path.join(OUTPUT_DIR, EPUB_FILENAME), epub);
   console.log(`Wrote ${EPUB_FILENAME} (${collection.length} stories)`);
+
+  // Variant EPUB without the GEO_HIDDEN stories, linked in place of the full one
+  // for matching readers. Shares the full EPUB's cover so the two look alike.
+  const geoHiddenSlugs = GEO_HIDDEN.map(r => r.slug);
+  const altCollection = collection.filter(p => !geoHiddenSlugs.includes(p.slug));
+  if (altCollection.length !== collection.length) {
+    const epubAlt = await buildEpub(altCollection, 'collection', BOOK_TITLE, coverPng);
+    fs.writeFileSync(path.join(OUTPUT_DIR, EPUB_FILENAME_ALT), epubAlt);
+    console.log(`Wrote ${EPUB_FILENAME_ALT} (${altCollection.length} stories)`);
+  }
 
   // Generate RSS feed
   const feedXml = buildRssFeed(fiction);
