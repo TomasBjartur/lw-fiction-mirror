@@ -17,7 +17,7 @@ node build.js
 # Open dist/index.html in a browser
 ```
 
-Requires Node 18+ and the `canvas` package (used for cover text rendering).
+Requires Node 18+ and the `canvas` package (used for cover text rendering). The cover typeface, EB Garamond (SIL OFL), is bundled in `fonts/` so local and CI builds render identically.
 
 ## Deploying
 
@@ -57,4 +57,4 @@ cached in `localStorage` for 24h to stay under the free tier's rate limit.
 
 ## Architecture
 
-Reading requires no JavaScript — the sidebar navigation and mobile hamburger menu are pure HTML + CSS. A small inline script adds the optional niceties: dark-mode toggle and the Book Order / Recent sort switcher (both remembered in localStorage). Fonts are system fonts (Charter/Georgia serif stack); there are no external requests on the reader's end.
+Reading requires no JavaScript — the sidebar navigation and mobile hamburger menu are pure HTML + CSS. A small inline script adds the optional niceties: dark-mode toggle and the Book Order / Recent sort switcher (both remembered in localStorage). Fonts are system fonts (Charter/Georgia serif stack). The only external request on the reader's end is the `GEO_HIDDEN` lookup to ipapi.co, which runs on every page view (cached 24h) while any rule is configured.

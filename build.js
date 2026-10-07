@@ -1,7 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { createCanvas } = require('canvas');
+const { createCanvas, registerFont } = require('canvas');
+
+// Cover typeface, bundled so the CI runner (which has no Georgia) renders the
+// same cover as a local Mac build. EB Garamond, SIL OFL — see fonts/OFL.txt.
+registerFont(path.join(__dirname, 'fonts', 'EBGaramond.ttf'), { family: 'EB Garamond' });
+registerFont(path.join(__dirname, 'fonts', 'EBGaramond-Italic.ttf'), { family: 'EB Garamond', style: 'italic' });
 
 const LW_GRAPHQL = 'https://www.lesswrong.com/graphql';
 const USER_SLUG = 'bjartur-tomas';
@@ -103,7 +108,8 @@ const FORCE_INCLUDE_SLUGS = ['san-silvestro', 'the-distaff-texts'];
 // Stories hidden from readers who appear to be in a given place, checked in the
 // browser against a geo-IP lookup. This is a curtain, not a block: the full HTML
 // is served to everyone before the check runs, so view-source, JS off, curl, a
-// VPN, the EPUB and the RSS feed all bypass it. Each rule matches on whichever
+// VPN and the RSS feed all bypass it. Matched readers are also served
+// EPUB_FILENAME_ALT, which omits the hidden stories. Each rule matches on whichever
 // of city/region/country it specifies; omitted fields are ignored.
 const GEO_HIDDEN = [
   { slug: 'our-beloved-monsters', region: 'BC', country: 'CA' },
@@ -362,7 +368,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   (function(){
     // Geo curtain for GEO_HIDDEN. The page HTML is already delivered by the time
     // this runs, so it is a curtain, not a block: view-source, JS off, curl, a
-    // VPN, the EPUB and the RSS feed all bypass it. Fails open by design — if the
+    // VPN and the RSS feed all bypass it. Fails open by design — if the
     // lookup errors, times out or is blocked, nothing is hidden.
     var RULES=${JSON.stringify(GEO_HIDDEN)},CUR=${JSON.stringify(currentSlug)};
     var ALT_EPUB=${JSON.stringify(EPUB_FILENAME_ALT)};
@@ -374,6 +380,10 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         if(!(eq(loc.city,r.city)&&eq(loc.region,r.region)&&eq(loc.country,r.country)))return;
         var els=document.querySelectorAll('[data-slug="'+r.slug+'"]');
         for(var i=0;i<els.length;i++)els[i].remove();
+        var navs=document.querySelectorAll('[data-geo-slug="'+r.slug+'"]');
+        for(var k=0;k<navs.length;k++){var a=navs[k],h=a.getAttribute('data-alt-href');
+          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label')}
+          else{a.removeAttribute('href');a.textContent=''}}
         var eps=document.querySelectorAll('.epub-link');
         for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
         if(CUR===r.slug)location.replace('index.html');
@@ -428,21 +438,33 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
 </html>`;
 }
 
+// Prev/next link from list[idx] one step in direction `step` (-1 or 1). When
+// the target is a GEO_HIDDEN story, the link also carries the next story past
+// it (skipping every GEO_HIDDEN slug), which the geo curtain swaps in.
+function postNavLink(list, idx, step, sort) {
+  const cls = step < 0 ? 'post-nav-prev' : 'post-nav-next';
+  const style = sort === 'book' ? '' : ' style="display:none"';
+  const label = p => step < 0 ? `← ${p.title}` : `${p.title} →`;
+  const target = list[idx + step];
+  if (!target) return `<span class="${cls}" data-sort="${sort}"${style}></span>`;
+  let geo = '';
+  if (GEO_HIDDEN.some(r => r.slug === target.slug)) {
+    let i = idx + step;
+    while (list[i] && GEO_HIDDEN.some(r => r.slug === list[i].slug)) i += step;
+    const alt = list[i];
+    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(label(alt)) : ''}"`;
+  }
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls}" data-sort="${sort}"${style}${geo}>${label(target)}</a>`;
+}
+
 function buildPostPage(post, allPosts) {
   const readTime = estimateReadingTime(post.wordCount);
   const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
 
-  // Next story by book order
   const byBook = bookOrder(allPosts);
   const bookIdx = byBook.findIndex(p => p.slug === post.slug);
-  const prevBook = bookIdx > 0 ? byBook[bookIdx - 1] : null;
-  const nextBook = bookIdx < byBook.length - 1 ? byBook[bookIdx + 1] : null;
-
-  // Next/prev story by date
   const byDate = [...allPosts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
   const dateIdx = byDate.findIndex(p => p.slug === post.slug);
-  const prevDate = dateIdx > 0 ? byDate[dateIdx - 1] : null;
-  const nextDate = dateIdx < byDate.length - 1 ? byDate[dateIdx + 1] : null;
 
   const content = `
     <article>
@@ -457,11 +479,11 @@ function buildPostPage(post, allPosts) {
         <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" class="epub-link" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
       </div>
       <footer class="post-footer post-nav">
-        ${prevBook ? `<a href="${prevBook.slug}.html" class="post-nav-link post-nav-prev" data-sort="book">← ${prevBook.title}</a>` : '<span class="post-nav-prev" data-sort="book"></span>'}
-        ${prevDate ? `<a href="${prevDate.slug}.html" class="post-nav-link post-nav-prev" data-sort="date" style="display:none">← ${prevDate.title}</a>` : '<span class="post-nav-prev" data-sort="date" style="display:none"></span>'}
+        ${postNavLink(byBook, bookIdx, -1, 'book')}
+        ${postNavLink(byDate, dateIdx, -1, 'date')}
         <a href="index.html" class="post-nav-link">Home</a>
-        ${nextBook ? `<a href="${nextBook.slug}.html" class="post-nav-link post-nav-next" data-sort="book">${nextBook.title} →</a>` : '<span class="post-nav-next" data-sort="book"></span>'}
-        ${nextDate ? `<a href="${nextDate.slug}.html" class="post-nav-link post-nav-next" data-sort="date" style="display:none">${nextDate.title} →</a>` : '<span class="post-nav-next" data-sort="date" style="display:none"></span>'}
+        ${postNavLink(byBook, bookIdx, 1, 'book')}
+        ${postNavLink(byDate, dateIdx, 1, 'date')}
       </footer>
     </article>`;
 
@@ -1931,7 +1953,7 @@ function buildCoverPng(posts, bookTitle) {
   }
   ctx.putImageData(imgData, 0, 0);
 
-  // Title text with system fonts
+  // Title text in the bundled cover font
   const titleParts = bookTitle.split(' and Other Stories by ');
   const mainTitle = titleParts[0] || bookTitle;
   const subtitle = titleParts.length > 1 ? 'and Other Stories' : '';
@@ -1941,17 +1963,17 @@ function buildCoverPng(posts, bookTitle) {
   ctx.textBaseline = 'top';
 
   // Main title
-  ctx.font = '300 72px "Georgia", "Noto Serif", "DejaVu Serif", serif';
+  ctx.font = '84px "EB Garamond"';
   ctx.fillStyle = coverPal.title;
-  ctx.fillText(mainTitle, W / 2, H * 0.735);
+  ctx.fillText(mainTitle, W / 2, H * 0.73);
 
   // Subtitle
-  ctx.font = '300 26px "Georgia", "Noto Serif", "DejaVu Serif", serif';
+  ctx.font = 'italic 36px "EB Garamond"';
   ctx.fillStyle = coverPal.sub;
-  ctx.fillText(subtitle.toLowerCase(), W / 2, H * 0.735 + 90);
+  ctx.fillText(subtitle.toLowerCase(), W / 2, H * 0.73 + 100);
 
   // Author
-  ctx.font = '300 34px "Georgia", "Noto Serif", "DejaVu Serif", serif';
+  ctx.font = '40px "EB Garamond"';
   ctx.fillStyle = coverPal.author;
   ctx.fillText(author, W / 2, H * 0.865);
 
