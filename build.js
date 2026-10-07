@@ -1638,8 +1638,8 @@ function perlinNoise() {
   };
 }
 
-// Cover style: 'flow', 'stipple', 'hatch', 'ridge'
-let COVER_STYLE = 'ridge';
+// Cover style: 'plate', 'flow', 'stipple', 'hatch', 'ridge'
+let COVER_STYLE = 'plate';
 // Ridge color palette: 'warm', 'navy', 'teal', 'ink', 'ember'
 let RIDGE_PALETTE = 'noir';
 
@@ -1652,7 +1652,98 @@ const RIDGE_PALETTES = {
   noir:  { bg: [18, 18, 22],    front: [240, 240, 235], back: [100, 100, 110], title: 'rgba(240,240,235,0.95)', sub: 'rgba(180,180,175,0.6)', author: 'rgba(210,210,205,0.8)' },
 };
 
+// 'plate' cover: ridge-line terrain printed on a dark inset panel, on cream
+// paper stock, with the title set beneath it like a literary paperback.
+const PLATE = {
+  paper: '#f2ece0', panel: '#151518', line: '#ece7dc',
+  title: '#1e1b18', sub: '#5b534a', author: '#3a342e', accent: '#a0734f',
+};
+
+function buildPlateCoverPng(posts, bookTitle) {
+  const W = 1200, H = 1800;
+  const noise = perlinNoise();
+  const fbm = (x, y, octaves) => {
+    let val = 0, amp = 1, freq = 1, max = 0;
+    for (let i = 0; i < octaves; i++) { val += noise(x * freq, y * freq) * amp; max += amp; amp *= 0.5; freq *= 2; }
+    return val / max;
+  };
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PLATE.paper;
+  ctx.fillRect(0, 0, W, H);
+
+  // Panel with ridge lines. Each line is filled below with the panel colour so
+  // nearer (lower) ridges occlude the ones behind them.
+  const px0 = 110, py0 = 110, px1 = W - 110, py1 = 1170;
+  ctx.fillStyle = PLATE.panel;
+  ctx.fillRect(px0, py0, px1 - px0, py1 - py0);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(px0, py0, px1 - px0, py1 - py0); ctx.clip();
+  const lines = 85 + posts.length;
+  const top = py0 + 30, spacing = (py1 - top) / lines, amp = 220;
+  for (let li = 0; li <= lines + 12; li++) {
+    const baseY = top + li * spacing, depth = li / lines;
+    const pts = [];
+    for (let x = px0 - 3; x <= px1 + 3; x += 3) {
+      const xNorm = (x - px0) / (px1 - px0);
+      const env = Math.exp(-Math.pow((xNorm - 0.5) / 0.28, 2)) * 0.85 + 0.15;
+      const nv = fbm(x * 0.0022, baseY * 0.0016, 5) + fbm(x * 0.007, baseY * 0.004, 3) * 0.25;
+      pts.push([x, baseY - Math.max(0, nv + 0.08) * amp * env * Math.min(1, depth * 1.6 + 0.1)]);
+    }
+    const trace = () => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts) ctx.lineTo(x, y); };
+    trace();
+    ctx.lineTo(px1 + 3, py1 + 400); ctx.lineTo(px0 - 3, py1 + 400); ctx.closePath();
+    ctx.fillStyle = PLATE.panel; ctx.fill();
+    trace();
+    ctx.globalAlpha = 0.2 + 0.8 * Math.min(1, depth / 0.25);
+    ctx.strokeStyle = PLATE.line;
+    ctx.lineWidth = 0.6 + 0.9 * Math.min(1, depth);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+
+  // Type
+  const parts = bookTitle.split(' and Other Stories by ');
+  const mainTitle = parts[0] || bookTitle;
+  const author = parts[1] || '';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = PLATE.title;
+  ctx.font = '104px "EB Garamond"';
+  ctx.fillText(mainTitle, W / 2, 1345);
+  if (author) {
+    ctx.fillStyle = PLATE.sub;
+    ctx.font = 'italic 44px "EB Garamond"';
+    ctx.fillText('and other stories', W / 2, 1410);
+    ctx.fillStyle = PLATE.accent;
+    ctx.fillRect(W / 2 - 28, 1470, 56, 2);
+    // Author in tracked capitals (canvas has no letter-spacing, so set each
+    // glyph by hand)
+    ctx.fillStyle = PLATE.author;
+    ctx.font = '30px "EB Garamond"';
+    const glyphs = [...author.toUpperCase()], tracking = 9;
+    const widths = glyphs.map(ch => ctx.measureText(ch).width);
+    let gx = W / 2 - (widths.reduce((a, b) => a + b, 0) + tracking * (glyphs.length - 1)) / 2;
+    ctx.textAlign = 'left';
+    glyphs.forEach((ch, i) => { ctx.fillText(ch, gx, 1560); gx += widths[i] + tracking; });
+  }
+
+  // Paper grain (deterministic)
+  const img = ctx.getImageData(0, 0, W, H);
+  let seed = 7;
+  for (let i = 0; i < img.data.length; i += 4) {
+    seed = (seed * 16807) % 2147483647;
+    const g = (seed / 2147483647 - 0.5) * 10;
+    img.data[i] += g; img.data[i + 1] += g; img.data[i + 2] += g;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  return canvas.toBuffer('image/png');
+}
+
 function buildCoverPng(posts, bookTitle) {
+  if (COVER_STYLE === 'plate') return buildPlateCoverPng(posts, bookTitle);
   const W = 1200;
   const H = 1800;
   const n = posts.length;

@@ -1,5 +1,5 @@
 // Quick cover preview — run: node preview-cover.js [count] [style]
-// style: flow | stipple | hatch | all (default: flow)
+// style: plate | flow | stipple | hatch | ridge | all (default: plate)
 // Generates /tmp/cover-preview.png (and /tmp/cover-preview-N.png for scale tests)
 
 const fs = require('fs');
@@ -30,12 +30,12 @@ const allStories = [
 ];
 
 const count = parseInt(process.argv[2]) || 8;
-const style = process.argv[3] || 'ridge';
+const style = process.argv[3] || 'plate';
 const palette = process.argv[4] || null;
 const posts = allStories.slice(0, count);
 const bookTitle = 'The Company Man and Other Stories by Tomás Bjartur';
 
-const styles = style === 'all' ? ['flow', 'stipple', 'hatch', 'ridge'] : [style];
+const styles = style === 'all' ? ['plate', 'flow', 'stipple', 'hatch', 'ridge'] : [style];
 const palettes = palette === 'all' ? ['warm', 'navy', 'teal', 'ink', 'ember'] : palette ? [palette] : [null];
 
 for (const s of styles) {
