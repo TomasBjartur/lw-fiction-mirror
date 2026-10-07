@@ -1963,19 +1963,31 @@ function buildCoverPng(posts, bookTitle) {
   ctx.textBaseline = 'top';
 
   // Main title
-  ctx.font = '84px "EB Garamond"';
+  ctx.font = '88px "EB Garamond"';
   ctx.fillStyle = coverPal.title;
-  ctx.fillText(mainTitle, W / 2, H * 0.73);
+  ctx.fillText(mainTitle, W / 2, H * 0.728);
 
   // Subtitle
-  ctx.font = 'italic 36px "EB Garamond"';
-  ctx.fillStyle = coverPal.sub;
-  ctx.fillText(subtitle.toLowerCase(), W / 2, H * 0.73 + 100);
-
-  // Author
-  ctx.font = '40px "EB Garamond"';
+  ctx.font = 'italic 42px "EB Garamond"';
   ctx.fillStyle = coverPal.author;
-  ctx.fillText(author, W / 2, H * 0.865);
+  ctx.fillText(subtitle.toLowerCase(), W / 2, H * 0.728 + 102);
+
+  // Short rule between title block and author
+  if (author) {
+    ctx.fillStyle = coverPal.sub;
+    ctx.fillRect(W / 2 - 30, H * 0.833, 60, 1.5);
+  }
+
+  // Author, in tracked capitals (canvas has no letter-spacing, so set
+  // each glyph by hand)
+  ctx.font = '34px "EB Garamond"';
+  ctx.fillStyle = coverPal.author;
+  const tracking = 7;
+  const glyphs = [...author.toUpperCase()];
+  const widths = glyphs.map(ch => ctx.measureText(ch).width);
+  let gx = W / 2 - (widths.reduce((a, b) => a + b, 0) + tracking * (glyphs.length - 1)) / 2;
+  ctx.textAlign = 'left';
+  glyphs.forEach((ch, i) => { ctx.fillText(ch, gx, H * 0.867); gx += widths[i] + tracking; });
 
   return canvas.toBuffer('image/png');
 }
