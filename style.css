@@ -15,6 +15,7 @@
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-700-v1.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Tinos'; src: url('fonts/tinos-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Fraunces'; src: url('fonts/fraunces-latin-italic-300-600-v1.woff2') format('woff2'); font-weight: 300 600; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face {
   font-family: 'Cormorant Garamond';
@@ -59,6 +60,8 @@
   --heading: var(--display);
   /* Page titles (site name, story title): Times New Roman, served as Tinos. */
   --h1: 'Tinos', 'Site Marks', 'Times New Roman', Times, serif;
+  /* Date and reading time: Fraunces italic. */
+  --when: 'Fraunces', 'Site Marks', Georgia, serif;
 
   --col: 44rem;
   --measure: 38rem;
@@ -283,17 +286,19 @@ main {
 .story-title:visited { color: var(--tc); }
 
 .story .n {
-  font: italic 500 0.95rem/1 var(--display);
-  font-variant-numeric: oldstyle-nums tabular-nums;
+  font: 300 0.8rem/1 var(--title);
+  font-variant-numeric: tabular-nums;
   text-align: right;
   color: var(--muted);
 }
 .story-head { padding-bottom: 0.1rem; }
 .story-head .n { color: var(--muted); opacity: 0.75; }
+.story .when, .post-meta .when {
+  font: italic 400 0.85rem/1 var(--when);
+  font-variant-numeric: oldstyle-nums;
+}
 .story .when {
   margin-left: 0.3rem;
-  font: italic 500 0.95rem/1 var(--display);
-  font-variant-numeric: oldstyle-nums;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -329,14 +334,13 @@ main {
   align-items: center;
   gap: 0.35rem;
   margin-top: 0.7rem;
-  font: italic 500 0.98rem/1.2 var(--display);
-  font-variant-numeric: oldstyle-nums;
+  font: 300 0.8rem/1.2 var(--title);
   color: var(--muted);
 }
 .post-meta .m { display: inline-flex; align-items: center; gap: 0.35rem; }
 .post-meta .m:empty, .post-meta .m:not(:has(a)) { display: none; }
 .post-meta .m-ss .src { margin-left: 0.4rem; }
-.post-meta .n { font-variant-numeric: oldstyle-nums tabular-nums; }
+.post-meta .n { font-variant-numeric: tabular-nums; }
 .post-meta .n::after, .story .n:not(:empty)::after {
   content: "";
   display: inline-block;

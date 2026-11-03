@@ -76,7 +76,7 @@ arrows, and any such character in a story, like the █ redactions) go into a sm
 `bun scripts/font-audit.mjs <url>...` asks Chrome which fonts each page
 actually draws with and exits 1 if any came from the device.
 
-Hovering a title turns it letter by letter (25 ms a letter) into Major Mono Display (a
+Hovering a title turns it letter by letter (25 ms a letter, forwards only; leaving resets it) into Major Mono Display (a
 build-time subset of just the letters the titles use). The mono letters
 are set at one smaller size (0.62em) so every title fits its resting
 width; glyphs are never stretched and nothing on the page moves. Title colours shade from

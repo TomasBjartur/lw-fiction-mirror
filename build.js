@@ -573,7 +573,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     if(h.getAttribute('data-order')==='book')setOrder('book');
 
     // Hovering a title turns it, one letter every 25ms, into Major Mono
-    // Display; leaving turns it back the same way. The title (or, if it
+    // Display; leaving resets it at once. The title (or, if it
     // wraps, each word) keeps its resting width and the mono letters share
     // one size per title, so no glyph is distorted, spacing stays even and
     // nothing around the title moves (see .morph in style.css).
@@ -613,12 +613,12 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
       function run(){
         clearInterval(timer);
         timer=setInterval(function(){
-          if(dir>0){if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm'}
-          else{if(n<=0)return clearInterval(timer);spans[--n].className=''}
+          if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm';
         },25);
       }
       a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();n=0}run()})});
-      a.addEventListener('mouseleave',function(){dir=-1;if(spans)run()});
+      // Leaving resets the title at once; the morph only plays forwards.
+      a.addEventListener('mouseleave',function(){dir=-1;clearInterval(timer);if(spans){spans.forEach(function(s){s.className=''});n=0}});
     });
   })();
   </script>
@@ -656,7 +656,7 @@ function buildPostPage(post, allPosts) {
     <article>
       <header class="post-header">
         <h1 class="t-${post.slug}">${post.title}</h1>
-        <p class="post-meta"><span>${meta}</span>${metricCells(post)}</p>
+        <p class="post-meta"><span class="when">${meta}</span>${metricCells(post)}</p>
       </header>
       <div class="post-body">
         ${cleanHtml(post.htmlBody)}
