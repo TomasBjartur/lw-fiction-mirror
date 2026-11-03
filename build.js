@@ -331,28 +331,81 @@ function textOf(html = '') {
     .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d));
 }
 
+// Fetches a Google Fonts `text=` subset (spec as in css2, e.g. 'Astloch:wght@700')
+// and returns the woff2 bytes. Results are cached in .cache/fonts/ by spec and
+// text, so rebuilds don't wait on Google (~5 s a font).
+async function fetchGoogleSubset(spec, text) {
+  const chars = [...new Set(text)].sort().join('');
+  const key = require('crypto').createHash('sha1').update(spec + '\n' + chars).digest('hex').slice(0, 16);
+  const cached = path.join(__dirname, '.cache', 'fonts', `${key}.woff2`);
+  if (fs.existsSync(cached)) return fs.readFileSync(cached);
+  const url = `https://fonts.googleapis.com/css2?family=${spec.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
+  const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
+  const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+  if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
+  const res = await fetch(m[1]);
+  if (!res.ok) throw new Error(`font HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  fs.mkdirSync(path.dirname(cached), { recursive: true });
+  fs.writeFileSync(cached, buf);
+  return buf;
+}
+
 // Fails loud: returns the fonts that were written; a missing one logs
-// [DEGRADED] and its characters fall back to a device font.
+// [DEGRADED] and its characters fall back to the next face in the stack.
 async function fetchSubsetFonts(posts) {
-  const ok = [];
-  for (const f of SUBSET_FONTS) {
-    const chars = [...new Set(f.text(posts))].join('');
-    const url = `https://fonts.googleapis.com/css2?family=${f.family.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
+  fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
+  const results = await Promise.all(SUBSET_FONTS.map(async f => {
     try {
-      const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
-      const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
-      if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
-      const res = await fetch(m[1]);
-      if (!res.ok) throw new Error(`font HTTP ${res.status}`);
-      fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
-      fs.writeFileSync(path.join(OUTPUT_DIR, f.file), Buffer.from(await res.arrayBuffer()));
+      fs.writeFileSync(path.join(OUTPUT_DIR, f.file), await fetchGoogleSubset(f.family, f.text(posts)));
       console.log(`Wrote ${f.file}`);
-      ok.push(f);
+      return f;
     } catch (err) {
       console.error(`[DEGRADED] subset font (${f.family}): ${err.message}`);
+      return null;
     }
-  }
-  return ok;
+  }));
+  return results.filter(Boolean);
+}
+
+// Each story's title has its own display face, picked by Markus from his
+// "reviewed and cool experimental fonts" (2026-11-03). [Google css2 spec,
+// size factor against the list's base size, weight]. The build fetches a
+// subset of just that title's letters per story; a story missing here, or a
+// failed fetch, falls back to the list's sans.
+const TITLE_FONTS = {
+  'duane-arnold-1': ['Monoton', 0.95, 400],
+  'san-silvestro': ['Ballet', 1.7, 400],
+  'the-distaff-texts': ['Astloch:wght@700', 1.35, 700],
+  'customer-satisfaction-opportunities-1': ['Bitcount Ink', 1.0, 400],
+  'the-elect-2': ['Jacques Francois Shadow', 1.1, 400],
+  'goldfish': ['Kalnia Glaze:wght@500', 1.1, 500],
+  'lobsang-s-children-1': ['Shizuru', 1.15, 400],
+  'remembering-aubrey-chang': ['Send Flowers', 1.4, 400],
+  'penny-s-hands': ['Neonderthaw', 1.6, 400],
+  'that-mad-olympiad-1': ['Faster One', 1.0, 400],
+  'the-origami-men': ['Foldit:wght@500', 1.15, 500],
+  'our-beloved-monsters': ['Zen Tokyo Zoo', 1.1, 400],
+  'the-company-man': ['Coral Pixels', 1.05, 400],
+  'the-liar-and-the-scold': ['Tilt Prism', 1.0, 400],
+  'the-maker-of-mind': ['Tourney:wght@500', 1.05, 500],
+};
+
+// Returns Map slug -> { file, size, weight } for the faces that were written.
+async function fetchTitleFonts(posts) {
+  const out = new Map();
+  await Promise.all(posts.filter(p => TITLE_FONTS[p.slug]).map(async p => {
+    const [spec, size, weight] = TITLE_FONTS[p.slug];
+    const file = `fonts/title-${p.slug}.woff2`;
+    try {
+      fs.writeFileSync(path.join(OUTPUT_DIR, file), await fetchGoogleSubset(spec, p.title));
+      out.set(p.slug, { file, size, weight });
+    } catch (err) {
+      console.error(`[DEGRADED] title font for ${p.slug} (${spec}): ${err.message}`);
+    }
+  }));
+  console.log(`Title fonts: ${out.size}/${posts.length} stories`);
+  return out;
 }
 
 function titleColor(rank, n) {
@@ -362,12 +415,18 @@ function titleColor(rank, n) {
 }
 
 // Per-story recency colour and the hover face, written to dist/titles.css.
-function buildTitlesCss(posts, subsetFonts) {
+function buildTitlesCss(posts, subsetFonts, titleFonts) {
   const byDate = sortByDate(posts);
   const face = subsetFonts
     .map(f => `@font-face{font-family:'${f.as}';src:url('${f.file}') format('woff2');font-display:${f.display}}\n`)
     .join('');
-  return face + byDate.map((p, rank) => `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}}`).join('\n') + '\n';
+  const titleFaces = [...titleFonts].map(([slug, f]) =>
+    `@font-face{font-family:'tf-${slug}';src:url('${f.file}') format('woff2');font-weight:${f.weight};font-display:swap}\n`).join('');
+  return face + titleFaces + byDate.map((p, rank) => {
+    const f = titleFonts.get(p.slug);
+    const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}` : '';
+    return `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}${font}}`;
+  }).join('\n') + '\n';
 }
 
 function sortByDate(posts) {
@@ -1875,8 +1934,8 @@ async function main() {
 
   // Reader metrics and per-title fonts
   attachMetrics(fiction, await fetchSubstackMetrics());
-  const subsetFonts = await fetchSubsetFonts(fiction);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, subsetFonts));
+  const [subsetFonts, titleFonts] = await Promise.all([fetchSubsetFonts(fiction), fetchTitleFonts(fiction)]);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, subsetFonts, titleFonts));
   console.log('Wrote titles.css');
 
   // Write index page

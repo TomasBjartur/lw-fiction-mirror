@@ -76,6 +76,12 @@ arrows, and any such character in a story, like the █ redactions) go into a sm
 `bun scripts/font-audit.mjs <url>...` asks Chrome which fonts each page
 actually draws with and exits 1 if any came from the device.
 
+Each story's title in the contents list (and in the newer/older links)
+has its own display face, from Markus's picks: `TITLE_FONTS` in
+`build.js` maps slug to [Google css2 spec, size factor, weight]. The
+build fetches a subset of just that title's letters per story (cached in
+`.cache/fonts/`); a story without an entry uses the list sans.
+
 Hovering a title turns it letter by letter (25 ms a letter, forwards only; leaving resets it) into Major Mono Display (a
 build-time subset of just the letters the titles use). The mono letters
 are set at one smaller size (0.62em) so every title fits its resting
