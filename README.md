@@ -196,6 +196,10 @@ much wider or much shorter. The meta beside a hovered title fades out. A
 title that needed a width beyond the axis would run past its resting
 end, up to the end of the column (half the row for newer/older links),
 and shrink only there.
+`node scripts/hover-check.mjs <chrome|firefox|webkit>` hovers every
+title in a real engine (the list and the newer/older links, at three
+desktop widths) and fails if a hovered title's width or letter height is
+more than 2% off its resting one, or its row moves.
 Story pages sign the story in the name's face (Send Flowers), as in the
 header. Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.
