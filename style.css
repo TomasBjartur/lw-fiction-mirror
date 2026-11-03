@@ -171,7 +171,7 @@ a:hover { color: var(--link-hover); }
 main {
   width: min(100% - 2rem, var(--col));
   margin: 0 auto;
-  padding: calc(var(--nav-h) + 1.6rem) 0 3rem;
+  padding: calc(var(--nav-h) + 2.1rem) 0 3rem;
 }
 
 /* --- Titles: per-story face (titles.css) and recency colour ---------- */
