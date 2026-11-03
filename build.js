@@ -1542,6 +1542,14 @@ const LOCAL_IMAGES = new Map();
 async function localizeImages(posts) {
   const urlToPath = new Map();
   for (const post of posts) {
+    // LessWrong ships responsive srcset/sizes pointing at its Cloudinary CDN.
+    // Browsers prefer srcset over the localized src, and EPUB forbids remote
+    // resources, so keep only src. Images LW gives no alt text get alt="".
+    post.htmlBody = post.htmlBody.replace(/<img\b[^>]*>/gi, tag => {
+      let t = tag.replace(/\s(?:srcset|sizes)="[^"]*"/gi, '');
+      if (!/\salt=/i.test(t)) t = t.replace(/^<img/i, '<img alt=""');
+      return t;
+    });
     const urls = [...post.htmlBody.matchAll(/<img[^>]*?src="([^"]+)"/gi)].map(m => m[1]);
     for (const url of urls) {
       if (url.startsWith('data:') || url.startsWith('images/')) continue;
@@ -1790,7 +1798,7 @@ ${chapterFiles.map(c => `    <item id="${c.halfTitleId}" href="${c.halfTitleFile
 ${allImages.map(img => `    <item id="${img.id}" href="${img.filename}" media-type="${img.mediaType}"/>`).join('\n')}
   </manifest>
   <spine>
-    <itemref idref="cover" linear="no"/>
+    <itemref idref="cover"/>
     <itemref idref="halftitle"/>
     <itemref idref="titlepage"/>
     <itemref idref="copyright"/>
