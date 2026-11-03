@@ -303,31 +303,57 @@ function cleanHtml(html, { forFeed = false } = {}) {
 const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>';
 // --- Title typography -------------------------------------------------------
 
-// Titles are set in Cormorant Garamond, the display face of markusstrasser.org
-// (fonts/web/, copied from that site's self-hosted subset). On hover they turn
-// letter by letter into Major Mono Display. The build downloads a Google Fonts
-// subset of Major Mono holding only the letters the titles use, so the file is
-// a few KB and readers never contact Google.
-const HOVER_FONT = { family: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2' };
+// Fonts the build subsets from Google Fonts with `text=`, so each file holds
+// only the characters used and readers never contact Google:
+// - Major Mono Display: the title hover morph (letters of the titles).
+// - Noto Sans JP as 'Site Marks': the katakana list numbers and the nav and
+//   arrow marks, which the latin text faces lack. Without it they come from
+//   whatever font the reader's device has. The stacks in style.css put
+//   'Site Marks' right after each text face.
+const KATAKANA = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヰヱヲン';
+const SUBSET_FONTS = [
+  { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
+    text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+  { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
+    text: posts => KATAKANA + '、△◐←→' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
+];
 
-// Fails loud and returns false; the hover then falls back to the system mono.
-async function fetchHoverFont(posts) {
-  const chars = [...new Set(posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')].join('');
-  const url = `https://fonts.googleapis.com/css2?family=${HOVER_FONT.family.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
-  try {
-    const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
-    const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
-    if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
-    const res = await fetch(m[1]);
-    if (!res.ok) throw new Error(`font HTTP ${res.status}`);
-    fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
-    fs.writeFileSync(path.join(OUTPUT_DIR, HOVER_FONT.file), Buffer.from(await res.arrayBuffer()));
-    console.log(`Wrote ${HOVER_FONT.file}`);
-    return true;
-  } catch (err) {
-    console.error(`[DEGRADED] hover font (${HOVER_FONT.family}): ${err.message}`);
-    return false;
+// The unicode-range of Google Fonts' "latin" subset, which is what the
+// served text faces in fonts/web/ hold.
+const LATIN_RANGES = [[0x0, 0xff], [0x131, 0x131], [0x152, 0x153], [0x2bb, 0x2bc], [0x2c6, 0x2c6], [0x2da, 0x2da],
+  [0x2dc, 0x2dc], [0x304, 0x304], [0x308, 0x308], [0x329, 0x329], [0x2000, 0x206f], [0x20ac, 0x20ac], [0x2122, 0x2122],
+  [0x2191, 0x2191], [0x2193, 0x2193], [0x2212, 0x2212], [0x2215, 0x2215], [0xfeff, 0xfeff], [0xfffd, 0xfffd]];
+function outsideLatin(text) {
+  return [...new Set(text)].filter(ch => { const c = ch.codePointAt(0); return !LATIN_RANGES.some(([lo, hi]) => c >= lo && c <= hi); }).join('');
+}
+function textOf(html = '') {
+  return html.replace(/<[^>]*>/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d));
+}
+
+// Fails loud: returns the fonts that were written; a missing one logs
+// [DEGRADED] and its characters fall back to a device font.
+async function fetchSubsetFonts(posts) {
+  const ok = [];
+  for (const f of SUBSET_FONTS) {
+    const chars = [...new Set(f.text(posts))].join('');
+    const url = `https://fonts.googleapis.com/css2?family=${f.family.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
+    try {
+      const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
+      const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+      if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
+      const res = await fetch(m[1]);
+      if (!res.ok) throw new Error(`font HTTP ${res.status}`);
+      fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
+      fs.writeFileSync(path.join(OUTPUT_DIR, f.file), Buffer.from(await res.arrayBuffer()));
+      console.log(`Wrote ${f.file}`);
+      ok.push(f);
+    } catch (err) {
+      console.error(`[DEGRADED] subset font (${f.family}): ${err.message}`);
+    }
   }
+  return ok;
 }
 
 function titleColor(rank, n) {
@@ -336,13 +362,12 @@ function titleColor(rank, n) {
   return `light-dark(oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305), oklch(${mix(0.94, 0.78)} ${mix(0.005, 0.11)} 305))`;
 }
 
-// Per-story @font-face and colour, written to dist/titles.css.
 // Per-story recency colour and the hover face, written to dist/titles.css.
-function buildTitlesCss(posts, hoverFontOk) {
+function buildTitlesCss(posts, subsetFonts) {
   const byDate = sortByDate(posts);
-  const face = hoverFontOk
-    ? `@font-face{font-family:'${HOVER_FONT.family}';src:url('${HOVER_FONT.file}') format('woff2');font-display:block}\n`
-    : '';
+  const face = subsetFonts
+    .map(f => `@font-face{font-family:'${f.as}';src:url('${f.file}') format('woff2');font-display:${f.display}}\n`)
+    .join('');
   return face + byDate.map((p, rank) => `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}}`).join('\n') + '\n';
 }
 
@@ -444,7 +469,8 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="titles.css">
-  <link rel="preload" href="fonts/cormorant-garamond-latin-v1.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
+  <link rel="preload" href="fonts/inter-latin-normal-300-700-v1.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
+  <link rel="preload" href="fonts/${currentSlug ? 'charis-sil-latin-normal-400-v1' : 'cormorant-garamond-latin-v1'}.woff2" as="font" type="font/woff2" crossorigin>
   <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
   <script>try{var d=document.documentElement,t=localStorage.getItem('theme');if(t)d.setAttribute('data-theme',t);if(localStorage.getItem('order')==='book')d.setAttribute('data-order','book')}catch(e){}</script>
@@ -545,26 +571,39 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     if(h.getAttribute('data-order')==='book')setOrder('book');
 
     // Hovering a title turns it, one letter every 50ms, into Major Mono
-    // Display; leaving turns it back the same way.
+    // Display; leaving turns it back the same way. Each letter's rest width
+    // is measured once and kept (see .morph .mm in style.css), so nothing
+    // around the title moves.
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
+    var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
     document.querySelectorAll('.morph').forEach(function(a){
-      var spans=null,text=null,timer=null,n=0;
+      var spans=null,text=null,timer=null,n=0,dir=0;
       function split(){
         text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
-        Array.from(text).forEach(function(ch){
-          var s=document.createElement('span');s.textContent=ch;s.setAttribute('aria-hidden','true');
-          a.appendChild(s);if(/\\S/.test(ch))spans.push(s);
+        text.split(/(\\s+)/).forEach(function(part){
+          if(!part)return;
+          if(/^\\s+$/.test(part)){a.appendChild(document.createTextNode(part));return}
+          var w=document.createElement('span');w.className='w';w.setAttribute('aria-hidden','true');
+          Array.from(part).forEach(function(ch){var s=document.createElement('span');s.textContent=ch;w.appendChild(s);spans.push(s)});
+          a.appendChild(w);
+        });
+        var rest=spans.map(function(s){return s.getBoundingClientRect().width});
+        spans.forEach(function(s){s.className='mq'});
+        var wide=spans.map(function(s){return s.getBoundingClientRect().width});
+        spans.forEach(function(s,i){
+          s.className='';s.style.setProperty('--w',rest[i]+'px');
+          s.style.setProperty('--sx',wide[i]>rest[i]?(rest[i]/wide[i]).toFixed(3):'1');
         });
       }
-      function run(dir){
+      function run(){
         clearInterval(timer);
         timer=setInterval(function(){
           if(dir>0){if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm'}
           else{if(n<=0)return clearInterval(timer);spans[--n].className=''}
         },50);
       }
-      a.addEventListener('mouseenter',function(){if(!spans||a.textContent!==text){split();n=0}run(1)});
-      a.addEventListener('mouseleave',function(){if(spans)run(-1)});
+      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();n=0}run()})});
+      a.addEventListener('mouseleave',function(){dir=-1;if(spans)run()});
     });
   })();
   </script>
@@ -1822,8 +1861,8 @@ async function main() {
 
   // Reader metrics and per-title fonts
   attachMetrics(fiction, await fetchSubstackMetrics());
-  const hoverFontOk = await fetchHoverFont(fiction);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, hoverFontOk));
+  const subsetFonts = await fetchSubsetFonts(fiction);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, subsetFonts));
   console.log('Wrote titles.css');
 
   // Write index page

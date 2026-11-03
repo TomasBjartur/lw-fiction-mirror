@@ -65,18 +65,27 @@ from the GraphQL query, Substack from `/api/v1/archive`; a failed fetch
 logs `[DEGRADED]` and the build continues without those numbers). Story
 pages link to the newer and older story.
 
-Titles are set in Cormorant Garamond, the display face of
-markusstrasser.org (its self-hosted variable subsets, in `fonts/web/`).
-Hovering a title turns it letter by letter into Major Mono Display; the
-build downloads a Google Fonts subset of just the letters the titles use
-(about 3 KB, self-hosted). Title colours shade from near-black (newest)
-to dark purple (oldest); `dist/titles.css` holds them. Story text is set
-in Charter from the system font stack.
+Every font is served by the site, so every device renders the same:
+nothing relies on fonts the reader has installed. The faces follow
+markusstrasser.org: Cormorant Garamond for headings, Inter (standing in
+for the system UI font) for the list of titles and the interface, Charis
+SIL (the open build of Charter) for story text and Fira Mono for code.
+Their latin subsets live in `fonts/web/` (`scripts/fetch-webfonts.py`
+refreshes them). Characters outside those subsets (the katakana list
+numbers, the nav marks, arrows, and any such character in a story, like
+the █ redactions) go into a small Noto Sans JP subset the build fetches.
+`bun scripts/font-audit.mjs <url>...` asks Chrome which fonts each page
+actually draws with and exits 1 if any came from the device.
+
+Hovering a title turns it letter by letter into Major Mono Display (a
+build-time subset of just the letters the titles use). Each letter keeps
+its resting width, so nothing on the page moves. Title colours shade from
+near-black (newest) to dark purple (oldest); `dist/titles.css` holds them.
 
 A small inline script adds the optional extras: the dark-mode toggle, a
 recent / book-order switch (remembered in localStorage; book order is
-`COLLECTION_ORDER`, as in the EPUB), arrow keys for newer/older, and a
-the hover morph. The only
+`COLLECTION_ORDER`, as in the EPUB), arrow keys for newer/older, and the hover
+morph. The only
 external request on the reader's end is the `GEO_HIDDEN` lookup to
 ipapi.co, which runs on every page view (cached 24h) while any rule is
 configured.

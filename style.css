@@ -3,8 +3,18 @@
    generated into dist/titles.css. Colours are OKLCH light-dark() pairs, and
    the theme toggle only switches color-scheme. */
 
-/* Cormorant Garamond, the display face of markusstrasser.org: its
-   self-hosted variable latin subsets (wght 300-700), copied as-is. */
+/* Every face is served from fonts/ so all devices render the same; no
+   stack may rely on an installed font. Latin subsets, fetched by
+   scripts/fetch-webfonts.py (Cormorant copied from markusstrasser.org).
+   Inter stands in for the system UI font (SF/Segoe/Roboto), Charis SIL is
+   the open build of Charter. */
+@font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('fonts/inter-latin-italic-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-700-v1.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face {
   font-family: 'Cormorant Garamond';
   src: url('fonts/cormorant-garamond-latin-v1.woff2') format('woff2');
@@ -38,9 +48,14 @@
   --blush:    light-dark(oklch(0.66 0.16 5),    oklch(0.8 0.11 5));
   --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.45 0.08 24 / 0.6));
 
-  --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, 'Noto Serif', Georgia, serif;
-  --display: 'Cormorant Garamond', Garamond, Georgia, serif;
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Noto Sans', sans-serif;
+  --serif: 'Charis SIL', 'Site Marks', Charter, Georgia, serif;
+  --display: 'Cormorant Garamond', 'Site Marks', Garamond, Georgia, serif;
+  --sans: 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
+  --mono: 'Fira Mono', ui-monospace, monospace;
+  /* Faces as on markusstrasser.org: Cormorant for headings (name, essay
+     titles), the sans for the lists of titles. */
+  --title: var(--sans);
+  --heading: var(--display);
 
   --col: 44rem;
   --measure: 38rem;
@@ -188,12 +203,24 @@ main {
 
 [class*=" t-"], [class^="t-"] {
   color: var(--tc, var(--ink));
-  font-family: var(--display);
-  font-weight: 500;
+  font-family: var(--title);
+  font-weight: 400;
 }
+.post-header h1[class^="t-"] { font-family: var(--heading); font-weight: 500; }
 
-/* Letter-by-letter hover morph (script in build.js). */
-.morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
+/* Letter-by-letter hover morph (script in build.js). Each morphed letter
+   keeps the width it had at rest (--w), and the wider mono glyph is
+   squeezed into it (--sx), so the line never reflows. line-height: 0 keeps
+   the taller mono glyph from growing the line box. Words are nowrap so
+   the per-letter spans cannot add break points. */
+.morph .w { white-space: nowrap; }
+.morph .mq, .morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
+.morph .w > span[style] { display: inline-block; width: var(--w); }
+.morph .mm {
+  line-height: 0;
+  text-align: center;
+  transform: scaleX(var(--sx, 1));
+}
 
 /* Hover: the title turns blush, instantly. */
 .blush { text-decoration: none; }
@@ -259,8 +286,8 @@ main {
 .story .m { display: contents; }
 
 .story-title {
-  font-size: 1.42rem;
-  line-height: 1.2;
+  font-size: 1.15rem;
+  line-height: 1.35;
 }
 .story-title:visited { color: var(--tc); }
 
@@ -390,7 +417,7 @@ main {
 .post-body figure { margin: 1.2em 0; }
 .post-body figcaption { margin-top: 0.4em; font-family: var(--sans); font-size: 0.75rem; text-align: center; color: var(--muted); }
 
-.post-body pre, .post-body code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.8em; hyphens: manual; }
+.post-body pre, .post-body code { font-family: var(--mono); font-size: 0.8em; hyphens: manual; }
 .post-body pre { margin: 1em 0; padding: 0.8em 1em; overflow-x: auto; white-space: pre-wrap; background: var(--paper-2); border-radius: 3px; }
 .post-body code { padding: 0.1em 0.3em; background: var(--paper-2); border-radius: 3px; }
 .post-body pre code { padding: 0; background: none; }
@@ -414,7 +441,7 @@ main {
   align-items: baseline;
   gap: 1rem;
 }
-.post-nav-link { font-size: 1.3rem; line-height: 1.25; }
+.post-nav-link { font-size: 1.05rem; line-height: 1.35; }
 .post-nav-link:visited { color: var(--tc); }
 .post-nav-prev::before { content: '← '; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 .post-nav-next { margin-left: auto; text-align: right; }
