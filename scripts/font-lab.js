@@ -34,6 +34,85 @@ const g = (name, extra = '', more = '') => {
 // Pen scripts have tiny x-heights; normalising by x-height blows them up.
 const script = name => g(name, '', ';font-size-adjust:none;font-size:1.55rem');
 
+// The canon: the most admired typefaces of all time, each as a face the site
+// can serve to every reader (Google Fonts, self-hostable). Where the classic
+// itself cannot be served, the row shows its best open revival and names it.
+// [name, what it is, Google family spec, extra css]
+const CANON = [
+  ['Serif: Renaissance and Baroque', [
+    ['EB Garamond', 'Claude Garamond, Paris 1530s; Duffner revival', 'EB Garamond:wght@500'],
+    ['Cormorant Garamond', 'Garamond display cut; markusstrasser.org headings', 'Cormorant Garamond:wght@500'],
+    ['Cardo', 'Aldus Manutius / Bembo, Venice 1495', 'Cardo'],
+    ['Sorts Mill Goudy', 'Goudy Old Style, 1915', 'Sorts Mill Goudy'],
+    ['Libre Caslon Text', 'William Caslon, London 1734', 'Libre Caslon Text'],
+    ['Alegreya', 'calligraphic old style, 2011', 'Alegreya:wght@500'],
+    ['Vollkorn', 'dark-coloured old style, 2005', 'Vollkorn:wght@500'],
+    ['Crimson Pro', 'in the line of Minion and Garamond, 2018', 'Crimson Pro:wght@500'],
+  ]],
+  ['Serif: Transitional and Didone', [
+    ['Libre Baskerville', 'John Baskerville, Birmingham 1757', 'Libre Baskerville'],
+    ['Bodoni Moda', 'Giambattista Bodoni, Parma 1790s', 'Bodoni Moda:wght@500'],
+    ['Playfair Display', 'Didot-era high contrast, 2011', 'Playfair Display:wght@500'],
+    ['Old Standard TT', 'late-19th-century "Modern" book face', 'Old Standard TT'],
+    ['Charis SIL', 'Charter, Matthew Carter 1987; the body face now', 'Charis SIL'],
+    ['Gelasio', 'Georgia, Matthew Carter 1993 (metric clone)', 'Gelasio:wght@500'],
+    ['Tinos', 'Times New Roman, 1932 (metric clone)', 'Tinos'],
+    ['Cinzel', 'Roman inscriptional capitals, Trajan column 113 AD', 'Cinzel:wght@500'],
+  ]],
+  ['Serif: contemporary', [
+    ['Source Serif 4', 'Fournier-inspired, Adobe 2014', 'Source Serif 4:wght@500'],
+    ['Literata', 'Google Play Books face, 2015', 'Literata:wght@500'],
+    ['Newsreader', 'newspaper text, Production Type 2020', 'Newsreader:wght@500'],
+    ['Spectral', 'screen-first text serif, 2017', 'Spectral:wght@500'],
+    ['Fraunces', '"Old Style soft" display, 2020', 'Fraunces:wght@500'],
+    ['Instrument Serif', 'condensed display serif, 2023', 'Instrument Serif'],
+    ['DM Serif Display', 'high-contrast transitional display', 'DM Serif Display'],
+    ['Young Serif', 'heavy old style in the Plantin line', 'Young Serif'],
+  ]],
+  ['Slab', [
+    ['Besley', 'Clarendon, Robert Besley 1845', 'Besley:wght@500'],
+    ['Zilla Slab', 'Mozilla\'s slab, 2017', 'Zilla Slab:wght@500'],
+    ['Roboto Slab', 'Rockwell-like geometric slab', 'Roboto Slab'],
+  ]],
+  ['Sans: grotesque and neo-grotesque', [
+    ['Inter', 'SF/Helvetica-style UI sans; the list font now', 'Inter'],
+    ['Libre Franklin', 'Franklin Gothic, Morris Fuller Benton 1902', 'Libre Franklin'],
+    ['Archivo', 'American grotesque, 2016', 'Archivo'],
+    ['Public Sans', 'US government neutral sans, 2019', 'Public Sans'],
+    ['IBM Plex Sans', 'IBM corporate face, 2017', 'IBM Plex Sans'],
+    ['Space Grotesk', 'quirky grotesque from Space Mono', 'Space Grotesk'],
+    ['Bricolage Grotesque', 'French-flavoured display grotesque, 2023', 'Bricolage Grotesque'],
+    ['Instrument Sans', 'precise neo-grotesque, 2023', 'Instrument Sans'],
+  ]],
+  ['Sans: geometric', [
+    ['Jost', 'Futura, Paul Renner 1927 (revival)', 'Jost'],
+    ['Josefin Sans', '1920s geometric with vintage proportions', 'Josefin Sans'],
+    ['Montserrat', 'Gotham-like, Buenos Aires signage', 'Montserrat'],
+    ['Poppins', 'pure circles-and-lines geometric', 'Poppins'],
+    ['Manrope', 'semi-condensed modern geometric', 'Manrope'],
+    ['Syne', 'wide-to-narrow art-centre face, 2017', 'Syne'],
+  ]],
+  ['Sans: humanist', [
+    ['Lato', 'warm humanist in the Gill Sans / Frutiger family', 'Lato'],
+    ['Source Sans 3', 'Adobe\'s first open face, in the Franklin/News Gothic line', 'Source Sans 3'],
+    ['Fira Sans', 'Erik Spiekermann for Mozilla, Meta lineage', 'Fira Sans'],
+    ['Open Sans', 'Frutiger-like, the web\'s workhorse', 'Open Sans'],
+    ['Marcellus', 'flared like Optima, Hermann Zapf 1958', 'Marcellus'],
+  ]],
+  ['Monospace', [
+    ['Courier Prime', 'Courier, IBM typewriter 1955', 'Courier Prime'],
+    ['IBM Plex Mono', 'IBM corporate mono', 'IBM Plex Mono'],
+    ['JetBrains Mono', 'code face, 2020', 'JetBrains Mono'],
+    ['Fira Mono', 'code blocks now', 'Fira Mono'],
+    ['Space Mono', 'retro-futurist display mono', 'Space Mono'],
+  ]],
+];
+const canonStyle = spec => {
+  const [name, rest = ''] = spec.split(':');
+  const w = (rest.match(/wght@(\d+)/) || [])[1];
+  return { family: spec.replace(/ /g, '+'), css: `font-family:'${name}'${w ? `;font-weight:${w}` : ''}` };
+};
+
 const DIRECTIONS = [
   {
     id: 'A', name: 'One family, many voices: Fraunces',
@@ -100,6 +179,7 @@ function titleColor(rank, n) {
 }
 
 const families = new Set();
+for (const [, faces] of CANON) for (const f of faces) families.add(canonStyle(f[2]).family);
 for (const d of DIRECTIONS) {
   d.families.forEach(f => families.add(f));
   d.styles.forEach(s => s.family && families.add(s.family));
@@ -110,6 +190,18 @@ const links = [];
 for (let i = 0; i < fam.length; i += 12) {
   links.push(`<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${fam.slice(i, i + 12).map(f => 'family=' + f).join('&')}&display=swap">`);
 }
+
+const samples = [0, 4, 12].map(i => stories[i % stories.length]);
+let k = 0;
+const canon = `
+  <section class="canon">
+    <h2><span class="id">K</span> The canon, as faces every reader gets</h2>
+    <p class="note">The most admired typefaces, each served by the site so every device shows the same thing. Where the classic itself cannot be served (Helvetica, Futura, Gill Sans, Optima, Didot), the row shows its best open revival and names the original. Three titles per face; codes like <b>K12</b>.</p>
+    ${CANON.map(([group, faces]) => `<h3>${group}</h3><table>${faces.map(([name, what, spec]) => {
+      const st = canonStyle(spec);
+      return `<tr><td class="code">K${++k}</td><td class="face"><b>${name}</b><br><span>${what}</span></td><td class="ttl" style="${st.css}">${samples.map(s => `<a href="${s.slug}.html">${s.title}</a>`).join('<i>·</i>')}</td></tr>`;
+    }).join('')}</table>`).join('')}
+  </section>`;
 
 const sections = DIRECTIONS.map(d => `
   <section>
@@ -140,14 +232,27 @@ ${links.join('\n')}
   li::marker { color: oklch(0.45 0.17 26); font-size: 0.85rem; }
   li a { font-size: 1.4rem; line-height: 1.2; text-decoration: none; font-size-adjust: 0.5; }
   li a:hover { color: oklch(0.66 0.16 5) !important; }
+  .canon { margin-bottom: 3rem; }
+  .canon h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: oklch(0.5 0.01 264); margin: 1.4rem 0 0.3rem; }
+  .canon table { border-collapse: collapse; width: 100%; }
+  .canon td { padding: 0.32rem 0.6rem 0.32rem 0; vertical-align: baseline; border-bottom: 1px solid oklch(0.92 0.005 85); }
+  .canon .code { width: 2.6rem; color: oklch(0.45 0.17 26); font-size: 0.8rem; }
+  .canon .face { width: 15rem; font-size: 0.8rem; }
+  .canon .face span { color: oklch(0.55 0.01 264); font-size: 0.72rem; }
+  .canon .ttl { font-size: 1.35rem; line-height: 1.25; font-size-adjust: 0.5; }
+  .canon .ttl a { color: oklch(0.24 0.01 264); text-decoration: none; }
+  .canon .ttl a:hover { color: oklch(0.66 0.16 5); }
+  .canon .ttl i { font-style: normal; color: oklch(0.75 0.01 264); margin: 0 0.5rem; }
   .f { margin-left: 0.6rem; font-size: 0.65rem; color: oklch(0.6 0.01 264); white-space: nowrap; }
 </style></head>
 <body>
-<h1>Font lab: title directions</h1>
+<h1>Font lab</h1>
+${canon}
+<h1>Earlier directions: one face per title</h1>
 <p class="intro">Every story title, in contents order (newest first), in seven directions. Codes like <b>C4</b> name a single title's face, so you can pick a whole direction or mix titles across them. Size is normalised by x-height, as on the site.</p>
 <main>${sections}
 </main>
 </body></html>
 `;
 fs.writeFileSync(path.join(dist, 'font-lab.html'), html);
-console.log(`Wrote dist/font-lab.html (${DIRECTIONS.length} directions × ${stories.length} titles, ${fam.length} families)`);
+console.log(`Wrote dist/font-lab.html (${k} canon faces, ${DIRECTIONS.length} directions × ${stories.length} titles, ${fam.length} families)`);
