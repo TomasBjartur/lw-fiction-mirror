@@ -135,13 +135,15 @@ the margin at text size (Bringhurst 4.1.5); punctuation right after the
 letter (I'm) is cut off from the initial by an invisible word joiner. A
 paragraph shorter than its initial is held open to the initial's depth,
 so the next paragraph starts below it. Firefox has no `initial-letter`
-and gets a float sized to the same box. Chrome copies a one-letter
-opening word without its space ("Iheard"); Safari and Firefox copy it
-whole. `node scripts/initials-check.mjs <chrome|firefox|webkit>` checks
-every story's initials in a real engine (its header says how to install
-the engines). `scripts/initials-lab.js` writes `dist/initials-lab/`, the
-comparison of faces, frequencies and quote treatments behind this
-choice; a design tool, not part of the site.
+and gets a float sized to the same box. Chrome drops a space that starts
+a line beside an initial, from copies and from what screen readers hear
+("Iheard"), so the space after a one-letter first word sits in a
+zero-width box. `node scripts/initials-check.mjs
+<chrome|firefox|webkit>` checks every story's initials in a real engine,
+copying included (its header says how to install the engines).
+`scripts/initials-lab.js` writes `dist/initials-lab/`, the comparison of
+faces, frequencies and quote treatments behind this choice; a design
+tool, not part of the site.
 
 While reading, the nav slides away on scrolling down and returns on any
 scroll up, near the top, or on keyboard focus; a hairline across the top

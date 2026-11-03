@@ -512,6 +512,9 @@ main {
 .post-body p.oq { position: relative; }
 .post-body p.oq::before { content: attr(data-q) / ""; position: absolute; top: 0; left: -0.45em; }
 .post-body p.oq:has(> :is(i, em):first-child)::before { font-style: italic; }
+/* The space after a one-letter first word, kept for copies and screen
+   readers in a box that takes no room (build.js). */
+.post-body .sp { display: inline-block; width: 0; white-space: pre; }
 
 /* Headings inside a story, left-aligned in the text face. */
 .post-body :is(h1, h2, h3, h4) {

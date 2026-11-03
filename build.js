@@ -378,7 +378,13 @@ function typeset(body) {
 //   draws it as nothing, and CSS hangs a visible one (data-q) in the margin
 //   at text size (Bringhurst 4.1.5);
 // - punctuation right after the letter (I'm) would be drawn at initial size;
-//   a word joiner (U+2060, invisible) ends ::first-letter at the letter.
+//   a word joiner (U+2060, invisible) ends ::first-letter at the letter;
+// - after a one-letter word (I, A) the space starts the line beside the
+//   initial, where Chrome drops it from copies and from what screen readers
+//   hear ("Iheard"). It goes in a zero-width box (.sp) that keeps it without
+//   moving the line, and a word joiner keeps the letter's text node from
+//   being emptied by ::first-letter, which would drop the letter from
+//   Chrome's accessibility tree.
 function markOpening(m, before, open, text, cls) {
   if (!/^[\u201c\u2018]?\p{L}/u.test(text)) return m;
   const q = /^[\u201c\u2018]/.test(text) ? text[0] : '';
@@ -387,9 +393,12 @@ function markOpening(m, before, open, text, cls) {
   const words = head.split(' ');
   let n = 0;
   while (n < Math.min(5, head === rest ? words.length - 1 : words.length)) { n++; if (/[.,;:!?\u201d]$/.test(words[n - 1])) break; }
-  const lead = words.slice(0, n).join(' ');
+  let lead = words.slice(0, n).join(' '), tail = rest.slice(lead.length);
+  const sp = '\u2060<span class="sp"> </span>';
+  if (/^\p{L} /u.test(lead)) lead = lead.replace(' ', sp);
+  else if (/^\p{L}$/u.test(lead) && tail.startsWith(' ')) { lead += sp; tail = tail.slice(1); }
   const attrs = q ? ` class="${cls} oq" data-q="${q}"` : ` class="${cls}"`;
-  const body = lead ? `<span class="lead">${q}${lead}</span>${rest.slice(lead.length)}` : q + rest;
+  const body = lead ? `<span class="lead">${q}${lead}</span>${tail}` : q + rest;
   return `${before}<p${attrs}>${open}${body}`;
 }
 

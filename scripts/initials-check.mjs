@@ -17,7 +17,8 @@
 // - the next paragraph must start at its own indent, not pushed right by
 //   an initial reaching down from a short paragraph above;
 // - the paragraph must be at least as tall as its initial;
-// - a paragraph that opens on a quote must copy with the quote.
+// - copying the paragraph must give its text: the opening quote, and the
+//   space after a one-letter first word (word joiners aside).
 // With a clip directory it also saves clips of reference spots to look at.
 // Exits 1 on any failure.
 import { createRequire } from 'node:module';
@@ -70,11 +71,9 @@ const CHECK = () => {
       const t = texts(nx)[0]; const i = t.data.search(/[^ \t\n\r]/);
       push = Math.round(charRect(t, i).left - nx.getBoundingClientRect().left - parseFloat(getComputedStyle(nx).textIndent));
     }
-    let copy = null;
-    if (p.classList.contains('oq')) {
-      getSelection().selectAllChildren(p); copy = getSelection().toString(); getSelection().removeAllRanges();
-    }
-    return { cls: p.className, text: p.textContent.trim().slice(0, 30), lines, need, rows: +(pr.height / lh).toFixed(2), push, copyQuote: copy === null ? null : /^[“‘]/.test(copy) };
+    const norm = s => s.replace(/\u2060/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    getSelection().selectAllChildren(p); const copy = norm(getSelection().toString()); getSelection().removeAllRanges();
+    return { cls: p.className, text: p.textContent.trim().slice(0, 30), lines, need, rows: +(pr.height / lh).toFixed(2), push, copy: copy === norm(p.textContent) ? null : copy };
   });
 };
 
@@ -100,7 +99,7 @@ for (const [w, h] of sizes) {
       checked++;
       const why = [r.push !== null && r.push > 4 && `next paragraph pushed ${r.push}px`,
         r.rows < r.need - 0.01 && `paragraph ${r.rows} lines tall for a ${r.need}-line initial`,
-        r.copyQuote === false && 'copy lost the opening quote'].filter(Boolean);
+        r.copy !== null && `copies as "${r.copy}"`].filter(Boolean);
       if (why.length) failures.push(`${w}px ${s} ${r.cls} "${r.text}": ${why.join('; ')}`);
     }
   }
