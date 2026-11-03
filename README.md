@@ -66,23 +66,32 @@ first paint). Each colour token is written once with `light-dark()` in
 APCA Lc 88 rather than pure white, accents lifted and desaturated, story
 images dimmed to 85%, interface weight 360 instead of 400) come from a
 research pass on dark-mode reading (Material, Apple HIG, APCA, polarity
-studies). The contents
+studies). `light-dark()` sets the browser baseline (Safari 17.5, Chrome
+123, Firefox 120, all from May 2024 or earlier); older browsers are not
+supported.
+
+`style.css` keeps every colour, size, space and duration as a token in
+`:root`; components use only tokens, and breakpoints change tokens or
+the layout tokens can't express (its header lists the breakpoints). The
+contents
 page opens with the author's name (Send Flowers), the book and the links
 (RSS, X, and a Substack-orange Subscribe button that goes to Substack)
 above a thin black rule. The book is its title in the text face,
 underlined, followed by "EPUB" and a download mark in the accent red: one
-link that downloads the EPUB. It sits on the name's row from 1200 px up
-and below the rule, indented to the list, on narrower screens; it is set
-at story-title size. The footer carries it too. Story pages put "TB" (in
-the name's face) and the EPUB link in their nav. On screens at least
-520 px tall the list fills the window: one equal row per story, titles
-scaled to the row, so every story shows without scrolling. On phones
-(640 px and under) the meta sits on its own line under each title. Rows
-never go below 2.1rem (2.3rem on phones), so a long list scrolls. A title
-too wide for its row (a long title in a wide face, on a phone) is shrunk
-to fit by a small script.
-Each title is followed by its month and reading time in Inter Light
-Italic (reading time at 260 words a minute, Brysbaert's 2019 mean for
+link that downloads the EPUB. From 1200 px up it sits on the name's row
+at the size of the nav labels; on narrower screens it goes below the
+rule, indented to the list, at story-title size. The footer carries it
+too (except on a phone's contents page, where it is already under the
+name). Story pages put "TB" (in the name's face) and the EPUB link in
+their nav. On screens at least 520 px tall the list fills the window:
+one equal row per story, titles scaled to the row, so every story shows
+without scrolling (on phones, with the browser's toolbars showing). On
+phones (640 px and under) the meta sits on its own line under each
+title. Rows never go below 2.1rem, so a long list scrolls. A title too
+wide for its space (a long title in a wide face in a list row, or a long
+word in a story's title, on a phone) is shrunk to fit by a small script.
+Each title is followed by its month and reading time in Inter Light,
+upright, the month a weight up (reading time at 260 words a minute, Brysbaert's 2019 mean for
 fiction, rounded to the minute under 10 and to 5 minutes above), then its
 LessWrong karma and comments and Substack likes, restacks and comments,
 small, in EB Garamond with old-style figures (LessWrong from the GraphQL
@@ -93,9 +102,9 @@ is the oldest story and the oldest's "older" link is the newest.
 
 Every font is served by the site, so every device renders the same:
 nothing relies on fonts the reader has installed. Inter (standing in for
-the system UI font) sets the interface, EB Garamond story text, story
-titles and the meta line, Fira Mono code and Cormorant Garamond headings
-inside stories.
+the system UI font) sets the interface and, in its Light weight, dates and
+reading times; EB Garamond sets story text, headings inside stories, the
+reader counts and the book; Fira Mono any code.
 
 Story pages are set as a printed book page (treatment A of the reading
 lab, Markus's pick): EB Garamond at 19-21.5 px on a ~62-character line,

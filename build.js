@@ -244,18 +244,24 @@ function orderForCollection(posts) {
   return bookOrder(eligible);
 }
 
-function formatDate(dateStr) {
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+// With html, the month is wrapped (.mo) so it can sit a weight above the
+// numbers; without, plain text for title attributes and the feed.
+const markMonth = (m, html) => html ? `<span class="mo">${m}</span>` : m;
+
+// "17 September 2025"
+function formatDate(dateStr, html = false) {
   const d = new Date(dateStr);
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${d.getUTCDate()} ${markMonth(MONTHS[d.getUTCMonth()], html)} ${d.getUTCFullYear()}`;
 }
 
-function formatMonthYear(dateStr) {
+// "Sep 2025"
+function formatMonthYear(dateStr, html = false) {
   const d = new Date(dateStr);
-  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${markMonth(MONTHS[d.getUTCMonth()].slice(0, 3), html)} ${d.getUTCFullYear()}`;
 }
 
 // Minutes to read: 260 words a minute, the mean silent reading rate for
@@ -633,7 +639,7 @@ const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.
 function whenText(p) {
   const mins = readingMinutes(p.wordCount);
   const read = mins ? ` · <span title="${mins} min read">${mins}m</span>` : '';
-  return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span>${read}</span>`;
+  return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt, true)}</span>${read}</span>`;
 }
 
 // Reader counts from LessWrong and Substack, each group led by its source
@@ -658,13 +664,15 @@ const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.5
 // Download mark: an arrow into a tray, so an EPUB link reads as a file.
 const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // The book as a download: its title, underlined, with the EPUB mark.
-const bookLink = cls => `<a href="${EPUB_FILENAME}" class="${cls} epub-link" title="The whole collection as a free EPUB" download><span class="bk-title">${SITE_TITLE}</span> <span class="bk-dl">EPUB${ICON_DL}</span></a>`;
+const bookLink = cls => `<a href="${EPUB_FILENAME}" class="book ${cls} epub-link" title="The whole collection as a free EPUB" download><span class="bk-title">${SITE_TITLE}</span> <span class="bk-dl">EPUB${ICON_DL}</span></a>`;
 const X_HANDLE = 'BjarturTomas';
 const X_URL = `https://x.com/${X_HANDLE}`;
 
 // One line at the foot of every page.
 function siteFoot() {
-  return `<p class="site-foot">© ${new Date().getFullYear()} ${AUTHOR} · <a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a> · ${bookLink('foot-book')}</p>`;
+  // The book with its separator, so a phone's contents page (where the
+  // book sits under the name) can drop it and keep the footer to a line.
+  return `<p class="site-foot">© ${new Date().getFullYear()} ${AUTHOR} · <a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item"> · ${bookLink('foot-book')}</span></p>`;
 }
 
 // Site links: in the fixed bar on story pages, beside the title on the
@@ -818,18 +826,22 @@ ${currentSlug ? `  <header class="nav">
       for(var i=0;i<as.length;i++)if(as[i].offsetParent){location.href=as[i].href;return}
     });
 
-    // A title too wide for its row (a long title in a wide face, on a phone)
-    // shrinks just enough to fit: --fit on its row scales the CSS size.
-    var rows=document.querySelectorAll('.stories .story');
+    // A title too wide for its space shrinks just enough to fit: --fit
+    // scales its CSS size. That is a long title in a wide face in a list
+    // row, or a long word in a story's title, on a phone. Only a row that
+    // keeps its title on one line (the filling list) has a width to fit.
+    var rows=document.querySelectorAll('.stories .story'),heads=document.querySelectorAll('.post-header h1');
+    function setFit(el,w,room){if(room>0&&w>room)el.style.setProperty('--fit',(room/w).toFixed(3))}
     function fit(){
       rows.forEach(function(li){li.style.removeProperty('--fit')});
+      heads.forEach(function(h){h.style.removeProperty('--fit')});
       rows.forEach(function(li){
-        var a=li.querySelector('.story-title'),c=li.querySelector('.title-cell');if(!a||!c)return;
-        var w=a.getBoundingClientRect().width,room=c.clientWidth-2;
-        if(w>room)li.style.setProperty('--fit',(room/w).toFixed(3));
+        var a=li.querySelector('.story-title'),c=li.querySelector('.title-cell');
+        if(a&&c)setFit(li,a.getBoundingClientRect().width,c.clientWidth-2);
       });
+      heads.forEach(function(h){setFit(h,h.scrollWidth,h.clientWidth)});
     }
-    if(rows.length){
+    if(rows.length||heads.length){
       var fitFrame=0;
       (document.fonts?document.fonts.ready:Promise.resolve()).then(fit);
       addEventListener('resize',function(){cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(fit)},{passive:true});
@@ -838,9 +850,22 @@ ${currentSlug ? `  <header class="nav">
     // Hovering a title turns it, letter by letter at uneven speed, into Major Mono
     // Display; leaving resets it at once. The title (or, if it wraps, each
     // word) keeps its resting box, so nothing around it moves; the mono
-    // letters are near title size, never distorted (see .morph in style.css).
+    // letters keep the title's size, never distorted (see .morph in style.css).
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
     var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
+    // The mono letters keep the title's size: never below its base size
+    // (before the face's own size factor, --ts), and as tall as the title's
+    // letters on average (the mean of its x-height and its capitals), so a
+    // title never shrinks on hover; Major Mono is unicase, so one height.
+    var cx=document.createElement('canvas').getContext('2d');
+    function up(font,t){cx.font=font;return cx.measureText(t).actualBoundingBoxAscent}
+    function monoSize(a,t,fontPx){
+      var cs=getComputedStyle(a),ts=parseFloat(cs.getPropertyValue('--ts'))||1;
+      var xs=(t.match(/[acemnorsuvwxz]/g)||[]).join('')||t;
+      var f=cs.fontStyle+' '+cs.fontWeight+' '+fontPx+'px '+cs.fontFamily,mf='400 100px "Major Mono Display"';
+      var h=(up(f,xs)+up(f,t))/2,m=(up(mf,xs)+up(mf,t))/200;
+      return Math.max(fontPx/ts,m>0?h/m:0);
+    }
     document.querySelectorAll('.morph').forEach(function(a){
       var spans=null,text=null,timer=null,left=null,dir=0;
       function split(){
@@ -860,6 +885,7 @@ ${currentSlug ? `  <header class="nav">
         });
         a.appendChild(mi);
         var fontPx=parseFloat(getComputedStyle(a).fontSize);
+        a.style.setProperty('--mono-size',monoSize(a,text,fontPx).toFixed(1)+'px');
         // Measure the text, not the box.
         var width=function(e){var r=document.createRange();r.selectNodeContents(e);return r.getBoundingClientRect().width};
         var boxes=oneLine?[mi]:Array.from(a.querySelectorAll('.w'));
@@ -871,9 +897,10 @@ ${currentSlug ? `  <header class="nav">
         if(oneLine){
           // The link keeps its resting box, so nothing moves.
           var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
-          // The mono text is no wider than the resting title (nor than half
-          // the newer/older row), so the title keeps its size on hover.
-          var room=Math.min(box,a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4);
+          // The mono text keeps the title's size and may run on to the end
+          // of the title column (the meta beside it fades meanwhile) or half
+          // the newer/older row; only there does it shrink to fit.
+          var room=a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4;
           a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
           // An inline title (the contents list) pins to its line height, so
           // the line it sits on keeps its height; a block-level link (a flex
@@ -931,19 +958,19 @@ function postNavLink(list, idx, step) {
     const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls} hover-red morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
 function buildPostPage(post, allPosts) {
   const readTime = estimateReadingTime(post.wordCount);
-  const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
+  const meta = [formatDate(post.postedAt, true), readTime].filter(Boolean).join(' · ');
   const byDate = sortByDate(allPosts);
   const idx = byDate.findIndex(p => p.slug === post.slug);
 
   const content = `
     <article>
       <header class="post-header">
-        <h1 class="t-${post.slug}">${post.title}</h1>
+        <h1>${post.title}</h1>
         <p class="byline">${AUTHOR}</p>
         <p class="post-meta meta"><span class="when">${meta}</span>${stats(post)}</p>
         <span class="orn" aria-hidden="true"></span>
@@ -969,7 +996,7 @@ function buildPostPage(post, allPosts) {
 function buildIndexPage(posts) {
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story${EDITOR_PICKS.has(p.slug) ? ' pick' : ''}" data-slug="${p.slug}"${EDITOR_PICKS.has(p.slug) ? ' title="Editor\'s pick"' : ''}>
-          <span class="title-cell"><a class="story-title hover-red morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
+          <span class="title-cell"><a class="story-title morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
         </li>`).join('');
 
   const content = `

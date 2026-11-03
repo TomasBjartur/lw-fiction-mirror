@@ -12,9 +12,8 @@ import pathlib, re, tempfile, urllib.parse, urllib.request
 
 UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
 FACES = {  # file prefix -> Google css2 family spec
-    'inter': 'Inter:ital,wght@0,300..700;1,300..700',
+    'inter': 'Inter:wght@300..700',
     'fira-mono': 'Fira+Mono:wght@400',
-    'tinos': 'Tinos:wght@400',
 }
 RAW = 'https://raw.githubusercontent.com/google/fonts/main/ofl/'
 FULL = [  # output file, repo path, weight to pin a variable font at (or None)

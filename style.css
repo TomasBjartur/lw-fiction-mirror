@@ -1,84 +1,130 @@
 /* The Origami Men and Other Stories — site stylesheet.
-   Copied to dist/style.css by build.js; per-story title faces and colours are
-   generated into dist/titles.css. Light only; colours are OKLCH. */
+   Copied to dist/style.css by build.js (font URLs get a content hash); the
+   per-story title faces, sizes and colours are generated into
+   dist/titles.css as --tf, --tw, --ts and --tc on each .t-<slug>.
 
-/* Every face is served from fonts/ so all devices render the same; no
-   stack may rely on an installed font. Latin subsets, fetched by
-   scripts/fetch-webfonts.py (Cormorant copied from markusstrasser.org).
-   Inter stands in for the system UI font (SF/Segoe/Roboto), Tinos has the
-   metrics of Times New Roman, EB Garamond sets stories and the meta line. */
+   How it is organised: every colour, size, space and duration is a token
+   in :root, and components only use tokens. Breakpoints change tokens, or
+   layout that tokens can't express:
+     max-width 640px   phones: smaller type, the meta under each title
+     max-width 520px   story text goes ragged (justified lines gap there)
+     min-width 1200px  the book joins the name's row on the contents page
+     min-height 520px  the contents list fills the window
+   Colours are OKLCH, each written once for light and dark with
+   light-dark(); browsers older than that (Safari 17.5, May 2024) are not
+   supported. */
+
+/* --- Fonts ------------------------------------------------------------ */
+/* Every face is served from fonts/, so all devices render the same; no
+   stack relies on an installed font. Latin subsets from
+   scripts/fetch-webfonts.py. Inter stands in for the system UI font,
+   EB Garamond sets the stories, the reader counts and the book, Fira Mono
+   any code. build.js adds subset faces (the name, the hover face, the
+   marks) and each story's title face in titles.css. */
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
-@font-face { font-family: 'Inter'; src: url('fonts/inter-latin-italic-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: italic; font-display: swap; }
-@font-face { font-family: 'Tinos'; src: url('fonts/tinos-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face {
-  font-family: 'Cormorant Garamond';
-  src: url('fonts/cormorant-garamond-latin-v1.woff2') format('woff2');
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Cormorant Garamond';
-  src: url('fonts/cormorant-garamond-latin-italic-v1.woff2') format('woff2');
-  font-weight: 300 700;
-  font-style: italic;
-  font-display: swap;
-}
+
+/* --- Tokens ----------------------------------------------------------- */
 
 :root {
-  /* Light and dark, each token written once with light-dark(). The page
-     follows the reader's system setting; the ◐ button (System → Light →
-     Dark, remembered) forces one via data-theme. Dark values and their
-     contrast (APCA Lc / WCAG) are from the dark-mode research memo:
-     warm near-black page at Material's #121212 lightness, off-white text
-     at Lc 88 (not pure white), accents lifted in lightness and halved in
-     chroma so they stay in gamut and don't vibrate. */
+  /* Colour. Light and dark, each written once. The page follows the
+     reader's system setting; the ◐ button (System → Light → Dark,
+     remembered) forces one via data-theme. Dark values are from the
+     dark-mode research memo: a warm near-black page at Material's #121212
+     lightness, off-white text at APCA Lc 88 (not pure white), accents
+     lifted in lightness and halved in chroma. */
   color-scheme: light dark;
+  --paper:         light-dark(oklch(0.99 0.006 85),  oklch(0.18 0.006 85));
+  --paper-2:       light-dark(oklch(0.965 0.008 82), oklch(0.215 0.007 82));
+  --ink:           light-dark(oklch(0.24 0.01 264),  oklch(0.91 0.008 85));
+  --ink-soft:      light-dark(oklch(0.38 0.01 264),  oklch(0.81 0.008 85));
+  --muted:         light-dark(oklch(0.55 0.01 264),  oklch(0.75 0.01 264));
+  --rule:          light-dark(oklch(0.88 0.006 264), oklch(0.32 0.006 264));
+  --rule-strong:   var(--ink);
+  /* The one accent: every hover, the EPUB mark, the editor's-pick rule,
+     the focus ring. */
+  --accent:        light-dark(oklch(0.52 0.22 24),   oklch(0.80 0.11 24));
+  --accent-deep:   light-dark(oklch(0.38 0.16 24),   oklch(0.68 0.14 24));
+  --accent-tint:   color-mix(in oklch, var(--accent) 10%, transparent);
+  --pick:          linear-gradient(var(--accent-deep), color-mix(in oklch, var(--accent) 50%, transparent));
+  /* Links inside story text, the only underlined blue. */
+  --link:          light-dark(oklch(0.47 0.15 264),  oklch(0.84 0.075 264));
+  --link-visited:  light-dark(oklch(0.42 0.14 294),  oklch(0.82 0.07 294));
+  --underline:     color-mix(in oklch, currentColor 40%, transparent);
+  --selection:     light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.40 0.09 24));
+  --progress:      light-dark(oklch(0.4 0.02 285 / 0.4), oklch(0.8 0.02 285 / 0.45));
+  /* Substack's own button colours, both themes. */
+  --substack:       #ff6719;
+  --substack-hover: color-mix(in oklch, var(--substack) 88%, black);
+  --on-substack:    #fff;
 
-  --paper:    light-dark(oklch(0.99 0.006 85),  oklch(0.18 0.006 85));
-  --paper-2:  light-dark(oklch(0.965 0.008 82), oklch(0.215 0.007 82));
-  --ink:      light-dark(oklch(0.24 0.01 264),  oklch(0.91 0.008 85));
-  --ink-soft: light-dark(oklch(0.38 0.01 264),  oklch(0.81 0.008 85));
-  --muted:    light-dark(oklch(0.55 0.01 264),  oklch(0.75 0.01 264));
-  --rule:     light-dark(oklch(0.88 0.006 264), oklch(0.32 0.006 264));
-  --rule-strong: var(--ink);
-  --link:     light-dark(oklch(0.47 0.15 264),  oklch(0.84 0.075 264));
-  --link-visited: light-dark(oklch(0.42 0.14 294), oklch(0.82 0.07 294));
-  --link-hover: light-dark(oklch(0.52 0.22 24), oklch(0.80 0.11 24));
-  --marker:   light-dark(oklch(0.45 0.17 26),   oklch(0.79 0.10 26));
-  --substack: #ff6719; /* Substack's own orange, both themes */
-  --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.40 0.09 24));
-  /* Editor's pick rule: the link-hover red (also the EPUB mark), dark at
-     the top fading to mid, so picks, the book and hovers share one accent. */
-  --pick:     linear-gradient(light-dark(oklch(0.38 0.16 24), oklch(0.68 0.14 24)), light-dark(oklch(0.52 0.22 24 / 0.5), oklch(0.80 0.11 24 / 0.5)));
-  /* Inter's weight in the interface; light text on dark reads heavier,
-     so dark drops it by ~0.9x (below). */
-  --ui-w: 400;
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-
-  /* Story text: EB Garamond, the book page Markus picked in the lab. */
+  /* Faces. 'Site Marks' (Noto Sans JP, subset) carries the marks and any
+     character outside latin, right after each text face. */
+  --sans:  'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
-  --display: 'Cormorant Garamond', 'Site Marks', Garamond, Georgia, serif;
-  --sans: 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
-  --mono: 'Fira Mono', ui-monospace, monospace;
-  /* Dates, reading times and reader counts. */
-  --meta: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
-  /* Faces as on markusstrasser.org: Cormorant for headings (name, essay
-     titles), the sans for the lists of titles. */
-  --title: var(--sans);
-  --heading: var(--display);
-  /* Page titles (site name, story title): Times New Roman, served as Tinos. */
-  --h1: 'Tinos', 'Site Marks', 'Times New Roman', Times, serif;
+  --mono:  'Fira Mono', ui-monospace, monospace;
+  --name:  'Author Name', var(--serif);  /* Send Flowers, subset to the name */
 
-  --col: 44rem;
-  --measure: 38rem;
-  --nav-h: 2.6rem;
+  /* Type scale. */
+  --fs-2xs:  0.7rem;    /* reader counts */
+  --fs-xs:   0.8rem;    /* footer, captions, the story's meta line, arrows */
+  --fs-s:    0.9rem;    /* nav labels */
+  --fs-nav-text: 1rem;  /* EB Garamond at the cap height of the nav labels */
+  --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
+  --fs-name: 2.9rem;    /* the name on the contents page */
+  --fs-book: clamp(1.2rem, 3vw, 1.65rem);  /* the book under the rule: a title's size */
+  --icon-k:  1.2;       /* an icon is 1.2x its label */
+  --title-size: 1.1rem; /* titles outside the filling list (newer/older, short windows) */
+  --title-line: 1.85rem;
+  --story-size: clamp(19px, 14.4px + 0.45vw, 21.5px);  /* story text; Rello et al. 2016 */
+
+  /* Weights. Light text on dark reads heavier, so dark takes the
+     interface weight down ~0.9x (Dark, below). */
+  --w-light:  300;
+  --w-ui:     400;
+  --w-strong: 600;
+  --track-label: 0.08em;  /* letter-spaced sans labels: nav, EPUB */
+  --track-caps:  0.16em;  /* the story title's spaced capitals */
+
+  /* Space. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --r:   3px;
+
+  /* Motion. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur:       0.15s;  /* hovers and fades */
+  --dur-slide: 0.2s;   /* the story nav and the progress line */
+
+  /* Layout. */
+  --col:    44rem;
+  --nav-h:  2.6rem;
+  --gutter: clamp(1rem, 3vw, 2.5rem);
+  --page-w: min(100% - 2 * var(--gutter), var(--col));
+  --indent: clamp(1.25rem, 4vw, 3.5rem);  /* the list sits one indent in from the name */
+
+  /* The contents list filling the window (Contents, below): one row per
+     story, never shorter than --row-min; the title is --title-k of the
+     row, capped at --title-cqw of the list's width; its line is
+     --title-lh of the row; the meta scales with the row, clamped. */
+  --row-min:   2.1rem;
+  --title-k:   0.56;
+  --title-cqw: 2.6cqw;
+  --title-lh:  1;
+  --meta-k:    0.27;
+  --meta-min:  0.7rem;
+  --meta-max:  0.95rem;
 }
 
+/* --- Base ------------------------------------------------------------- */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -88,115 +134,114 @@ html {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  scroll-padding-top: calc(var(--nav-h) + 0.8rem);
+  scroll-padding-top: calc(var(--nav-h) + var(--s-3));
 }
 
 body {
   font-family: var(--sans);
-  color: var(--ink);
-  background: var(--paper);
   line-height: 1.5;
   font-kerning: normal;
+  color: var(--ink);
+  background: var(--paper);
 }
 
 ::selection { background: var(--selection); }
 
-a { color: var(--link); text-underline-offset: 0.15em; text-decoration-thickness: 1px; }
-a:visited { color: var(--link-visited); }
-a:hover { color: var(--link-hover); }
+/* Interface links take their component's colour and turn the accent on
+   hover; only links inside story text are blue and underlined. */
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--accent); }
 
-:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r); }
 
 .skip-link {
-  position: absolute; left: 1rem; top: -4rem; z-index: 50;
-  padding: 0.4rem 0.8rem; background: var(--ink); color: var(--paper);
-  font-size: 0.75rem; text-decoration: none;
+  position: absolute; left: var(--s-4); top: -4rem; z-index: 50;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-xs);
+  color: var(--paper);
+  background: var(--ink);
 }
-.skip-link:focus { top: 0.4rem; }
+.skip-link:focus { top: var(--s-2); }
 
-/* --- Nav ------------------------------------------------------------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
+/* One underline for every underlined link: story text and the book. */
+.post-body a, .book {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--underline);
+  text-underline-offset: 0.2em;
+}
+.post-body a:hover, .book:hover { text-decoration-color: currentColor; }
+
+/* --- Layout ----------------------------------------------------------- */
+/* One centred column under the story nav; the contents page has no bar
+   (and fills the window when tall enough: Contents, below). */
+
+main {
+  width: var(--page-w);
+  margin: 0 auto;
+  padding: calc(var(--nav-h) + var(--s-5)) 0 var(--s-7);
+}
+.is-index main { padding-top: var(--s-6); }
+
+/* --- Nav -------------------------------------------------------------- */
+/* The site links: beside the name on the contents page, in a bar across
+   the top of story pages. */
+
+.navbar { display: flex; align-items: center; gap: var(--s-1); }
+
+.nav-item {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--s-1) var(--s-2);
+  font: var(--w-ui) var(--fs-s)/1 var(--sans);
+  letter-spacing: var(--track-label);
+  white-space: nowrap;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.nav-item:hover { color: var(--accent); background: var(--accent-tint); }
+.nav-home { font: 400 var(--fs-mark)/1 var(--name); letter-spacing: 0; color: var(--ink); }
+.nav-epub { color: var(--accent); }
+.nav-x svg, .x-link svg { width: calc(1em * var(--icon-k)); height: calc(1em * var(--icon-k)); fill: currentColor; }
+.theme-toggle { font-size: calc(var(--fs-s) * var(--icon-k)); letter-spacing: 0; }
+
+/* Substack's own button: 40px tall, 8px corners, semibold, its orange. */
+.nav-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  height: 2.35rem;
+  margin-left: auto;
+  padding: 0 var(--s-4);
+  font: var(--w-strong) var(--fs-s)/1 var(--sans);
+  color: var(--on-substack);
+  background: var(--substack);
+  border-radius: 8px;
+}
+.nav-sub:hover { color: var(--on-substack); background: var(--substack-hover); }
+.nav-sub svg { width: auto; height: 0.85em; fill: currentColor; }
+
+/* Story pages: the bar slides up out of the way while reading down and
+   returns on scroll up (script in build.js); a hairline across the top
+   shows progress through the story. Both as on markusstrasser.org. */
 .nav {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 20;
   display: flex;
   justify-content: center;
-  padding-top: 0.3rem;
+  padding-top: var(--s-1);
   background: color-mix(in oklch, var(--paper) 94%, transparent);
   backdrop-filter: blur(12px);
+  transition: transform var(--dur-slide) var(--ease-out);
 }
-
-.navbar {
-  position: relative;
-  width: min(100% - 2rem, var(--col));
-  min-height: var(--nav-h);
-  display: flex;
-  align-items: center;
-  gap: 0.1rem;
-  border-bottom: 1px solid var(--rule-strong);
-}
-
-.nav-item {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.3rem 0.55rem;
-  font: var(--ui-w) 0.9rem/1 var(--sans);
-  letter-spacing: 0.08em;
-  color: var(--ink-soft);
-  background: none;
-  border: 0;
-  border-radius: 3px;
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.nav-item:visited { color: var(--ink-soft); }
-.nav-x svg, .x-link svg { width: 1.15em; height: 1.15em; fill: currentColor; opacity: 0.5; transition: opacity 0.15s ease; }
-.nav-x:hover svg, .x-link:hover svg { opacity: 1; }
-.nav-x svg { width: 1.1rem; height: 1.1rem; }
-
-.site-foot {
-  margin-top: 0.8rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid color-mix(in oklch, var(--ink) 14%, transparent);
-  font: var(--ui-w) 0.8rem/1.4 var(--sans);
-  color: var(--muted);
-}
-.site-foot a { color: inherit; text-decoration: none; }
-.x-link { display: inline-flex; align-items: center; gap: 0.3em; }
-.x-link:hover { color: var(--ink); }
-.nav-item:hover, .nav-item[aria-current="page"] {
-  color: var(--link-hover);
-  background: color-mix(in oklch, var(--link-hover) 10%, transparent);
-}
-.nav-home { font: 400 1.35rem/1 'Author Name', var(--serif); letter-spacing: 0; color: var(--ink); text-decoration: none; }
-.nav-home:visited { color: var(--ink); }
-.nav-sub {
-  /* Substack's own button: 40px tall, 8px corners, semibold, its orange. */
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  height: 2.35rem;
-  margin-left: auto;
-  padding: 0 1rem;
-  font: 600 0.85rem/1 var(--sans);
-  color: #fff;
-  background: var(--substack);
-  border-radius: 8px;
-  text-decoration: none;
-}
-.nav-sub:visited, .nav-sub:hover { color: #fff; }
-.nav-sub:hover { background: color-mix(in oklch, var(--substack) 88%, black); }
-.nav-sub svg { width: 0.7rem; height: 0.75rem; fill: currentColor; }
-.site-head .nav-sub { margin-left: 0.5rem; }
-
-/* Story pages: the nav slides up out of the way while reading down and
-   returns on scroll up (script in build.js); a separate hairline across
-   the top shows progress through the story text. Both as on
-   markusstrasser.org. */
-.nav { transition: transform 180ms var(--ease-out); }
 .nav.hidden { transform: translateY(-100%); }
+.nav .navbar { width: var(--page-w); min-height: var(--nav-h); border-bottom: 1px solid var(--rule-strong); }
 
 .reading-progress {
   position: fixed;
@@ -205,165 +250,76 @@ a:hover { color: var(--link-hover); }
   height: 2px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.22s ease;
+  transition: opacity var(--dur-slide) ease;
 }
 .reading-progress.visible { opacity: 1; }
-.progress-bar {
-  height: 100%;
-  transform: scaleX(0);
-  transform-origin: left;
-  background: light-dark(oklch(0.4 0.02 285 / 0.4), oklch(0.8 0.02 285 / 0.45));
+.progress-bar { height: 100%; transform: scaleX(0); transform-origin: left; background: var(--progress); }
+
+/* --- The book --------------------------------------------------------- */
+/* The collection as a download: its title in the text face, underlined,
+   then "EPUB" and a download mark in the accent, so it reads as a file
+   rather than a story. The mark is the nav labels' size, or its line's
+   if smaller (the footer). */
+.book { color: var(--ink-soft); }
+.bk-dl {
+  font: var(--w-ui) min(var(--fs-s), 1em)/1 var(--sans);
+  letter-spacing: var(--track-label);
+  white-space: nowrap;
+  color: var(--accent);
 }
+.dl-ico { width: 1em; height: 1em; margin-left: 0.25em; vertical-align: -0.12em; }
 
-/* --- Layout ---------------------------------------------------------- */
+/* --- Footer ----------------------------------------------------------- */
 
-main {
-  width: min(100% - 2rem, var(--col));
-  margin: 0 auto;
-  padding: calc(var(--nav-h) + 2.1rem) 0 3rem;
+.site-foot {
+  margin-top: var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--rule);
+  font: var(--w-ui) var(--fs-xs)/1.4 var(--sans);
+  color: var(--muted);
 }
-/* The contents page has no bar: its links sit beside the title. */
-.is-index main { padding-top: 2.6rem; }
+.x-link { display: inline-flex; align-items: center; gap: 0.3em; }
 
-/* --- Titles: per-story face (titles.css) and recency colour ---------- */
+/* --- Story titles ----------------------------------------------------- */
+/* In the contents list and the newer/older links: each story's own face,
+   weight, size factor and recency colour from titles.css; --fit shrinks
+   a title too wide for its row (script in build.js). */
 
-
-/* Each story's own face, weight and size factor come from titles.css
-   (--tf, --tw, --ts); stories without one use the list sans. */
-[class*=" t-"], [class^="t-"] {
+.story-title, .post-nav-link {
+  font-family: var(--tf, var(--sans)), var(--sans);
+  font-weight: var(--tw, var(--w-light));
+  font-size: calc(var(--title-size) * var(--ts, 1) * var(--fit, 1));
+  line-height: var(--title-line);
   color: var(--tc, var(--ink));
-  font-family: var(--tf, var(--title)), var(--title);
-  font-weight: var(--tw, 300);
 }
-.post-header h1[class^="t-"] { font-family: var(--serif); font-weight: 400; color: var(--ink); }
 
-/* Letter-by-letter hover morph (script in build.js). The script pins the
-   title's resting box (.pinned; or, for a wrapped title, each word's: --w),
-   so nothing reflows. The mono letters are set at title size
-   (--mono-size), capped by --mfit so the mono text is no wider than the
-   resting title: the title changes face but keeps its size.
-   line-height: 0 keeps the mono glyphs from growing the line box. */
+/* Hover morph (script in build.js): the title turns, letter by letter,
+   into Major Mono Display. The script pins the title's resting box
+   (.pinned; or, for a wrapped title, each word's: --w), so nothing
+   reflows, and sets --mono-size (the title's x-height, never below its
+   base size) and --mfit (the most that fits the room to the end of the
+   column). line-height: 0 keeps the mono glyphs from growing the line. */
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
-.morph .mq, .morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
-.morph .mm { font-size: min(var(--mono-size, 1.05rem), var(--mfit, 1em)); line-height: 0; }
+.morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; }
+.morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
-.title-cell .meta { transition: opacity 0.12s ease-out; }
-.title-cell:has(.mm) .meta { opacity: 0; transition-duration: 0.18s; }
 
-/* Hover: the title turns the accent red of every other hover, instantly. */
-.hover-red { text-decoration: none; }
-.hover-red:hover, .hover-red:visited:hover { color: var(--link-hover); }
+/* --- Meta: dates, reading times and reader counts --------------------- */
+/* Date and reading time in Inter Light (the served stand-in for
+   Helvetica Light), the month a weight up and a step larger than the
+   counts; the counts in EB Garamond's old-style figures, each followed by
+   a small icon of its kind and each source led by its mark (a link). */
 
-/* Metric icons, drawn as masks in currentColor. */
-.k-date     { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'><rect x='3.5' y='5' width='17' height='15.5' rx='2'/><path d='M3.5 10h17M8 3v4M16 3v4'/></svg>"); }
-.k-read     { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='8.8'/><path d='M12 7v5.2l3.4 2'/></svg>"); }
-.k-karma    { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 4.5l8 13.5H4z'/></svg>"); }
-.k-cmts     { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'><path d='M4 5h16v10.5H10.5L6 19.5v-4H4z'/></svg>"); }
-.k-likes    { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 20.5s-8-4.9-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.7-8 10.6-8 10.6z'/></svg>"); }
-.k-restacks { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 11V9a3 3 0 0 1 3-3H19M16 3l3 3-3 3M19.5 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3'/></svg>"); }
-
-.ico::before {
-  content: "";
-  display: inline-block;
-  width: 0.8rem;
-  height: 0.8rem;
-  vertical-align: -0.1rem;
-  background: currentColor;
-  -webkit-mask: var(--ico) center / contain no-repeat;
-  mask: var(--ico) center / contain no-repeat;
-}
-
-/* --- Contents -------------------------------------------------------- */
-
-/* The author's name, the book (its title as the EPUB download) and the
-   site links on one row above a thin rule when the window is wide enough;
-   otherwise the book drops below the rule as its own line, indented to
-   the list. The list sits one indent in from the name (--indent). */
-.is-index { --indent: clamp(1.25rem, 4vw, 3.5rem); }
-.site-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: "name . nav" "rule rule rule" "book book book";
-  align-items: baseline;
-  column-gap: 1rem;
-  margin-bottom: 1.2rem;
-}
-.site-h1 { grid-area: name; }
-.site-head .navbar { grid-area: nav; width: auto; min-height: 0; gap: 0; border: 0; }
-.site-head .nav-item { padding: 0.15rem 0.35rem; }
-.head-rule { grid-area: rule; margin-top: 0.35rem; border: 0; border-top: 1px solid var(--ink); }
-.head-book { grid-area: book; justify-self: start; margin: 0.9rem 0 0.4rem var(--indent); }
-/* Title-sized, so the book never reads smaller than a story; it joins the
-   name's row only where that row has room for it at that size. */
-@media (min-width: 1200px) {
-  .site-head { grid-template-columns: auto 1fr auto auto; grid-template-areas: "name . book nav" "rule rule rule rule"; }
-  .head-book { margin: 0 0.6rem 0 0; font-size: min(1.65rem, 2.2vw); }
-}
-
-/* The book as a download: text face, underlined, with the EPUB mark, so it
-   reads as a file rather than a story. */
-.head-book, .foot-book {
-  color: var(--ink-soft);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
-  text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
-}
-.head-book { font: 400 clamp(1.2rem, 3vw, 1.65rem)/1.2 var(--serif); }
-.head-book:visited, .foot-book:visited { color: var(--ink-soft); }
-.head-book:hover, .foot-book:hover { color: var(--link-hover); text-decoration-color: currentColor; }
-.bk-dl, .nav-epub, .nav-epub:visited { color: var(--link-hover); }
-.bk-dl { white-space: nowrap; font: var(--ui-w) 0.68em/1 var(--sans); letter-spacing: 0.08em; }
-.dl-ico { width: 1em; height: 1em; margin-left: 0.25em; vertical-align: -0.12em; }
-.nav-epub .dl-ico { width: 0.95em; height: 0.95em; }
-
-.site-h1 {
-  font-family: 'Author Name', var(--h1);
-  font-size: 2.9rem;
-  font-weight: 400;
-  line-height: 1.15;
-  color: var(--ink);
-}
-
-.stories { list-style: none; padding-left: var(--indent, 0); }
-/* Editor's picks: a red rule in the margin, left of the title. */
-.story { position: relative; }
-.story.pick::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * min(0.75rem, var(--indent, 1rem) / 2));
-  top: 18%;
-  bottom: 18%;
-  width: 4px;
-  border-radius: 2px;
-  background: var(--pick);
-}
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.story { padding: 0.1rem 0; }
-
-.story-title {
-  --mono-size: 1.15rem;
-  font-size: calc(1.15rem * var(--ts, 1) * var(--fit, 1));
-  /* Absolute, so every row is the same height whatever the title's face. */
-  line-height: 1.85rem;
-}
-.story-title:visited { color: var(--tc); }
-
-/* Date, reading time and reader counts: small, in the quiet text face,
-   set right after the title. */
 .meta {
-  font: 400 0.7rem/1 var(--meta);
+  font: 400 var(--fs-2xs)/1 var(--serif);
   font-variant-numeric: oldstyle-nums proportional-nums;
   letter-spacing: 0.01em;
   color: var(--muted);
 }
-.story .meta { margin-left: 0.35rem; white-space: nowrap; }
-/* Date and reading time a step larger than the reader counts. */
-/* Date and reading time: Inter Light Italic (the served stand-in for
-   Helvetica), a step larger than the counts in EB Garamond. */
-.meta .when { font: italic 300 1.08em/1 var(--sans); color: var(--ink-soft); }
-.meta .m { display: inline-flex; align-items: baseline; gap: 0.3rem; margin-left: 0.55rem; }
+.meta .when { font: var(--w-light) 1.08em/1 var(--sans); color: var(--ink-soft); }
+.meta .mo { font-weight: var(--w-ui); }
+.meta .m { display: inline-flex; align-items: baseline; gap: 0.3em; margin-left: 0.8em; }
 .meta .n::after {
   content: "";
   display: inline-block;
@@ -376,117 +332,116 @@ main {
   -webkit-mask: var(--ico) center / contain no-repeat;
   mask: var(--ico) center / contain no-repeat;
 }
+.k-karma    { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 4.5l8 13.5H4z'/></svg>"); }
+.k-cmts     { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'><path d='M4 5h16v10.5H10.5L6 19.5v-4H4z'/></svg>"); }
+.k-likes    { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 20.5s-8-4.9-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.7-8 10.6-8 10.6z'/></svg>"); }
+.k-restacks { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 11V9a3 3 0 0 1 3-3H19M16 3l3 3-3 3M19.5 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3'/></svg>"); }
 
-.src {
-  display: inline-flex;
-  align-self: center;
-  width: 0.7rem;
-  height: 0.7rem;
-}
+.src { display: inline-flex; align-self: center; width: 1em; height: 1em; }
 .src svg { width: 100%; height: 100%; fill: currentColor; }
 .src-lw { color: var(--ink-soft); }
 .src-ss { color: var(--substack); }
-.src:hover { opacity: 0.7; }
 
-/* Wide enough and tall enough: the contents page fills the window. Slim
-   side margins; the list takes the height left under the header, split into
-   one equal row per story (--n, set by the build), and titles scale with the
-   row (cq units of the list), capped by the width. So every story shows
-   without scrolling and no height is left over. */
-@media (min-width: 641px) and (min-height: 520px) {
-  .is-index main {
-    width: auto;
-    min-height: 100dvh;
-    margin: 0 clamp(1rem, 3vw, 2.5rem);
-    padding: 1.2rem 0 1rem;
-    display: flex;
-    flex-direction: column;
-  }
-  .is-index .site-head { flex: none; margin-bottom: 1.6rem; }
-  .is-index .site-foot { flex: none; }
-  .stories {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    container-type: size;
-    /* Rows never drop below 2.1rem: once there are too many stories to
-       fit, the list runs past the window and the page scrolls. */
-    grid-template-rows: repeat(var(--n), minmax(2.1rem, 1fr));
-    min-height: calc(var(--n) * 2.1rem);
-  }
-  /* cq units resolve against the list only inside it, so the row size is
-     defined on the rows. */
-  .story { --row: max(2.1rem, 100cqh / var(--n)); display: flex; align-items: center; min-height: 0; padding: 0; }
-  .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
-  .story-title {
-    font-size: calc(min(var(--row) * 0.56, 2.6cqw) * var(--ts, 1) * var(--fit, 1));
-    line-height: var(--row);
-    --mono-size: min(var(--row) * 0.56, 2.6cqw);
-  }
-  .story .meta { font-size: clamp(0.7rem, var(--row) * 0.27, 0.95rem); margin-left: 0.6em; }
+/* --- Contents --------------------------------------------------------- */
+/* The name, the book and the site links above a thin rule. The book sits
+   under the rule, indented to the list and title-sized, and joins the
+   name's row, at the nav labels' size, where that row has room. */
+
+.site-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "name . nav" "rule rule rule" "book book book";
+  align-items: baseline;
+  column-gap: var(--s-4);
+  margin-bottom: var(--s-4);
+}
+.site-h1 { grid-area: name; font: 400 var(--fs-name)/1.15 var(--name); white-space: nowrap; color: var(--ink); }
+.site-head .navbar { grid-area: nav; }
+.head-rule { grid-area: rule; margin-top: var(--s-1); border: 0; border-top: 1px solid var(--rule-strong); }
+.head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: 400 var(--fs-book)/1.2 var(--serif); }
+@media (min-width: 1200px) {
+  .site-head { grid-template-columns: auto 1fr auto auto; grid-template-areas: "name . book nav" "rule rule rule rule"; }
+  .head-book { margin: 0 var(--s-2) 0 0; font-size: var(--fs-nav-text); }
 }
 
-/* Phones fill the screen the same way, with the meta on its own line under
-   each title: the row splits about 60/40 between title and meta, and titles
-   scale with the row, capped by the width. svh, so the list fits with the
-   browser's toolbars showing. Rows stop shrinking at 2.3rem; past that the
-   page scrolls. */
-@media (max-width: 640px) and (min-height: 520px) {
+.stories { list-style: none; padding-left: var(--indent); }
+.story { position: relative; padding: var(--s-1) 0; }
+.story .meta { margin-left: 0.6em; white-space: nowrap; }
+.title-cell .meta { transition: opacity var(--dur) ease-out; }
+.title-cell:has(.mm) .meta { opacity: 0; }
+/* Editor's picks: an accent rule in the margin, left of the title. */
+.story.pick::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * min(var(--s-3), var(--indent) / 2));
+  top: 18%;
+  bottom: 18%;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--pick);
+}
+
+/* Tall enough: the list fills the window. It takes the height left under
+   the header, one equal row per story (--n, set by the build), and titles
+   scale with the row (cq units of the list), capped by its width, so
+   every story shows without scrolling and no height is left over. Rows
+   stop shrinking at --row-min; past that the list's min-height pushes the
+   footer down and the page scrolls. svh, so the list fits with a phone
+   browser's toolbars showing. The height must be fixed, not a min-height:
+   cq units need a definite container height (with min-height Chrome
+   resolves 100cqh to 0 and every row falls to --row-min). */
+@media (min-height: 520px) {
   .is-index main {
-    width: auto;
-    min-height: 100svh;
-    margin: 0 1rem;
-    padding: 0.9rem 0 0.4rem;
     display: flex;
     flex-direction: column;
+    width: auto;
+    height: 100svh;
+    margin: 0 var(--gutter);
+    padding: var(--s-4) 0 var(--s-3);
   }
   .is-index .site-head, .is-index .site-foot { flex: none; }
-  .is-index .site-foot { margin-top: 0.4rem; }
   .stories {
     flex: 1;
-    min-height: 0;
     display: grid;
+    grid-template-rows: repeat(var(--n), minmax(var(--row-min), 1fr));
+    min-height: calc(var(--n) * var(--row-min));
     container-type: size;
-    grid-template-rows: repeat(var(--n), minmax(2.3rem, 1fr));
-    min-height: calc(var(--n) * 2.3rem);
   }
-  .story { --row: max(2.3rem, 100cqh / var(--n)); display: flex; align-items: center; min-height: 0; padding: 0; }
+  /* cq units resolve against the list only inside it, so the row
+     measures are defined on the rows. */
+  .story {
+    --row: max(var(--row-min), 100cqh / var(--n));
+    --title-size: min(var(--row) * var(--title-k), var(--title-cqw));
+    --title-line: calc(var(--row) * var(--title-lh));
+    display: flex;
+    align-items: center;
+    min-height: 0;
+    padding: 0;
+  }
   .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
-  .story-title {
-    font-size: calc(min(var(--row) * 0.42, 5.2cqw) * var(--ts, 1) * var(--fit, 1));
-    line-height: calc(var(--row) * 0.58);
-    --mono-size: min(var(--row) * 0.42, 5.2cqw);
-  }
-  .story .meta { display: block; margin: 0; font-size: clamp(0.62rem, var(--row) * 0.2, 0.8rem); line-height: 1.15; }
+  .story .meta { font-size: clamp(var(--meta-min), var(--row) * var(--meta-k), var(--meta-max)); }
 }
 
-/* --- Story: a printed book page ------------------------------------- */
+/* --- Story: a printed book page ---------------------------------------- */
 /* Treatment A from the reading lab (scripts/reading-lab.js): EB Garamond
    at ~21px on a justified, hyphenated ~62-character line (ragged on
    phones), 1em indents, a centred spaced-capitals title, a three-line drop
    cap and a small-caps lead-in. Bringhurst's 66-character ideal and
-   Standard Ebooks' indents; the size follows Rello et al. 2016. */
+   Standard Ebooks' indents. */
 
-.is-post article {
-  --story-size: clamp(19px, 14.4px + 0.45vw, 21.5px);
-  max-width: calc(29 * var(--story-size));
-  margin: 0 auto;
-}
+.is-post article { max-width: calc(29 * var(--story-size)); margin: 0 auto; }
 
-.post-header { margin: 0.6rem 0 2.2rem; text-align: center; font-size: var(--story-size); }
+.post-header { margin-bottom: var(--s-5); text-align: center; font-size: var(--story-size); }
 .post-header h1 {
-  font-size: 1.55em;
-  line-height: 1.2;
+  font: 400 calc(1.8em * var(--fit, 1))/1.15 var(--serif);
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  margin-right: -0.16em;
+  letter-spacing: var(--track-caps);
+  margin-right: calc(-1 * var(--track-caps));
   text-wrap: balance;
 }
-/* The byline is the author's name in its own face, as in the header. */
-.byline { margin-top: 0.6em; font: 400 1.5em/1.2 'Author Name', var(--serif); letter-spacing: 0; color: var(--ink); }
-.post-meta { justify-content: center; margin-top: 0.7em; font-size: 0.62em; }
-.post-meta .m:first-of-type { margin-left: 0.7rem; }
-.orn { display: block; width: 2.4em; margin: 1.3em auto 0; border-top: 1px solid currentColor; opacity: 0.55; }
+.byline { margin-top: 0.4em; font: 400 1.5em/1.2 var(--name); }
+.post-meta { margin-top: 0.5em; font-size: var(--fs-xs); }
+.orn { display: block; width: 2.4em; margin: 1em auto 0; border-top: 1px solid var(--muted); }
 
 .post-body {
   font-family: var(--serif);
@@ -497,11 +452,13 @@ main {
   -webkit-hyphens: auto;
   hyphenate-limit-chars: 6 3 2;
   text-wrap: pretty;
-  font-kerning: normal;
   font-variant-numeric: oldstyle-nums proportional-nums;
   font-variant-ligatures: common-ligatures;
   overflow-wrap: break-word;
 }
+.post-body a { color: var(--link); }
+.post-body a:visited { color: var(--link-visited); }
+.post-body a:hover { color: var(--accent); }
 
 /* Book paragraphs: 1em indent, no gap; flush after any break. */
 .post-body p { text-indent: 1em; hanging-punctuation: first; orphans: 2; widows: 2; }
@@ -522,137 +479,108 @@ main {
 @supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
   .post-body p.first::first-letter { float: left; font-size: 3.9em; line-height: 0.8; margin: 0.06em 0.08em 0 0; }
 }
-.end-mark { margin-top: 2em; text-align: center; letter-spacing: 0.5em; color: var(--muted); font-family: var(--serif); }
 
-.post-body h1, .post-body h2, .post-body h3, .post-body h4 {
-  margin: 1.6em 0 0.6em;
-  font-family: var(--display);
-  font-weight: 500;
+/* Headings inside a story, left-aligned in the text face. */
+.post-body :is(h1, h2, h3, h4) {
+  margin: 1.5em 0 0.5em;
+  font-weight: 400;
   line-height: 1.2;
+  text-align: left;
   text-wrap: balance;
 }
-.post-body h1 { font-size: 1.5rem; }
-.post-body h2 { font-size: 1.35rem; }
-.post-body h3, .post-body h4 { font-size: 1.15rem; font-style: italic; }
+.post-body h1 { font-size: 1.3em; }
+.post-body h2 { font-size: 1.15em; }
+.post-body :is(h3, h4) { font-size: 1em; font-style: italic; }
 
-.post-body blockquote {
-  margin: 0.9em 0;
-  padding-left: 1.2em;
-  border-left: 1px solid var(--rule);
-  color: var(--ink-soft);
-}
+.post-body :is(blockquote, ul, ol, figure, pre) { margin-block: 1em; }
+.post-body blockquote { padding-left: 1.2em; border-left: 1px solid var(--rule); color: var(--ink-soft); }
 .post-body blockquote p + p { margin-top: 0.5em; }
-.post-body ul, .post-body ol { margin: 0.7em 0 0.7em 1.3em; }
+.post-body :is(ul, ol) { margin-left: 1.3em; }
 .post-body li + li { margin-top: 0.2em; }
-.post-body a { text-decoration-color: color-mix(in oklch, currentColor 40%, transparent); }
 
-.post-body hr {
-  height: auto;
-  margin: 1.3em 0;
-  border: 0;
-  text-align: center;
-  overflow: visible;
-}
-.post-body hr::before {
-  content: '*\2002*\2002*';
-  letter-spacing: 0.1em;
-  line-height: 1;
-}
+/* A scene break: three spaced asterisks. */
+.post-body hr { height: auto; margin: 1.5em 0; border: 0; text-align: center; overflow: visible; }
+.post-body hr::before { content: '*\2002*\2002*'; letter-spacing: 0.1em; line-height: 1; }
 
-.post-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
-.post-body figure { margin: 1.2em 0; }
-.post-body figcaption { margin-top: 0.4em; font-family: var(--sans); font-size: 0.75rem; text-align: center; color: var(--muted); }
+.post-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; filter: var(--img-filter, none); }
+.post-body img[data-keep-bright] { filter: none; }
+.post-body figcaption { margin-top: 0.4em; font: var(--fs-xs)/1.4 var(--sans); text-align: center; color: var(--muted); }
 
-.post-body pre, .post-body code { font-family: var(--mono); font-size: 0.8em; hyphens: manual; }
-.post-body pre { margin: 1em 0; padding: 0.8em 1em; overflow-x: auto; white-space: pre-wrap; background: var(--paper-2); border-radius: 3px; }
-.post-body code { padding: 0.1em 0.3em; background: var(--paper-2); border-radius: 3px; }
+.post-body :is(pre, code) { font-family: var(--mono); font-size: 0.8em; hyphens: manual; }
+.post-body pre { padding: 0.8em 1em; overflow-x: auto; white-space: pre-wrap; background: var(--paper-2); border-radius: var(--r); }
+.post-body code { padding: 0.1em 0.3em; background: var(--paper-2); border-radius: var(--r); }
 .post-body pre code { padding: 0; background: none; }
 
-.post-body :is(h1, h2, h3, h4, figcaption) { text-align: left; }
-/* Browsers justify greedily, line by line; at ~43 characters that opens
-   visible gaps, so phones go ragged and keep the hyphenation. */
-@media (max-width: 520px) {
-  .post-body { text-align: left; hyphenate-limit-chars: 7 3 3; }
-}
+.end-mark { margin-top: 2em; font-family: var(--serif); text-align: center; letter-spacing: 0.5em; color: var(--muted); }
 
-.post-footer {
-  max-width: var(--measure);
-  margin-top: 1.8rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--rule);
-}
-
+.post-footer { margin-top: var(--s-6); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
 .post-nav {
   display: flex;
   justify-content: space-between;
   /* Centre, not baseline: the two links are in different faces, and a
      hovered (pinned) link's baseline must not nudge the other one. */
   align-items: center;
-  gap: 1rem;
+  gap: var(--s-4);
 }
-.post-nav-link { --mono-size: 1.05rem; font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.8rem; }
-.post-nav-link:visited { color: var(--tc); }
-.post-nav-prev::before { content: '← '; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 .post-nav-next { margin-left: auto; text-align: right; }
-.post-nav-next::after { content: ' →'; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
+.post-nav-prev::before, .post-nav-next::after { font: 400 var(--fs-xs)/1 var(--sans); color: var(--muted); }
+.post-nav-prev::before { content: '← '; }
+.post-nav-next::after { content: ' →'; }
 
+/* --- Phones ----------------------------------------------------------- */
 
-/* --- Narrow screens -------------------------------------------------- */
+/* Browsers justify greedily, line by line; at ~43 characters that opens
+   visible gaps, so narrow screens go ragged and keep the hyphenation. */
+@media (max-width: 520px) {
+  .post-body { text-align: left; hyphenate-limit-chars: 7 3 3; }
+}
 
 @media (max-width: 640px) {
   html { font-size: 16px; }
+  :root {
+    --fs-name: clamp(1.5rem, 7vw, 2.3rem);
+    /* The meta goes under each title: a row splits about 60/40 between
+       title and meta. */
+    --title-k:   0.46;
+    --title-cqw: 5.2cqw;
+    --title-lh:  0.58;
+    --meta-k:    0.2;
+    --meta-min:  0.62rem;
+    --meta-max:  0.8rem;
+  }
   .nav-rss { display: none; }
-  .nav-item { padding: 0.3rem 0.4rem; }
-
-  .story { padding: 0.3rem 0; }
-  .story .meta { display: block; margin: 0.1rem 0 0; white-space: normal; }
-  .story .meta .m:first-of-type { margin-left: 0.55rem; }
-
-  /* The name stays on one line beside the links; a smaller Subscribe. */
-  .site-h1 { font-size: clamp(1.5rem, 7vw, 2.3rem); white-space: nowrap; }
-  .site-head { column-gap: 0.5rem; margin-bottom: 0.6rem; }
-  .site-head .nav-item { padding: 0.15rem 0.3rem; }
-  .nav-sub { height: 2rem; padding: 0 0.75rem; font-size: 0.8rem; gap: 0.35rem; }
-  .head-book { margin: 0.5rem 0 0.1rem var(--indent); }
-  .post-header h1 { font-size: 1.95rem; }
-  .post-nav { flex-direction: column; gap: 0.4rem; }
+  .nav-item { padding-inline: var(--s-1); }
+  .nav-sub { height: 2rem; padding-inline: var(--s-3); font-size: var(--fs-xs); }
+  .site-head { column-gap: var(--s-2); margin-bottom: var(--s-2); }
+  .head-book { margin: var(--s-2) 0 0 var(--indent); }
+  .is-index .foot-book-item { display: none; }
+  .story .meta { display: block; margin: 0; line-height: 1.15; white-space: normal; }
+  .post-nav { flex-direction: column; gap: var(--s-2); }
   .post-nav-next { margin-left: 0; text-align: left; }
 }
 
-/* --- Print: the story alone ------------------------------------------ */
+/* --- Dark ------------------------------------------------------------- */
+/* Colours switch through light-dark(); what it can't carry is a lighter
+   interface weight and dimmed story images (Apple HIG: darken
+   white-ground images; Readium: never invert). */
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --w-ui: 360; --img-filter: brightness(0.85); }
+}
+:root[data-theme="dark"] { --w-ui: 360; --img-filter: brightness(0.85); }
+
+/* --- Print: the story alone ------------------------------------------- */
 
 @media print {
   html { font-size: 11pt; }
-  .nav, .skip-link, .post-footer { display: none !important; }
+  .nav, .reading-progress, .skip-link, .post-footer { display: none !important; }
   main { width: auto; padding: 0; }
-  .post-body { max-width: none; }
   .post-body p { orphans: 3; widows: 3; }
   .post-body a { color: inherit; text-decoration: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
-  .nav, .reading-progress { transition: none; }
 }
-
-/* --- Dark ------------------------------------------------------------ */
-
-:root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"]  { color-scheme: dark; }
-
-/* What light-dark() can't carry: lighter UI weight and dimmed story images
-   (Apple HIG: darken white-ground images; Readium: never invert). */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --ui-w: 360; }
-  :root:not([data-theme="light"]) .post-body img:not([data-keep-bright]) { filter: brightness(0.85); }
-}
-:root[data-theme="dark"] { --ui-w: 360; }
-:root[data-theme="dark"] .post-body img:not([data-keep-bright]) { filter: brightness(0.85); }
-
-.theme-toggle {
-  font-family: var(--sans);
-  font-size: 0.95rem;
-  letter-spacing: 0;
-  cursor: pointer;
-}
-
