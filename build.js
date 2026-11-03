@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { createCanvas, registerFont } = require('canvas');
+const { createCanvas, loadImage, registerFont } = require('canvas');
 
 // Cover typeface, bundled so the CI runner (which has no Georgia) renders the
 // same cover as a local Mac build. EB Garamond, SIL OFL — see fonts/OFL.txt.
@@ -238,15 +238,32 @@ function estimateReadingTime(wordCount) {
   return `${minutes} min read`;
 }
 
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201C', rdquo: '\u201D',
+  mdash: '\u2014', ndash: '\u2013', hellip: '\u2026',
+};
+
+function decodeEntities(str) {
+  return str
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? ' ');
+}
+
+// Plain-text opening of a story. Returns unescaped text: escape it for the
+// context it goes into (escapeAttr / escapeHtml).
 function extractExcerpt(html, maxLen = 160) {
-  const text = (html || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&[a-zA-Z]+;|&#\d+;|&#x[0-9a-fA-F]+;/g, ' ')
+  const text = decodeEntities((html || '').replace(/<[^>]+>/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
   if (text.length <= maxLen) return text;
   const cut = text.slice(0, maxLen);
-  return cut.slice(0, cut.lastIndexOf(' ')) + '…';
+  return cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:.\u2014\u2013-]+$/, '') + '\u2026';
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function escapeAttr(str) {
@@ -256,7 +273,7 @@ function escapeAttr(str) {
     .replace(/</g, '&lt;');
 }
 
-function cleanHtml(html) {
+function cleanHtml(html, { forFeed = false } = {}) {
   if (!html) return '';
   // Remove LW-specific widgets, voting buttons, etc.
   // Keep the prose clean
@@ -268,8 +285,26 @@ function cleanHtml(html) {
     .replace(/class="[^"]*"/g, '')
     // Remove style attributes
     .replace(/style="[^"]*"/g, '')
-    // Replace <hr> scene breaks with visible separator for RSS readers
-    .replace(/<hr\s*\/?>/gi, '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>');
+    // Double spaces typed after full stops show up as " &nbsp;"; justified
+    // text would stretch them, so set a single word space.
+    .replace(/(?:[ \t]+&nbsp;|&nbsp;[ \t]+)(?=\S)/g, ' ')
+    // Paragraphs holding only spaces/&nbsp; are spacer lines from the editor
+    .replace(/<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '')
+    // Feed readers ignore our stylesheet, so scene breaks there need visible text;
+    // the site keeps <hr> and draws it in CSS.
+    .replace(/<hr\s*\/?>/gi, forFeed ? SCENE_BREAK_INLINE : '<hr>');
+}
+
+const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>';
+const [TITLE_MAIN, TITLE_SUB] = (() => {
+  const m = SITE_TITLE.match(/^(.*?)\s+(and other stories)$/i);
+  return m ? [m[1], m[2].toLowerCase()] : [SITE_TITLE, ''];
+})();
+const AUTHOR = SITE_SUBTITLE.replace(/^by\s+/i, '');
+
+// Title with its "and other stories" tail set as a quieter italic line.
+function titleMarkup() {
+  return TITLE_SUB ? `${TITLE_MAIN} <em>${TITLE_SUB}</em>` : TITLE_MAIN;
 }
 
 function buildNav(posts, currentSlug, sortBy) {
@@ -279,23 +314,27 @@ function buildNav(posts, currentSlug, sortBy) {
 
   return sorted.map(p => {
     const active = p.slug === currentSlug ? ' class="active"' : '';
-    return `<li data-slug="${p.slug}"><a href="${p.slug}.html"${active}><span class="nav-title">${p.title}</span></a></li>`;
+    return `<li data-slug="${p.slug}"><a href="${p.slug}.html"${active}${active ? ' aria-current="page"' : ''}><span class="nav-title">${p.title}</span></a></li>`;
   }).join('\n');
+}
+
+function sortToggle() {
+  return `<div class="sort-toggle" role="group" aria-label="Order stories by">
+          <button type="button" class="sort-btn active" data-sort="book" aria-pressed="true">Book order</button>
+          <button type="button" class="sort-btn" data-sort="date" aria-pressed="false">Recent</button>
+        </div>`;
 }
 
 function buildSidebar(posts, currentSlug) {
   return `
-    <nav class="sidebar">
+    <nav class="sidebar" aria-label="Stories">
       <div class="sidebar-header">
-        <a href="index.html" class="site-title">${SITE_TITLE}</a>
-        <span class="site-subtitle">${SITE_SUBTITLE}</span>
+        <a href="index.html" class="site-title">${titleMarkup()}</a>
+        <span class="site-subtitle">${AUTHOR}</span>
       </div>
 
       <div class="nav-section">
-        <div class="sort-toggle">
-          <button class="sort-btn active" data-sort="book">Book Order</button>
-          <button class="sort-btn" data-sort="date">Recent</button>
-        </div>
+        ${sortToggle()}
         <ul class="nav-list" data-sort="book">
           ${buildNav(posts, currentSlug, 'book')}
         </ul>
@@ -338,29 +377,31 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
+  <link rel="preload" href="fonts/EBGaramond-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
   <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
-<body>
+<body class="${currentSlug ? 'is-post' : 'is-index'}">
+  <a class="skip-link" href="#content">Skip to ${currentSlug ? 'story' : 'contents'}</a>
 
   <input type="checkbox" id="menu-toggle" hidden>
   <label for="menu-toggle" class="menu-overlay" aria-hidden="true"></label>
 
   <header class="top-bar">
-    <label for="menu-toggle" class="menu-button" role="button" tabindex="0" aria-label="Toggle menu">☰</label>
-    <a href="index.html" class="top-bar-title">Tomás Bjartur</a>
+    <label for="menu-toggle" class="menu-button" role="button" tabindex="0" aria-label="Stories menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></label>
+    <a href="index.html" class="top-bar-title">${TITLE_MAIN}</a>
     <div class="top-bar-actions">
-      <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
-      <a href="${EPUB_FILENAME}" class="top-bar-btn epub-link">EPUB</a>
+      <button type="button" class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"><svg class="icon-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 12.2A7 7 0 0 1 7.8 3.5a7 7 0 1 0 8.7 8.7Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><svg class="icon-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10 1.8v2M10 16.2v2M1.8 10h2M16.2 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS feed">RSS</a>
+      <a href="${EPUB_FILENAME}" class="top-bar-btn epub-link" title="Download the collection as an EPUB">EPUB</a>
       <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
-      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS Feed">RSS</a>
-    </div>
+    </div>${currentSlug ? '\n    <div class="progress" aria-hidden="true"></div>' : ''}
   </header>
 
   ${buildSidebar(posts, currentSlug)}
 
-  <main>
+  <main id="content" tabindex="-1">
     ${content}
   </main>
 
@@ -382,7 +423,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         for(var i=0;i<els.length;i++)els[i].remove();
         var navs=document.querySelectorAll('[data-geo-slug="'+r.slug+'"]');
         for(var k=0;k<navs.length;k++){var a=navs[k],h=a.getAttribute('data-alt-href');
-          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label')}
+          if(h){a.href=h;var t=a.querySelector('.post-nav-title');(t||a).textContent=a.getAttribute('data-alt-label')}
           else{a.removeAttribute('href');a.textContent=''}}
         var eps=document.querySelectorAll('.epub-link');
         for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
@@ -412,7 +453,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     // Theme toggle
     var h=document.documentElement,b=document.getElementById('theme-btn');
     function isDark(){var t=h.getAttribute('data-theme');return t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches)}
-    function updateTheme(){b.textContent=isDark()?'\u2600\uFE0F':'\uD83C\uDF19'}
+    function updateTheme(){b.setAttribute('aria-pressed',isDark()?'true':'false');b.setAttribute('aria-label',isDark()?'Switch to light mode':'Switch to dark mode')}
     b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}updateTheme()});
     updateTheme();
 
@@ -423,7 +464,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
       sort=s;try{localStorage.setItem('sort',s)}catch(e){}
       document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
       document.querySelectorAll('.index-list[data-sort]').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
-      document.querySelectorAll('.sort-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-sort')===s)});
+      document.querySelectorAll('.sort-btn').forEach(function(btn){var on=btn.getAttribute('data-sort')===s;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',on?'true':'false')});
       document.querySelectorAll('.post-nav-next,.post-nav-prev').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
     }
     document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
@@ -432,6 +473,17 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     // Keyboard support for the hamburger label
     var m=document.querySelector('.menu-button'),c=document.getElementById('menu-toggle');
     if(m&&c){m.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();c.checked=!c.checked}})}
+    if(c)document.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.checked)c.checked=false});
+
+    // Arrow keys step to the previous/next story in the current order
+    document.addEventListener('keydown',function(e){
+      if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
+      if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+      var el=document.activeElement;if(el&&(el.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;
+      var cls=e.key==='ArrowLeft'?'.post-nav-prev':'.post-nav-next';
+      var links=document.querySelectorAll('a'+cls+'[href]');
+      for(var i=0;i<links.length;i++){if(links[i].style.display!=='none'){location.href=links[i].href;return}}
+    });
   })();
   </script>
 </body>
@@ -444,7 +496,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
 function postNavLink(list, idx, step, sort) {
   const cls = step < 0 ? 'post-nav-prev' : 'post-nav-next';
   const style = sort === 'book' ? '' : ' style="display:none"';
-  const label = p => step < 0 ? `← ${p.title}` : `${p.title} →`;
+  const label = p => p.title;
   const target = list[idx + step];
   if (!target) return `<span class="${cls}" data-sort="${sort}"${style}></span>`;
   let geo = '';
@@ -454,7 +506,8 @@ function postNavLink(list, idx, step, sort) {
     const alt = list[i];
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(label(alt)) : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls}" data-sort="${sort}"${style}${geo}>${label(target)}</a>`;
+  const dir = step < 0 ? '← Previous' : 'Next →';
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls}" data-sort="${sort}"${style}${geo} rel="${step < 0 ? 'prev' : 'next'}"><span class="post-nav-dir">${dir}</span><span class="post-nav-title">${label(target)}</span></a>`;
 }
 
 function buildPostPage(post, allPosts) {
@@ -474,16 +527,20 @@ function buildPostPage(post, allPosts) {
       </header>
       <div class="post-body">
         ${cleanHtml(post.htmlBody)}
-        <p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>
-        <p style="text-align:center;margin:1em 0"><a href="${SUBSTACK_URL}" style="color:#a0734f;text-decoration:none;font-size:0.9em">Subscribe on Substack</a></p>
-        <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" class="epub-link" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
       </div>
-      <footer class="post-footer post-nav">
-        ${postNavLink(byBook, bookIdx, -1, 'book')}
-        ${postNavLink(byDate, dateIdx, -1, 'date')}
-        <a href="index.html" class="post-nav-link">Home</a>
-        ${postNavLink(byBook, bookIdx, 1, 'book')}
-        ${postNavLink(byDate, dateIdx, 1, 'date')}
+      <p class="end-mark" aria-hidden="true">&#x2767;</p>
+      <p class="colophon">
+        New stories arrive by email: <a href="${SUBSTACK_URL}">subscribe on Substack</a>.<br>
+        <a href="${EPUB_FILENAME}" class="epub-link">Download the whole collection</a> as a free EPUB.
+      </p>
+      <footer class="post-footer">
+        <nav class="post-nav" aria-label="More stories">
+          ${postNavLink(byBook, bookIdx, -1, 'book')}
+          ${postNavLink(byDate, dateIdx, -1, 'date')}
+          ${postNavLink(byBook, bookIdx, 1, 'book')}
+          ${postNavLink(byDate, dateIdx, 1, 'date')}
+        </nav>
+        <a href="index.html" class="post-nav-home">Contents</a>
       </footer>
     </article>`;
 
@@ -495,6 +552,8 @@ function buildPostPage(post, allPosts) {
 function buildIndexPage(posts) {
   const byDate = [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
   const byBook = bookOrder(posts);
+  const hidden = new Set(GEO_HIDDEN.map(r => r.slug));
+  const first = byBook.find(p => !hidden.has(p.slug)) || byBook[0];
 
   function buildListing(sorted) {
     return sorted.map(p => {
@@ -504,6 +563,7 @@ function buildIndexPage(posts) {
       <li class="index-item" data-slug="${p.slug}">
         <a href="${p.slug}.html">
           <span class="index-title">${p.title}</span>
+          <span class="index-excerpt">${escapeHtml(extractExcerpt(p.htmlBody, 220))}</span>
           <span class="index-meta">${meta}</span>
         </a>
       </li>`;
@@ -512,8 +572,22 @@ function buildIndexPage(posts) {
 
   const content = `
     <div class="index-page">
-      <h1>${SITE_TITLE}</h1>
-      <p class="index-intro">${SITE_DESCRIPTION}</p>
+      <header class="title-page">
+        <img class="title-cover" src="${COVER_THUMB}" width="400" height="600" alt="Cover of ${escapeAttr(SITE_TITLE)}">
+        <div>
+          <h1>${titleMarkup()}</h1>
+          <p class="title-author">${AUTHOR}</p>
+          <p class="title-actions">
+            <a class="begin" href="${first.slug}.html">Begin reading</a>
+            <a class="epub-link" href="${EPUB_FILENAME}">EPUB</a>
+            <a href="${SUBSTACK_URL}">Subscribe</a>
+          </p>
+        </div>
+      </header>
+      <div class="contents-head">
+        <h2>Contents</h2>
+        ${sortToggle()}
+      </div>
       <ul class="index-list" data-sort="book">
         ${buildListing(byBook)}
       </ul>
@@ -525,641 +599,9 @@ function buildIndexPage(posts) {
   return pageShell(content, null, posts, null);
 }
 
+// The stylesheet lives in style.css so it can be edited as CSS.
 function buildStylesheet() {
-  return `/* Tomás B. Fiction — Static Mirror */
-
-:root {
-  --bg: #fcfbf9;
-  --text: #1a1a1a;
-  --text-light: #7a7570;
-  --accent: #8b4513;
-  --border: #e8e4de;
-  --sidebar-bg: #f5f2ed;
-  --sidebar-width: 260px;
-  --active-bg: #ebe7e0;
-  --link: #6b3a2e;
-  --max-prose: 38rem;
-  --serif: Charter, 'Bitstream Charter', 'Noto Serif', 'DejaVu Serif', 'Liberation Serif', Georgia, serif;
-  --sans: -apple-system, 'Segoe UI', system-ui, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
-  --radius: 6px;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html {
-  font-size: 18px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  scroll-behavior: smooth;
-}
-
-body {
-  font-family: var(--serif);
-  color: var(--text);
-  background: var(--bg);
-  line-height: 1.75;
-  display: flex;
-  min-height: 100vh;
-}
-
-::selection {
-  background: rgba(139, 69, 19, 0.15);
-}
-
-/* --- Sidebar --- */
-.sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--border);
-  padding: 1.5rem 0;
-  position: fixed;
-  top: 3rem;
-  left: 0;
-  bottom: 0;
-  overflow-y: auto;
-  font-family: var(--sans);
-  font-size: 0.78rem;
-  z-index: 10;
-}
-
-.sidebar-header {
-  padding: 0 1.4rem 1.2rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1rem;
-}
-
-.site-title {
-  display: block;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text);
-  text-decoration: none;
-  letter-spacing: -0.01em;
-}
-.site-title:hover { color: var(--accent); }
-
-.site-subtitle {
-  display: block;
-  color: var(--text-light);
-  font-size: 0.8rem;
-  margin-top: 0.2rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.sort-toggle {
-  display: flex;
-  gap: 0;
-  padding: 0.6rem 1.4rem 0.5rem;
-}
-
-.sort-btn {
-  flex: 1;
-  padding: 0.3rem 0;
-  font-family: var(--sans);
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-light);
-  background: none;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.sort-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.sort-btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; border-left: none; }
-.sort-btn.active {
-  background: var(--active-bg);
-  color: var(--accent);
-}
-.sort-btn:hover:not(.active) {
-  background: var(--active-bg);
-}
-
-.nav-section h3 {
-  padding: 0.8rem 1.4rem 0.3rem;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-light);
-  font-weight: 600;
-}
-
-.nav-section ul {
-  list-style: none;
-}
-
-.nav-section li a {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5em;
-  padding: 0.35rem 1.4rem;
-  color: var(--text);
-  text-decoration: none;
-  border-radius: 0;
-  transition: background 0.15s, color 0.15s;
-}
-
-.nav-section li a:hover {
-  background: var(--active-bg);
-  color: var(--accent);
-}
-
-.nav-section li a.active {
-  background: var(--active-bg);
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.nav-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* --- Top bar --- */
-.top-bar {
-  position: fixed;
-  top: 0;
-  left: var(--sidebar-width);
-  right: 0;
-  height: 3rem;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 1.5rem;
-  z-index: 15;
-  font-family: var(--sans);
-  gap: 1rem;
-}
-
-.top-bar-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  text-decoration: none;
-  margin-right: auto;
-  display: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.top-bar-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-left: auto;
-}
-
-.top-bar-btn {
-  padding: 0.35rem 0.9rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-decoration: none;
-  border-radius: var(--radius);
-  transition: background 0.15s, color 0.15s;
-  border: 1px solid var(--border);
-  color: var(--text);
-  background: var(--bg);
-}
-.top-bar-btn:hover {
-  background: var(--sidebar-bg);
-  color: var(--accent);
-}
-
-.top-bar-btn-rss {
-  font-size: 0.65rem;
-  padding: 0.25rem 0.55rem;
-  opacity: 0.45;
-  border-color: transparent;
-}
-.top-bar-btn-rss:hover { opacity: 0.85; border-color: var(--border); }
-
-.top-bar-btn-primary {
-  background: #a0734f;
-  color: #fff;
-  border-color: #a0734f;
-}
-.top-bar-btn-primary:hover {
-  background: #8b6243;
-  border-color: #8b6243;
-  color: #fff;
-}
-
-.sidebar-footer {
-  padding: 1.5rem 1.4rem 0;
-  border-top: 1px solid var(--border);
-  margin-top: 1rem;
-}
-
-.lw-link {
-  font-size: 0.75rem;
-  color: var(--text-light);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.lw-link:hover { color: var(--accent); }
-
-/* --- Main --- */
-main {
-  margin-left: var(--sidebar-width);
-  margin-top: 3rem;
-  flex: 1;
-  padding: 3rem 2.5rem 6rem;
-  display: flex;
-  justify-content: center;
-}
-
-article, .index-page {
-  max-width: var(--max-prose);
-  width: 100%;
-}
-
-/* --- Post --- */
-.post-header {
-  margin-bottom: 3rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.post-header h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.6rem;
-}
-
-.post-meta {
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  color: var(--text-light);
-  letter-spacing: 0.01em;
-}
-
-.post-body p {
-  margin-bottom: 1.3em;
-  hanging-punctuation: first last;
-}
-
-.post-body blockquote {
-  border-left: 2px solid var(--accent);
-  padding-left: 1.4em;
-  margin: 1.8em 0;
-  color: var(--text-light);
-  font-style: italic;
-}
-
-.post-body h2, .post-body h3 {
-  margin: 2.2em 0 0.8em;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-}
-
-.post-body h2 { font-size: 1.4rem; }
-.post-body h3 { font-size: 1.15rem; }
-
-.post-body a {
-  color: var(--link);
-  text-decoration: underline;
-  text-decoration-color: rgba(107, 58, 46, 0.3);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-  transition: text-decoration-color 0.15s;
-}
-.post-body a:hover {
-  text-decoration-color: var(--link);
-}
-
-.post-body hr {
-  border: none;
-  text-align: center;
-  margin: 3em 0;
-}
-.post-body hr::before {
-  content: '\\2022\\2003\\2022\\2003\\2022';
-  color: var(--text-light);
-  font-size: 0.85rem;
-}
-
-.post-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-}
-
-.post-body pre, .post-body code {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 0.85em;
-}
-
-.post-body pre {
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border);
-  padding: 1.2em;
-  overflow-x: auto;
-  border-radius: var(--radius);
-  margin: 1.8em 0;
-}
-
-.post-body code {
-  background: var(--sidebar-bg);
-  padding: 0.15em 0.4em;
-  border-radius: 3px;
-}
-
-.post-body pre code {
-  background: none;
-  padding: 0;
-}
-
-.post-footer {
-  margin-top: 4rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  color: var(--text-light);
-}
-
-.post-footer a {
-  color: var(--link);
-  text-decoration: underline;
-  text-decoration-color: rgba(107, 58, 46, 0.3);
-  text-underline-offset: 2px;
-}
-.post-footer a:hover {
-  text-decoration-color: var(--link);
-}
-
-.post-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-}
-
-.post-nav-link {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.post-nav-prev,
-.post-nav-next {
-  max-width: 40%;
-}
-
-.post-nav-next {
-  text-align: right;
-}
-
-/* --- Index page --- */
-.index-page h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin-bottom: 0.3rem;
-  letter-spacing: -0.02em;
-}
-
-.index-intro {
-  color: var(--text-light);
-  font-size: 0.95rem;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.index-list {
-  list-style: none;
-}
-
-.index-item a {
-  display: block;
-  padding: 1rem 0.8rem;
-  margin: 0 -0.8rem;
-  text-decoration: none;
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-  border-radius: var(--radius);
-  transition: background 0.15s;
-}
-
-.index-item:first-child a {
-  border-top: 1px solid var(--border);
-}
-
-.index-item a:hover {
-  background: var(--sidebar-bg);
-}
-
-.index-title {
-  display: block;
-  font-size: 1.15rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.index-meta {
-  display: block;
-  font-family: var(--sans);
-  font-size: 0.78rem;
-  color: var(--text-light);
-  margin-top: 0.2rem;
-}
-
-/* --- Mobile overlay for closing sidebar --- */
-.menu-overlay {
-  display: none;
-}
-
-/* --- Mobile hamburger (in top bar) --- */
-.menu-button {
-  display: none;
-  background: none;
-  border: none;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 2rem;
-  text-align: center;
-  color: var(--text);
-  flex-shrink: 0;
-}
-.menu-button:hover {
-  color: var(--accent);
-}
-
-@media (max-width: 860px) {
-  .menu-button { display: block; }
-  .top-bar-title { display: block; }
-
-  .top-bar {
-    left: 0;
-  }
-
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: none;
-    top: 3rem;
-    height: calc(100vh - 3rem);
-  }
-
-  #menu-toggle:checked ~ .sidebar {
-    transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0,0,0,0.08);
-  }
-
-  #menu-toggle:checked ~ .menu-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    top: 3rem;
-    z-index: 5;
-    background: rgba(0,0,0,0.15);
-  }
-
-  main {
-    margin-left: 0;
-    padding: 2rem 1.5rem 4rem;
-  }
-
-  .post-header h1, .index-page h1 {
-    font-size: 1.75rem;
-  }
-}
-
-@media (max-width: 520px) {
-  html { font-size: 17px; }
-
-  .top-bar { padding: 0 0.75rem; gap: 0.5rem; }
-  .top-bar-actions { gap: 0.35rem; }
-  .top-bar-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
-  .top-bar-btn-rss { display: none; }
-
-  main {
-    padding: 1.5rem 1.2rem 3rem;
-  }
-
-  .post-header {
-    margin-bottom: 2rem;
-  }
-
-  .post-header h1, .index-page h1 {
-    font-size: 1.55rem;
-  }
-
-  .post-body blockquote {
-    margin-left: 0;
-    padding-left: 1em;
-  }
-
-  .index-item a {
-    padding: 0.8rem 0.6rem;
-    margin: 0 -0.6rem;
-  }
-}
-
-/* --- Dark mode --- */
-[data-theme="dark"] {
-  --bg: #1a1a1e;
-  --text: #e0ddd8;
-  --text-light: #9a9590;
-  --accent: #c8956a;
-  --border: #2e2e33;
-  --sidebar-bg: #222226;
-  --active-bg: #2a2a2f;
-  --link: #c8956a;
-}
-
-[data-theme="dark"] ::selection {
-  background: rgba(200, 149, 106, 0.25);
-}
-
-[data-theme="dark"] .top-bar-btn-primary {
-  background: #a0734f;
-  border-color: #a0734f;
-}
-[data-theme="dark"] .top-bar-btn-primary:hover {
-  background: #8b6243;
-  border-color: #8b6243;
-}
-
-[data-theme="dark"] .post-body a {
-  text-decoration-color: rgba(200, 149, 106, 0.3);
-}
-[data-theme="dark"] .post-body a:hover {
-  text-decoration-color: var(--link);
-}
-[data-theme="dark"] .post-footer a {
-  text-decoration-color: rgba(200, 149, 106, 0.3);
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-theme="auto"] {
-    --bg: #1a1a1e;
-    --text: #e0ddd8;
-    --text-light: #9a9590;
-    --accent: #c8956a;
-    --border: #2e2e33;
-    --sidebar-bg: #222226;
-    --active-bg: #2a2a2f;
-    --link: #c8956a;
-  }
-  [data-theme="auto"] ::selection {
-    background: rgba(200, 149, 106, 0.25);
-  }
-  [data-theme="auto"] .top-bar-btn-primary {
-    background: #a0734f;
-    border-color: #a0734f;
-  }
-  [data-theme="auto"] .top-bar-btn-primary:hover {
-    background: #8b6243;
-    border-color: #8b6243;
-  }
-  [data-theme="auto"] .post-body a {
-    text-decoration-color: rgba(200, 149, 106, 0.3);
-  }
-  [data-theme="auto"] .post-body a:hover {
-    text-decoration-color: var(--link);
-  }
-  [data-theme="auto"] .post-footer a {
-    text-decoration-color: rgba(200, 149, 106, 0.3);
-  }
-}
-
-.theme-toggle {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.35rem 0.55rem;
-  cursor: pointer;
-  font-size: 0.85rem;
-  line-height: 1;
-  color: var(--text);
-  transition: background 0.15s, color 0.15s;
-}
-.theme-toggle:hover {
-  background: var(--sidebar-bg);
-  color: var(--accent);
-}
-
-/* Respect reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-`;
+  return fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
 }
 
 // --- RSS feed ---
@@ -1185,7 +627,7 @@ function buildRssFeed(posts) {
       <guid isPermaLink="true">${link}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(p.title)} — ${estimateReadingTime(p.wordCount)}</description>
-      <content:encoded><![CDATA[${cleanHtml(p.htmlBody).replace(/src="images\//g, `src="${SITE_URL}/images/`)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
+      <content:encoded><![CDATA[${cleanHtml(p.htmlBody, { forFeed: true }).replace(/src="images\//g, `src="${SITE_URL}/images/`)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
     </item>`;
   }).join('\n');
 
@@ -2278,6 +1720,19 @@ ${chapterFiles.map(c => `    <itemref idref="${c.halfTitleId}"/>
   return buildZip(entries);
 }
 
+// Small JPEG of the cover for the index page; cover.png stays full size for
+// the EPUB and social previews.
+const COVER_THUMB = 'cover-thumb.jpg';
+async function buildCoverThumb(coverPng, width = 400) {
+  const img = await loadImage(coverPng);
+  const height = Math.round(img.height * width / img.width);
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas.toBuffer('image/jpeg', { quality: 0.86 });
+}
+
 async function main() {
   console.log('Fetching user...');
   const user = await getUser();
@@ -2313,9 +1768,14 @@ async function main() {
     console.log(`Wrote ${LOCAL_IMAGES.size} images to images/`);
   }
 
-  // Write stylesheet
+  // Write stylesheet and the web subset of the display face (scripts/subset-fonts.sh)
   fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
   console.log('Wrote style.css');
+  const webFonts = path.join(__dirname, 'fonts', 'web');
+  fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
+  for (const name of fs.readdirSync(webFonts).filter(n => n.endsWith('.woff2'))) {
+    fs.copyFileSync(path.join(webFonts, name), path.join(OUTPUT_DIR, 'fonts', name));
+  }
 
   // Write index page
   fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), buildIndexPage(fiction));
@@ -2333,6 +1793,8 @@ async function main() {
   const coverPng = buildCoverPng(collection, BOOK_TITLE);
   fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
   console.log('Wrote cover.png');
+  fs.writeFileSync(path.join(OUTPUT_DIR, COVER_THUMB), await buildCoverThumb(coverPng));
+  console.log(`Wrote ${COVER_THUMB}`);
 
   // Generate EPUB
   const epub = await buildEpub(collection, 'collection', BOOK_TITLE, coverPng);
