@@ -67,12 +67,20 @@ APCA Lc 88 rather than pure white, accents lifted and desaturated, story
 images dimmed to 85%, interface weight 360 instead of 400) come from a
 research pass on dark-mode reading (Material, Apple HIG, APCA, polarity
 studies). The contents
-page opens with the author's name (Send Flowers) beside the links (EPUB,
-RSS, X, and a Substack-orange Subscribe button that goes to Substack),
-a thin black rule, then the book title (Zen Tokyo Zoo) and the list. On
-screens at least 641 px wide and 520 px tall the list fills the window:
-one equal row per story, titles scaled to the row, so every story shows
-without scrolling; rows never go below 2.1rem, so a long list scrolls.
+page opens with the author's name (Send Flowers), the book and the links
+(RSS, X, and a Substack-orange Subscribe button that goes to Substack)
+above a thin black rule. The book is its title in the text face,
+underlined, followed by "EPUB" and a download mark in the accent red: one
+link that downloads the EPUB. It sits on the name's row from 1200 px up
+and below the rule, indented to the list, on narrower screens; it is set
+at story-title size. The footer carries it too. Story pages put "TB" (in
+the name's face) and the EPUB link in their nav. On screens at least
+520 px tall the list fills the window: one equal row per story, titles
+scaled to the row, so every story shows without scrolling. On phones
+(640 px and under) the meta sits on its own line under each title. Rows
+never go below 2.1rem (2.3rem on phones), so a long list scrolls. A title
+too wide for its row (a long title in a wide face, on a phone) is shrunk
+to fit by a small script.
 Each title is followed by its month and reading time in Inter Light
 Italic (reading time at 260 words a minute, Brysbaert's 2019 mean for
 fiction, rounded to the minute under 10 and to 5 minutes above), then its
@@ -80,7 +88,8 @@ LessWrong karma and comments and Substack likes, restacks and comments,
 small, in EB Garamond with old-style figures (LessWrong from the GraphQL
 query, Substack from `/api/v1/archive`; a failed fetch logs `[DEGRADED]`
 and the build continues without those numbers). Story pages link to the
-newer and older story.
+newer and older story; the list wraps, so the newest story's "newer" link
+is the oldest story and the oldest's "older" link is the newest.
 
 Every font is served by the site, so every device renders the same:
 nothing relies on fonts the reader has installed. Inter (standing in for
@@ -148,8 +157,8 @@ external request on the reader's end is the `GEO_HIDDEN` lookup to
 ipapi.co, which runs on every page view (cached 24h) while any rule is
 configured.
 
-Stories marked as editor's picks (`EDITOR_PICKS`) get a faint purple
-rule in the margin of the contents list. A story with no `TITLE_FONTS`
+Stories marked as editor's picks (`EDITOR_PICKS`) get a red rule (the
+link-hover and EPUB accent, dark fading to mid) in the margin of the contents list. A story with no `TITLE_FONTS`
 entry takes the next face from `TITLE_FONT_BACKLOG` (unused faces from
 Markus's picks, oldest new story first), and the build log names it so
 it can be pinned.

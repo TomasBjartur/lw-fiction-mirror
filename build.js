@@ -393,8 +393,8 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
 // - Major Mono Display: the title hover morph (letters of the titles).
-// - Zen Tokyo Zoo as 'Site Title': the book title on the contents page.
-// - Send Flowers as 'Author Name': the author's name, the contents page h1.
+// - Send Flowers as 'Author Name': the author's name (the contents page
+//   h1) and the TB home link on story pages.
 // - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
 //   character in a story that the latin text faces lack. Without it they come from
 //   whatever font the reader's device has. The stacks in style.css put
@@ -402,8 +402,6 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 const SUBSET_FONTS = [
   { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
-  { family: 'Zen Tokyo Zoo', as: 'Site Title', file: 'fonts/site-title-zen-tokyo-zoo.woff2', display: 'block',
-    text: () => SITE_TITLE },
   { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
     text: () => AUTHOR },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
@@ -657,19 +655,23 @@ const FAVICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 
 // The bird from markusstrasser.org's Icon.svelte.
 const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
+// Download mark: an arrow into a tray, so an EPUB link reads as a file.
+const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// The book as a download: its title, underlined, with the EPUB mark.
+const bookLink = cls => `<a href="${EPUB_FILENAME}" class="${cls} epub-link" title="The whole collection as a free EPUB" download><span class="bk-title">${SITE_TITLE}</span> <span class="bk-dl">EPUB${ICON_DL}</span></a>`;
 const X_HANDLE = 'BjarturTomas';
 const X_URL = `https://x.com/${X_HANDLE}`;
 
 // One line at the foot of every page.
 function siteFoot() {
-  return `<p class="site-foot">© ${new Date().getFullYear()} ${AUTHOR} · <a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a></p>`;
+  return `<p class="site-foot">© ${new Date().getFullYear()} ${AUTHOR} · <a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a> · ${bookLink('foot-book')}</p>`;
 }
 
 // Site links: in the fixed bar on story pages, beside the title on the
 // contents page. Subscribe looks like Substack's own button, so readers
 // know where it goes.
 function navItems(currentSlug) {
-  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>△</a><a href="${EPUB_FILENAME}" class="nav-item epub-link" title="The whole collection as a free EPUB">EPUB</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">◐</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
+  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>TB</a><a href="${EPUB_FILENAME}" class="nav-item nav-epub epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">◐</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
 }
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
@@ -816,6 +818,23 @@ ${currentSlug ? `  <header class="nav">
       for(var i=0;i<as.length;i++)if(as[i].offsetParent){location.href=as[i].href;return}
     });
 
+    // A title too wide for its row (a long title in a wide face, on a phone)
+    // shrinks just enough to fit: --fit on its row scales the CSS size.
+    var rows=document.querySelectorAll('.stories .story');
+    function fit(){
+      rows.forEach(function(li){li.style.removeProperty('--fit')});
+      rows.forEach(function(li){
+        var a=li.querySelector('.story-title'),c=li.querySelector('.title-cell');if(!a||!c)return;
+        var w=a.getBoundingClientRect().width,room=c.clientWidth-2;
+        if(w>room)li.style.setProperty('--fit',(room/w).toFixed(3));
+      });
+    }
+    if(rows.length){
+      var fitFrame=0;
+      (document.fonts?document.fonts.ready:Promise.resolve()).then(fit);
+      addEventListener('resize',function(){cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(fit)},{passive:true});
+    }
+
     // Hovering a title turns it, letter by letter at uneven speed, into Major Mono
     // Display; leaving resets it at once. The title (or, if it wraps, each
     // word) keeps its resting box, so nothing around it moves; the mono
@@ -894,15 +913,18 @@ ${currentSlug ? `  <header class="nav">
 // 1 older). When the target is a GEO_HIDDEN story, the link also carries the
 // next story past it (skipping every GEO_HIDDEN slug), which the geo curtain
 // swaps in.
+// The list wraps: the newest story's "newer" link is the oldest story and
+// the oldest's "older" link is the newest, so both links always lead on.
 function postNavLink(list, idx, step) {
   const cls = step < 0 ? 'post-nav-prev' : 'post-nav-next';
-  const target = list[idx + step];
+  const at = i => list[((i % list.length) + list.length) % list.length];
+  const target = list.length > 1 ? at(idx + step) : null;
   if (!target) return `<span class="${cls}"></span>`;
   let geo = '';
   if (GEO_HIDDEN.some(r => r.slug === target.slug)) {
-    let i = idx + step;
-    while (list[i] && GEO_HIDDEN.some(r => r.slug === list[i].slug)) i += step;
-    const alt = list[i];
+    let i = idx + step, guard = list.length;
+    while (guard-- > 0 && GEO_HIDDEN.some(r => r.slug === at(i).slug)) i += step;
+    const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
   return `<a href="${target.slug}.html" class="post-nav-link ${cls} blush morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
@@ -931,7 +953,6 @@ function buildPostPage(post, allPosts) {
           ${postNavLink(byDate, idx, -1)}
           ${postNavLink(byDate, idx, 1)}
         </nav>
-        <p class="colophon">New stories by email: <a href="${SUBSTACK_URL}">Substack</a> · the whole collection as a free <a href="${EPUB_FILENAME}" class="epub-link">EPUB</a></p>
         ${siteFoot()}
       </footer>
     </article>`;
@@ -949,14 +970,10 @@ function buildIndexPage(posts) {
 
   const content = `
     <header class="site-head">
-      <div class="head-row">
-        <h1 class="site-h1">${AUTHOR}</h1>
-        <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>△<\/a>/, '').replace(/<a[^>]*epub-link[^>]*>EPUB<\/a>/, '')}</nav>
-      </div>
-      <div class="head-row book-row">
-        <h2 class="site-h2">${SITE_TITLE}</h2>
-        <a href="${EPUB_FILENAME}" class="epub-dl epub-link" title="The whole collection as a free EPUB" download>EPUB<span aria-hidden="true">↗</span></a>
-      </div>
+      <h1 class="site-h1">${AUTHOR}</h1>
+      ${bookLink('head-book')}
+      <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>TB<\/a>/, '').replace(/<a[^>]*nav-epub[^>]*>EPUB.*?<\/a>/, '')}</nav>
+      <hr class="head-rule">
     </header>
     <ol class="stories" style="--n:${posts.length}">${rows}
     </ol>

@@ -53,7 +53,9 @@
   --substack: #ff6719; /* Substack's own orange, both themes */
   --blush:    light-dark(oklch(0.66 0.16 5),    oklch(0.74 0.12 5));
   --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.40 0.09 24));
-  --pick:     light-dark(oklch(0.5 0.17 305 / 0.3), oklch(0.70 0.12 305 / 0.35));
+  /* Editor's pick rule: the link-hover red (also the EPUB mark), dark at
+     the top fading to mid, so picks, the book and hovers share one accent. */
+  --pick:     linear-gradient(light-dark(oklch(0.38 0.16 24), oklch(0.68 0.14 24)), light-dark(oklch(0.52 0.22 24 / 0.5), oklch(0.80 0.11 24 / 0.5)));
   /* Inter's weight in the interface; light text on dark reads heavier,
      so dark drops it by ~0.9x (below). */
   --ui-w: 400;
@@ -140,7 +142,7 @@ a:hover { color: var(--link-hover); }
   display: inline-flex;
   align-items: center;
   padding: 0.3rem 0.55rem;
-  font: var(--ui-w) 0.8rem/1 var(--sans);
+  font: var(--ui-w) 0.9rem/1 var(--sans);
   letter-spacing: 0.08em;
   color: var(--ink-soft);
   background: none;
@@ -151,15 +153,15 @@ a:hover { color: var(--link-hover); }
   cursor: pointer;
 }
 .nav-item:visited { color: var(--ink-soft); }
-.nav-x svg, .x-link svg { width: 1em; height: 1em; fill: currentColor; opacity: 0.5; transition: opacity 0.15s ease; }
+.nav-x svg, .x-link svg { width: 1.15em; height: 1.15em; fill: currentColor; opacity: 0.5; transition: opacity 0.15s ease; }
 .nav-x:hover svg, .x-link:hover svg { opacity: 1; }
-.nav-x svg { width: 0.95rem; height: 0.95rem; }
+.nav-x svg { width: 1.1rem; height: 1.1rem; }
 
 .site-foot {
   margin-top: 0.8rem;
   padding-top: 0.6rem;
   border-top: 1px solid color-mix(in oklch, var(--ink) 14%, transparent);
-  font: var(--ui-w) 0.72rem/1.4 var(--sans);
+  font: var(--ui-w) 0.8rem/1.4 var(--sans);
   color: var(--muted);
 }
 .site-foot a { color: inherit; text-decoration: none; }
@@ -169,8 +171,8 @@ a:hover { color: var(--link-hover); }
   color: var(--link-hover);
   background: color-mix(in oklch, var(--link-hover) 10%, transparent);
 }
-.nav-home { text-decoration: none; color: var(--marker); }
-.nav-home:visited { color: var(--marker); }
+.nav-home { font: 400 1.35rem/1 'Author Name', var(--serif); letter-spacing: 0; color: var(--ink); text-decoration: none; }
+.nav-home:visited { color: var(--ink); }
 .nav-sub {
   /* Substack's own button: 40px tall, 8px corners, semibold, its orange. */
   display: inline-flex;
@@ -275,35 +277,47 @@ main {
 
 /* --- Contents -------------------------------------------------------- */
 
-/* The author's name with the site links beside it, then the book: its
-   title with the EPUB download, and its stories. The book block sits one
-   indent in from the name (--indent), so the name hangs as the page's
-   heading and the titles share one left edge with the book title. */
+/* The author's name, the book (its title as the EPUB download) and the
+   site links on one row above a thin rule when the window is wide enough;
+   otherwise the book drops below the rule as its own line, indented to
+   the list. The list sits one indent in from the name (--indent). */
 .is-index { --indent: clamp(1.25rem, 4vw, 3.5rem); }
-.site-head { margin-bottom: 1.2rem; }
-.head-row {
-  display: flex;
-  flex-wrap: wrap;
+.site-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "name . nav" "rule rule rule" "book book book";
   align-items: baseline;
   column-gap: 1rem;
+  margin-bottom: 1.2rem;
 }
-.head-row:first-child { padding-bottom: 0.35rem; border-bottom: 1px solid var(--ink); }
-.head-row + .head-row { margin-top: 0.7rem; padding-left: var(--indent); }
-.book-row { align-items: center; column-gap: 0.8rem; }
-.epub-dl {
-  font: italic 400 1rem/1 var(--meta);
-  letter-spacing: 0.02em;
+.site-h1 { grid-area: name; }
+.site-head .navbar { grid-area: nav; width: auto; min-height: 0; gap: 0; border: 0; }
+.site-head .nav-item { padding: 0.15rem 0.35rem; }
+.head-rule { grid-area: rule; margin-top: 0.35rem; border: 0; border-top: 1px solid var(--ink); }
+.head-book { grid-area: book; justify-self: start; margin: 0.9rem 0 0.4rem var(--indent); }
+/* Title-sized, so the book never reads smaller than a story; it joins the
+   name's row only where that row has room for it at that size. */
+@media (min-width: 1200px) {
+  .site-head { grid-template-columns: auto 1fr auto auto; grid-template-areas: "name . book nav" "rule rule rule rule"; }
+  .head-book { margin: 0 0.6rem 0 0; font-size: min(1.65rem, 2.2vw); }
+}
+
+/* The book as a download: text face, underlined, with the EPUB mark, so it
+   reads as a file rather than a story. */
+.head-book, .foot-book {
   color: var(--ink-soft);
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
-  text-decoration-color: color-mix(in oklch, currentColor 45%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
 }
-.epub-dl span { font-style: normal; font-size: 0.8em; margin-left: 0.12em; }
-.epub-dl:visited { color: var(--ink-soft); }
-.epub-dl:hover { color: var(--link-hover); text-decoration-color: currentColor; }
-.site-head .navbar { width: auto; min-height: 0; gap: 0; border: 0; margin-left: auto; }
-.site-head .nav-item { padding: 0.15rem 0.35rem; }
+.head-book { font: 400 clamp(1.2rem, 3vw, 1.65rem)/1.2 var(--serif); }
+.head-book:visited, .foot-book:visited { color: var(--ink-soft); }
+.head-book:hover, .foot-book:hover { color: var(--link-hover); text-decoration-color: currentColor; }
+.bk-dl, .nav-epub, .nav-epub:visited { color: var(--link-hover); }
+.bk-dl { white-space: nowrap; font: var(--ui-w) 0.68em/1 var(--sans); letter-spacing: 0.08em; }
+.dl-ico { width: 1em; height: 1em; margin-left: 0.25em; vertical-align: -0.12em; }
+.nav-epub .dl-ico { width: 0.95em; height: 0.95em; }
 
 .site-h1 {
   font-family: 'Author Name', var(--h1);
@@ -312,17 +326,9 @@ main {
   line-height: 1.15;
   color: var(--ink);
 }
-.site-h2 {
-  font-family: 'Site Title', var(--h1);
-  font-size: 1.5rem;
-  font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: 0.01em;
-  color: var(--ink-soft);
-}
 
 .stories { list-style: none; padding-left: var(--indent, 0); }
-/* Editor's picks: a faint purple rule in the margin, left of the title. */
+/* Editor's picks: a red rule in the margin, left of the title. */
 .story { position: relative; }
 .story.pick::before {
   content: "";
@@ -330,8 +336,8 @@ main {
   left: calc(-1 * min(0.75rem, var(--indent, 1rem) / 2));
   top: 18%;
   bottom: 18%;
-  width: 2px;
-  border-radius: 1px;
+  width: 4px;
+  border-radius: 2px;
   background: var(--pick);
 }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -339,7 +345,7 @@ main {
 
 .story-title {
   --mono-size: 1.25rem;
-  font-size: calc(1.15rem * var(--ts, 1));
+  font-size: calc(1.15rem * var(--ts, 1) * var(--fit, 1));
   /* Absolute, so every row is the same height whatever the title's face. */
   line-height: 1.85rem;
 }
@@ -391,7 +397,7 @@ main {
 @media (min-width: 641px) and (min-height: 520px) {
   .is-index main {
     width: auto;
-    height: 100dvh;
+    min-height: 100dvh;
     margin: 0 clamp(1rem, 3vw, 2.5rem);
     padding: 1.2rem 0 1rem;
     display: flex;
@@ -407,18 +413,53 @@ main {
     /* Rows never drop below 2.1rem: once there are too many stories to
        fit, the list runs past the window and the page scrolls. */
     grid-template-rows: repeat(var(--n), minmax(2.1rem, 1fr));
+    min-height: calc(var(--n) * 2.1rem);
   }
   /* cq units resolve against the list only inside it, so the row size is
      defined on the rows. */
   .story { --row: max(2.1rem, 100cqh / var(--n)); display: flex; align-items: center; min-height: 0; padding: 0; }
   .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
   .story-title {
-    font-size: calc(min(var(--row) * 0.56, 2.6cqw) * var(--ts, 1));
+    font-size: calc(min(var(--row) * 0.56, 2.6cqw) * var(--ts, 1) * var(--fit, 1));
     line-height: var(--row);
     /* 8% above the base title size, so a title grows a touch on hover. */
     --mono-size: calc(min(var(--row) * 0.56, 2.6cqw) * 1.08);
   }
   .story .meta { font-size: clamp(0.7rem, var(--row) * 0.27, 0.95rem); margin-left: 0.6em; }
+}
+
+/* Phones fill the screen the same way, with the meta on its own line under
+   each title: the row splits about 60/40 between title and meta, and titles
+   scale with the row, capped by the width. svh, so the list fits with the
+   browser's toolbars showing. Rows stop shrinking at 2.3rem; past that the
+   page scrolls. */
+@media (max-width: 640px) and (min-height: 520px) {
+  .is-index main {
+    width: auto;
+    min-height: 100svh;
+    margin: 0 1rem;
+    padding: 0.9rem 0 0.4rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-index .site-head, .is-index .site-foot { flex: none; }
+  .is-index .site-foot { margin-top: 0.4rem; }
+  .stories {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    container-type: size;
+    grid-template-rows: repeat(var(--n), minmax(2.3rem, 1fr));
+    min-height: calc(var(--n) * 2.3rem);
+  }
+  .story { --row: max(2.3rem, 100cqh / var(--n)); display: flex; align-items: center; min-height: 0; padding: 0; }
+  .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
+  .story-title {
+    font-size: calc(min(var(--row) * 0.42, 5.2cqw) * var(--ts, 1) * var(--fit, 1));
+    line-height: calc(var(--row) * 0.58);
+    --mono-size: calc(min(var(--row) * 0.42, 5.2cqw) * 1.08);
+  }
+  .story .meta { display: block; margin: 0; font-size: clamp(0.62rem, var(--row) * 0.2, 0.8rem); line-height: 1.15; }
 }
 
 /* --- Story: a printed book page ------------------------------------- */
@@ -556,11 +597,6 @@ main {
 .post-nav-next { margin-left: auto; text-align: right; }
 .post-nav-next::after { content: ' →'; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 
-.colophon {
-  margin-top: 0.8rem;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
 
 /* --- Narrow screens -------------------------------------------------- */
 
@@ -573,8 +609,12 @@ main {
   .story .meta { display: block; margin: 0.1rem 0 0; white-space: normal; }
   .story .meta .m:first-of-type { margin-left: 0.55rem; }
 
-  .site-h1 { font-size: 2.3rem; }
-  .site-h2 { font-size: 1.2rem; }
+  /* The name stays on one line beside the links; a smaller Subscribe. */
+  .site-h1 { font-size: clamp(1.5rem, 7vw, 2.3rem); white-space: nowrap; }
+  .site-head { column-gap: 0.5rem; margin-bottom: 0.6rem; }
+  .site-head .nav-item { padding: 0.15rem 0.3rem; }
+  .nav-sub { height: 2rem; padding: 0 0.75rem; font-size: 0.8rem; gap: 0.35rem; }
+  .head-book { margin: 0.5rem 0 0.1rem var(--indent); }
   .post-header h1 { font-size: 1.95rem; }
   .post-nav { flex-direction: column; gap: 0.4rem; }
   .post-nav-next { margin-left: 0; text-align: left; }
