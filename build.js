@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { createCanvas, loadImage, registerFont } = require('canvas');
+const { createCanvas, registerFont } = require('canvas');
 
 // Cover typeface, bundled so the CI runner (which has no Georgia) renders the
 // same cover as a local Mac build. EB Garamond, SIL OFL — see fonts/OFL.txt.
@@ -296,58 +296,152 @@ function cleanHtml(html, { forFeed = false } = {}) {
 }
 
 const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>';
-const [TITLE_MAIN, TITLE_SUB] = (() => {
-  const m = SITE_TITLE.match(/^(.*?)\s+(and other stories)$/i);
-  return m ? [m[1], m[2].toLowerCase()] : [SITE_TITLE, ''];
-})();
-const AUTHOR = SITE_SUBTITLE.replace(/^by\s+/i, '');
+// --- Title typography -------------------------------------------------------
 
-// Title with its "and other stories" tail set as a quieter italic line.
-function titleMarkup() {
-  return TITLE_SUB ? `${TITLE_MAIN} <em>${TITLE_SUB}</em>` : TITLE_MAIN;
+// Each story title is set in its own Google Fonts face. The build downloads a
+// subset holding only that title's letters (both cases, for the hover ripple)
+// and self-hosts it, so a face costs a few KB and readers never hit Google.
+// Stories missing here take the next face from TITLE_FONT_SPARES.
+const TITLE_FONTS = {
+  'the-company-man': { family: 'Courier Prime', weight: 700 },
+  'our-beloved-monsters': { family: 'Pirata One' },
+  'that-mad-olympiad-1': { family: 'Shrikhand' },
+  'the-maker-of-mind': { family: 'Syne', weight: 700 },
+  'san-silvestro': { family: 'IM Fell English' },
+  'remembering-aubrey-chang': { family: 'Bodoni Moda', weight: 500 },
+  'lobsang-s-children-1': { family: 'Alegreya', weight: 500 },
+  'the-liar-and-the-scold': { family: 'Libre Caslon Display' },
+  'the-elect-2': { family: 'Abril Fatface' },
+  'goldfish': { family: 'Caveat', weight: 600 },
+  'customer-satisfaction-opportunities-1': { family: 'Barlow Condensed', weight: 500 },
+  'penny-s-hands': { family: 'Young Serif' },
+  'the-distaff-texts': { family: 'MedievalSharp' },
+  'duane-arnold-1': { family: 'Space Mono', weight: 700 },
+  'the-origami-men': { family: 'EB Garamond', weight: 500 },
+};
+const TITLE_FONT_SPARES = [
+  { family: 'Fraunces', weight: 600 }, { family: 'Unbounded', weight: 500 },
+  { family: 'Instrument Serif' }, { family: 'Gloock' }, { family: 'DM Serif Display' },
+];
+const TITLE_FONT_FALLBACK = "Georgia, 'Times New Roman', serif";
+
+function titleFontFor(slug, i) {
+  return TITLE_FONTS[slug] || TITLE_FONT_SPARES[i % TITLE_FONT_SPARES.length];
 }
 
-function buildNav(posts, currentSlug, sortBy) {
-  const sorted = sortBy === 'book'
-    ? bookOrder(posts)
-    : [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-
-  return sorted.map(p => {
-    const active = p.slug === currentSlug ? ' class="active"' : '';
-    return `<li data-slug="${p.slug}"><a href="${p.slug}.html"${active}${active ? ' aria-current="page"' : ''}><span class="nav-title">${p.title}</span></a></li>`;
-  }).join('\n');
+// Download one subset font per story into dist/fonts/. Returns slug ->
+// { family, file }; a story whose download fails gets no entry and falls back
+// to TITLE_FONT_FALLBACK, reported as [DEGRADED].
+async function fetchTitleFonts(posts) {
+  const out = new Map();
+  const dir = path.join(OUTPUT_DIR, 'fonts');
+  fs.mkdirSync(dir, { recursive: true });
+  const unknown = posts.filter(p => !TITLE_FONTS[p.slug]);
+  await Promise.all(posts.map(async (p) => {
+    const spec = titleFontFor(p.slug, unknown.indexOf(p));
+    const chars = [...new Set(p.title + p.title.toUpperCase() + p.title.toLowerCase())].join('');
+    const fam = spec.family.replace(/ /g, '+') + (spec.weight ? `:wght@${spec.weight}` : '');
+    const cssUrl = `https://fonts.googleapis.com/css2?family=${fam}&text=${encodeURIComponent(chars)}`;
+    try {
+      // A modern UA gets woff2 back; the CSS then names one file for this text.
+      const css = await (await fetch(cssUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
+      const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+      if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
+      const res = await fetch(m[1]);
+      if (!res.ok) throw new Error(`font HTTP ${res.status}`);
+      const file = `fonts/t-${p.slug}.woff2`;
+      fs.writeFileSync(path.join(OUTPUT_DIR, file), Buffer.from(await res.arrayBuffer()));
+      out.set(p.slug, { family: spec.family, weight: spec.weight || 400, file });
+    } catch (err) {
+      console.error(`[DEGRADED] title font for ${p.slug} (${spec.family}): ${err.message}`);
+    }
+  }));
+  console.log(`Wrote ${out.size}/${posts.length} title fonts`);
+  return out;
 }
 
-function sortToggle() {
-  return `<div class="sort-toggle" role="group" aria-label="Order stories by">
-          <button type="button" class="sort-btn active" data-sort="book" aria-pressed="true">Book order</button>
-          <button type="button" class="sort-btn" data-sort="date" aria-pressed="false">Recent</button>
-        </div>`;
+// Titles shade from near-black (newest) to dark purple (oldest); in dark mode
+// from near-white to pale violet.
+function titleColor(rank, n) {
+  const t = n > 1 ? rank / (n - 1) : 0;
+  const mix = (a, b) => (a + (b - a) * t).toFixed(3);
+  return `light-dark(oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305), oklch(${mix(0.94, 0.78)} ${mix(0.005, 0.11)} 305))`;
 }
 
-function buildSidebar(posts, currentSlug) {
-  return `
-    <nav class="sidebar" aria-label="Stories">
-      <div class="sidebar-header">
-        <a href="index.html" class="site-title">${titleMarkup()}</a>
-        <span class="site-subtitle">${AUTHOR}</span>
-      </div>
-
-      <div class="nav-section">
-        ${sortToggle()}
-        <ul class="nav-list" data-sort="book">
-          ${buildNav(posts, currentSlug, 'book')}
-        </ul>
-        <ul class="nav-list" data-sort="date" style="display:none">
-          ${buildNav(posts, currentSlug, 'date')}
-        </ul>
-      </div>
-
-      <div class="sidebar-footer">
-        <a href="${SUBSTACK_URL}" class="lw-link">Subscribe on Substack</a>
-      </div>
-    </nav>`;
+// Per-story @font-face and colour, written to dist/titles.css.
+function buildTitlesCss(posts, fonts) {
+  const byDate = sortByDate(posts);
+  return byDate.map((p, rank) => {
+    const f = fonts.get(p.slug);
+    const face = f ? `@font-face{font-family:'T ${p.slug}';src:url('${f.file}') format('woff2');font-weight:${f.weight};font-display:swap}\n` : '';
+    const family = f ? `'T ${p.slug}', ${TITLE_FONT_FALLBACK}` : TITLE_FONT_FALLBACK;
+    return `${face}.t-${p.slug}{font-family:${family};font-weight:${f ? f.weight : 400};--tc:${titleColor(rank, byDate.length)}}`;
+  }).join('\n') + '\n';
 }
+
+function sortByDate(posts) {
+  return [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+}
+
+// --- Reader metrics ----------------------------------------------------------
+
+const SUBSTACK_BASE = SUBSTACK_URL.replace(/\/subscribe.*$/, '');
+const normTitle = t => String(t).toLowerCase().replace(/[‘’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Likes, restacks and comments for each Substack post, keyed by normalised
+// title. Fails loud and returns an empty map, so the site still builds.
+async function fetchSubstackMetrics() {
+  const out = new Map();
+  try {
+    for (let offset = 0; ; offset += 50) {
+      const res = await fetch(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const page = await res.json();
+      for (const p of page) {
+        out.set(normTitle(p.title), {
+          url: p.canonical_url,
+          likes: p.reaction_count ?? 0,
+          restacks: p.restacks ?? 0,
+          comments: p.comment_count ?? 0,
+        });
+      }
+      if (page.length < 50) break;
+    }
+    console.log(`Fetched Substack metrics for ${out.size} posts`);
+  } catch (err) {
+    console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}`);
+  }
+  return out;
+}
+
+function attachMetrics(posts, substack) {
+  for (const p of posts) {
+    p.lw = p.external ? null : {
+      url: `https://www.lesswrong.com/posts/${p._id}/${p.slug}`,
+      karma: p.baseScore,
+      comments: p.commentCount,
+    };
+    p.ss = substack.get(normTitle(p.title)) || null;
+  }
+}
+
+const ICON_LW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-4.6 6L18 18l-6-4.6L6 18l4.6-6L6 6l6 4.6z" opacity=".55"/><path d="M12 0l2.2 9.8L24 12l-9.8 2.2L12 24l-2.2-9.8L0 12l9.8-2.2z"/></svg>';
+const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.4H0zM0 2.7h11v1.4H0zM0 5.4h11V12L5.5 9 0 12z"/></svg>';
+
+// Metric cells. `cells` keeps every slot (blank when a story isn't on a
+// platform) so rows line up as columns on the contents page.
+function metricCells(p) {
+  const n = (v, unit, label) => `<span class="n" data-u="${unit}" title="${v} ${label}">${v}</span>`;
+  const lw = p.lw
+    ? `<a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, '▲', 'karma')}${n(p.lw.comments, 'c', 'comments')}`
+    : '<span class="src"></span><span class="n"></span><span class="n"></span>';
+  const ss = p.ss
+    ? `<a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, '♥', 'likes')}${n(p.ss.restacks, '↻', 'restacks')}${n(p.ss.comments, 'c', 'comments')}`
+    : '<span class="src"></span><span class="n"></span><span class="n"></span><span class="n"></span>';
+  return `<span class="m m-lw">${lw}</span><span class="m m-ss">${ss}</span>`;
+}
+
+// --- Pages -------------------------------------------------------------------
 
 const FAVICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23a0734f'/%3E%3Ctext x='50' y='73' font-size='62' text-anchor='middle' font-family='Georgia,serif' fill='%23fff'%3ET%3C/text%3E%3C/svg%3E";
 
@@ -377,29 +471,26 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
-  <link rel="preload" href="fonts/EBGaramond-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="titles.css">
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
-  <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <script>try{var d=document.documentElement,t=localStorage.getItem('theme');if(t)d.setAttribute('data-theme',t);if(localStorage.getItem('order')==='book')d.setAttribute('data-order','book')}catch(e){}</script>
 </head>
 <body class="${currentSlug ? 'is-post' : 'is-index'}">
   <a class="skip-link" href="#content">Skip to ${currentSlug ? 'story' : 'contents'}</a>
 
-  <input type="checkbox" id="menu-toggle" hidden>
-  <label for="menu-toggle" class="menu-overlay" aria-hidden="true"></label>
-
-  <header class="top-bar">
-    <label for="menu-toggle" class="menu-button" role="button" tabindex="0" aria-label="Stories menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></label>
-    <a href="index.html" class="top-bar-title">${TITLE_MAIN}</a>
-    <div class="top-bar-actions">
-      <button type="button" class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"><svg class="icon-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 12.2A7 7 0 0 1 7.8 3.5a7 7 0 1 0 8.7 8.7Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><svg class="icon-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10 1.8v2M10 16.2v2M1.8 10h2M16.2 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
-      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS feed">RSS</a>
-      <a href="${EPUB_FILENAME}" class="top-bar-btn epub-link" title="Download the collection as an EPUB">EPUB</a>
-      <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
-    </div>${currentSlug ? '\n    <div class="progress" aria-hidden="true"></div>' : ''}
+  <header class="nav">
+    <nav class="navbar" aria-label="Site">
+      <a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>△</a>
+      <a href="${EPUB_FILENAME}" class="nav-item epub-link" title="The whole collection as a free EPUB">/epub</a>
+      <a href="feed.xml" class="nav-item nav-rss">/rss</a>
+      <button type="button" class="nav-item theme-toggle" id="theme-btn" aria-label="Toggle dark mode">◐</button>
+      <form class="subscribe" action="${SUBSTACK_BASE}/subscribe" method="get">
+        <input type="email" name="email" placeholder="💌 email" aria-label="Email address for new stories" autocomplete="email" required>
+        <button type="submit" title="Subscribe on Substack">→</button>
+      </form>
+    </nav>${currentSlug ? '\n    <div class="progress" aria-hidden="true"></div>' : ''}
   </header>
-
-  ${buildSidebar(posts, currentSlug)}
 
   <main id="content" tabindex="-1">
     ${content}
@@ -423,7 +514,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         for(var i=0;i<els.length;i++)els[i].remove();
         var navs=document.querySelectorAll('[data-geo-slug="'+r.slug+'"]');
         for(var k=0;k<navs.length;k++){var a=navs[k],h=a.getAttribute('data-alt-href');
-          if(h){a.href=h;var t=a.querySelector('.post-nav-title');(t||a).textContent=a.getAttribute('data-alt-label')}
+          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label');a.className=a.className.replace(/\\bt-\\S+/,'t-'+a.getAttribute('data-alt-slug'));a.removeAttribute('aria-label')}
           else{a.removeAttribute('href');a.textContent=''}}
         var eps=document.querySelectorAll('.epub-link');
         for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
@@ -457,32 +548,59 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}updateTheme()});
     updateTheme();
 
-    // Sort toggle
-    var sort;try{sort=localStorage.getItem('sort')}catch(e){}
-    if(!sort)sort='book';
-    function applySort(s){
-      sort=s;try{localStorage.setItem('sort',s)}catch(e){}
-      document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
-      document.querySelectorAll('.index-list[data-sort]').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
-      document.querySelectorAll('.sort-btn').forEach(function(btn){var on=btn.getAttribute('data-sort')===s;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',on?'true':'false')});
-      document.querySelectorAll('.post-nav-next,.post-nav-prev').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
-    }
-    document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
-    applySort(sort);
-
-    // Keyboard support for the hamburger label
-    var m=document.querySelector('.menu-button'),c=document.getElementById('menu-toggle');
-    if(m&&c){m.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();c.checked=!c.checked}})}
-    if(c)document.addEventListener('keydown',function(e){if(e.key==='Escape'&&c.checked)c.checked=false});
-
-    // Arrow keys step to the previous/next story in the current order
+    // Arrow keys step to the newer/older story
     document.addEventListener('keydown',function(e){
       if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
       if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
       var el=document.activeElement;if(el&&(el.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;
-      var cls=e.key==='ArrowLeft'?'.post-nav-prev':'.post-nav-next';
-      var links=document.querySelectorAll('a'+cls+'[href]');
-      for(var i=0;i<links.length;i++){if(links[i].style.display!=='none'){location.href=links[i].href;return}}
+      var as=document.querySelectorAll(e.key==='ArrowLeft'?'a.post-nav-prev[href]':'a.post-nav-next[href]');
+      for(var i=0;i<as.length;i++)if(as[i].offsetParent){location.href=as[i].href;return}
+    });
+
+    // Recent / book order. Reorders the DOM so the list numbering follows.
+    var list=document.querySelector('.stories');
+    function setOrder(o){
+      if(o==='book')h.setAttribute('data-order','book');else h.removeAttribute('data-order');
+      try{localStorage.setItem('order',o)}catch(e){}
+      document.querySelectorAll('.order-switch button').forEach(function(btn){btn.setAttribute('aria-pressed',btn.dataset.o===o?'true':'false')});
+      if(!list)return;
+      Array.from(list.querySelectorAll('.story[data-slug]'))
+        .sort(function(x,y){return x.dataset[o]-y.dataset[o]})
+        .forEach(function(li){list.appendChild(li)});
+    }
+    document.querySelectorAll('.order-switch button').forEach(function(btn){btn.addEventListener('click',function(){setOrder(btn.dataset.o)})});
+    if(h.getAttribute('data-order')==='book')setOrder('book');
+
+    // Title ripple: while a title is hovered, a capital runs through it one
+    // letter every 50ms, lifting its neighbours like a wave.
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
+    var LIFT=[-0.2,-0.09,-0.03];
+    document.querySelectorAll('.ripple').forEach(function(a){
+      var spans=null,text,timer=null,pos=-1;
+      function split(){
+        text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
+        Array.from(text).forEach(function(ch){
+          var s=document.createElement('span');s.textContent=ch;s.setAttribute('aria-hidden','true');
+          if(/\\S/.test(ch)){s.className='rl';spans.push(s)}
+          a.appendChild(s);
+        });
+      }
+      function paint(){
+        for(var i=0;i<spans.length;i++){
+          var d=Math.abs(i-pos),s=spans[i],ch=s.dataset.ch||(s.dataset.ch=s.textContent);
+          s.textContent=d===0?ch.toUpperCase():ch;
+          s.classList.toggle('on',d===0);
+          s.style.transform=d<LIFT.length?'translateY('+LIFT[d]+'em)':'';
+        }
+      }
+      function step(){pos++;if(pos>spans.length+6)pos=0;paint()}
+      a.addEventListener('mouseenter',function(){
+        if(!spans||a.textContent!==text)split();
+        a.classList.add('rippling');pos=-1;clearInterval(timer);timer=setInterval(step,50);
+      });
+      a.addEventListener('mouseleave',function(){
+        clearInterval(timer);a.classList.remove('rippling');pos=-99;if(spans)paint();
+      });
     });
   })();
   </script>
@@ -490,57 +608,51 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
 </html>`;
 }
 
-// Prev/next link from list[idx] one step in direction `step` (-1 or 1). When
-// the target is a GEO_HIDDEN story, the link also carries the next story past
-// it (skipping every GEO_HIDDEN slug), which the geo curtain swaps in.
-function postNavLink(list, idx, step, sort) {
+// Newer/older link from list[idx] one step in direction `step` (-1 newer,
+// 1 older). When the target is a GEO_HIDDEN story, the link also carries the
+// next story past it (skipping every GEO_HIDDEN slug), which the geo curtain
+// swaps in.
+function postNavLink(list, idx, step) {
   const cls = step < 0 ? 'post-nav-prev' : 'post-nav-next';
-  const style = sort === 'book' ? '' : ' style="display:none"';
-  const label = p => p.title;
   const target = list[idx + step];
-  if (!target) return `<span class="${cls}" data-sort="${sort}"${style}></span>`;
+  if (!target) return `<span class="${cls}"></span>`;
   let geo = '';
   if (GEO_HIDDEN.some(r => r.slug === target.slug)) {
     let i = idx + step;
     while (list[i] && GEO_HIDDEN.some(r => r.slug === list[i].slug)) i += step;
     const alt = list[i];
-    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(label(alt)) : ''}"`;
+    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  const dir = step < 0 ? '← Previous' : 'Next →';
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls}" data-sort="${sort}"${style}${geo} rel="${step < 0 ? 'prev' : 'next'}"><span class="post-nav-dir">${dir}</span><span class="post-nav-title">${label(target)}</span></a>`;
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls} ripple t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
 function buildPostPage(post, allPosts) {
   const readTime = estimateReadingTime(post.wordCount);
   const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
-
+  const byDate = sortByDate(allPosts);
+  const idx = byDate.findIndex(p => p.slug === post.slug);
   const byBook = bookOrder(allPosts);
   const bookIdx = byBook.findIndex(p => p.slug === post.slug);
-  const byDate = [...allPosts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  const dateIdx = byDate.findIndex(p => p.slug === post.slug);
 
   const content = `
     <article>
       <header class="post-header">
-        <h1>${post.title}</h1>
-        <p class="post-meta">${meta}</p>
+        <h1 class="t-${post.slug}">${post.title}</h1>
+        <p class="post-meta"><span>${meta}</span>${metricCells(post)}</p>
       </header>
       <div class="post-body">
         ${cleanHtml(post.htmlBody)}
       </div>
-      <p class="end-mark" aria-hidden="true">&#x2767;</p>
-      <p class="colophon">
-        New stories arrive by email: <a href="${SUBSTACK_URL}">subscribe on Substack</a>.<br>
-        <a href="${EPUB_FILENAME}" class="epub-link">Download the whole collection</a> as a free EPUB.
-      </p>
       <footer class="post-footer">
-        <nav class="post-nav" aria-label="More stories">
-          ${postNavLink(byBook, bookIdx, -1, 'book')}
-          ${postNavLink(byDate, dateIdx, -1, 'date')}
-          ${postNavLink(byBook, bookIdx, 1, 'book')}
-          ${postNavLink(byDate, dateIdx, 1, 'date')}
+        <nav class="post-nav order-date" aria-label="Newer and older stories">
+          ${postNavLink(byDate, idx, -1)}
+          ${postNavLink(byDate, idx, 1)}
         </nav>
-        <a href="index.html" class="post-nav-home">Contents</a>
+        <nav class="post-nav order-book" aria-label="Previous and next in book order">
+          ${postNavLink(byBook, bookIdx, -1)}
+          ${postNavLink(byBook, bookIdx, 1)}
+        </nav>
+        <p class="colophon">New stories by email: <a href="${SUBSTACK_URL}">Substack</a> · the whole collection as a free <a href="${EPUB_FILENAME}" class="epub-link">EPUB</a></p>
       </footer>
     </article>`;
 
@@ -550,51 +662,22 @@ function buildPostPage(post, allPosts) {
 }
 
 function buildIndexPage(posts) {
-  const byDate = [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  const byBook = bookOrder(posts);
-  const hidden = new Set(GEO_HIDDEN.map(r => r.slug));
-  const first = byBook.find(p => !hidden.has(p.slug)) || byBook[0];
-
-  function buildListing(sorted) {
-    return sorted.map(p => {
-      const readTime = estimateReadingTime(p.wordCount);
-      const meta = [formatDate(p.postedAt), readTime].filter(Boolean).join(' · ');
-      return `
-      <li class="index-item" data-slug="${p.slug}">
-        <a href="${p.slug}.html">
-          <span class="index-title">${p.title}</span>
-          <span class="index-excerpt">${escapeHtml(extractExcerpt(p.htmlBody, 220))}</span>
-          <span class="index-meta">${meta}</span>
-        </a>
-      </li>`;
-    }).join('\n');
-  }
+  const bookPos = new Map(bookOrder(posts).map((p, i) => [p.slug, i]));
+  const rows = sortByDate(posts).map((p, i) => `
+        <li class="story" data-slug="${p.slug}" data-date="${i}" data-book="${bookPos.get(p.slug)}">
+          <a class="story-title ripple t-${p.slug}" href="${p.slug}.html">${p.title}</a>
+          ${metricCells(p)}
+        </li>`).join('');
 
   const content = `
-    <div class="index-page">
-      <header class="title-page">
-        <img class="title-cover" src="${COVER_THUMB}" width="400" height="600" alt="Cover of ${escapeAttr(SITE_TITLE)}">
-        <div>
-          <h1>${titleMarkup()}</h1>
-          <p class="title-author">${AUTHOR}</p>
-          <p class="title-actions">
-            <a class="begin" href="${first.slug}.html">Begin reading</a>
-            <a class="epub-link" href="${EPUB_FILENAME}">EPUB</a>
-            <a href="${SUBSTACK_URL}">Subscribe</a>
-          </p>
-        </div>
-      </header>
-      <div class="contents-head">
-        <h2>Contents</h2>
-        ${sortToggle()}
-      </div>
-      <ul class="index-list" data-sort="book">
-        ${buildListing(byBook)}
-      </ul>
-      <ul class="index-list" data-sort="date" style="display:none">
-        ${buildListing(byDate)}
-      </ul>
-    </div>`;
+    <h1 class="site-h1">${SITE_TITLE}</h1>
+    <ol class="stories">
+        <li class="story story-head">
+          <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" data-o="date" aria-pressed="true">recent</button> · <button type="button" data-o="book" aria-pressed="false">book order</button></span>
+          <span class="m m-lw" aria-hidden="true"><span class="src">LessWrong</span><span class="n">karma</span><span class="n">cmts</span></span>
+          <span class="m m-ss" aria-hidden="true"><span class="src">Substack</span><span class="n">likes</span><span class="n">restacks</span><span class="n">cmts</span></span>
+        </li>${rows}
+    </ol>`;
 
   return pageShell(content, null, posts, null);
 }
@@ -1720,19 +1803,6 @@ ${chapterFiles.map(c => `    <itemref idref="${c.halfTitleId}"/>
   return buildZip(entries);
 }
 
-// Small JPEG of the cover for the index page; cover.png stays full size for
-// the EPUB and social previews.
-const COVER_THUMB = 'cover-thumb.jpg';
-async function buildCoverThumb(coverPng, width = 400) {
-  const img = await loadImage(coverPng);
-  const height = Math.round(img.height * width / img.width);
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, width, height);
-  return canvas.toBuffer('image/jpeg', { quality: 0.86 });
-}
-
 async function main() {
   console.log('Fetching user...');
   const user = await getUser();
@@ -1777,6 +1847,12 @@ async function main() {
     fs.copyFileSync(path.join(webFonts, name), path.join(OUTPUT_DIR, 'fonts', name));
   }
 
+  // Reader metrics and per-title fonts
+  attachMetrics(fiction, await fetchSubstackMetrics());
+  const titleFonts = await fetchTitleFonts(fiction);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, titleFonts));
+  console.log('Wrote titles.css');
+
   // Write index page
   fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), buildIndexPage(fiction));
   console.log('Wrote index.html');
@@ -1793,8 +1869,6 @@ async function main() {
   const coverPng = buildCoverPng(collection, BOOK_TITLE);
   fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
   console.log('Wrote cover.png');
-  fs.writeFileSync(path.join(OUTPUT_DIR, COVER_THUMB), await buildCoverThumb(coverPng));
-  console.log(`Wrote ${COVER_THUMB}`);
 
   // Generate EPUB
   const epub = await buildEpub(collection, 'collection', BOOK_TITLE, coverPng);
@@ -1836,7 +1910,7 @@ async function main() {
 // Export for testing, run if called directly
 function setCoverStyle(s) { COVER_STYLE = s; }
 function setRidgePalette(p) { RIDGE_PALETTE = p; }
-module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng, setCoverStyle, setRidgePalette };
+module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildCoverPng, setCoverStyle, setRidgePalette };
 
 if (require.main === module) {
   main().catch(err => {

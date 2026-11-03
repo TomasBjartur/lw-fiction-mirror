@@ -43,7 +43,8 @@ const GEO_HIDDEN = [
 ];
 ```
 
-A matching reader loses the story from the sidebar and index, is redirected to
+A matching reader loses the story from the contents list and the newer/older
+links, is redirected to
 the index if they open the story URL directly, and gets their EPUB download
 pointed at `EPUB_FILENAME_ALT` — a second EPUB built in the same pass, with the
 same cover and title, minus the hidden stories.
@@ -57,4 +58,26 @@ cached in `localStorage` for 24h to stay under the free tier's rate limit.
 
 ## Architecture
 
-Reading requires no JavaScript — the sidebar navigation and mobile hamburger menu are pure HTML + CSS. A small inline script adds the optional niceties: dark-mode toggle and the Book Order / Recent sort switcher (both remembered in localStorage). Fonts are system fonts (Charter/Georgia serif stack). The only external request on the reader's end is the `GEO_HIDDEN` lookup to ipapi.co, which runs on every page view (cached 24h) while any rule is configured.
+Reading requires no JavaScript. The contents page is a numbered list,
+newest first, with each story's LessWrong karma and comments and its
+Substack likes, restacks and comments, fetched at build time (LessWrong
+from the GraphQL query, Substack from `/api/v1/archive`; a failed fetch
+logs `[DEGRADED]` and the build continues without those numbers). Story
+pages link to the newer and older story.
+
+Each title is set in its own Google Fonts face (`TITLE_FONTS` in
+`build.js`; new stories take a face from `TITLE_FONT_SPARES`). The build
+downloads a subset containing only that title's letters and self-hosts it
+under `dist/fonts/`, so each face is 1–16 KB and readers never contact
+Google. Title colours shade from near-black (newest) to dark purple
+(oldest); `dist/titles.css` holds the generated faces and colours. Story
+text is set in Charter from the system font stack, and the site heading
+in EB Garamond (`fonts/web/`, made by `scripts/subset-fonts.sh`).
+
+A small inline script adds the optional extras: the dark-mode toggle, a
+recent / book-order switch (remembered in localStorage; book order is
+`COLLECTION_ORDER`, as in the EPUB), arrow keys for newer/older, and a
+hover effect that runs a capital letter through each title. The only
+external request on the reader's end is the `GEO_HIDDEN` lookup to
+ipapi.co, which runs on every page view (cached 24h) while any rule is
+configured.
