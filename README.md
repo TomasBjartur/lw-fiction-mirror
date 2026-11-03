@@ -62,7 +62,7 @@ Reading requires no JavaScript. The site is light only. The contents
 page opens with the author's name (Send Flowers) beside the links (EPUB,
 RSS, X, and a Substack-orange Subscribe button that goes to Substack),
 a thin black rule, then the book title (Zen Tokyo Zoo) and the list. On
-screens at least 780 px wide and 520 px tall the list fills the window:
+screens at least 641 px wide and 520 px tall the list fills the window:
 one equal row per story, titles scaled to the row, so every story shows
 without scrolling; rows never go below 2.1rem, so a long list scrolls.
 Each title is followed by its month and reading time and then its
@@ -105,10 +105,32 @@ may run on to the end of the title column while the meta beside it
 fades out. Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.
 
-A small inline script adds the optional extras: a
-recent / book-order switch (remembered in localStorage; book order is
-`COLLECTION_ORDER`, as in the EPUB), arrow keys for newer/older, and the hover
-morph. The only
+A small inline script adds the optional extras: arrow keys for
+newer/older and the hover morph (book order, `COLLECTION_ORDER`, now only
+shapes the EPUB). The only
 external request on the reader's end is the `GEO_HIDDEN` lookup to
 ipapi.co, which runs on every page view (cached 24h) while any rule is
 configured.
+
+Stories marked as editor's picks (`EDITOR_PICKS`) get a faint purple
+rule in the margin of the contents list. A story with no `TITLE_FONTS`
+entry takes the next face from `TITLE_FONT_BACKLOG` (unused faces from
+Markus's picks, oldest new story first), and the build log names it so
+it can be pinned.
+
+## Open questions for Tomás
+
+- **What should stop a deploy?** The site rebuilds every 6 hours. Right
+  now three things stop a build (the last good version stays live):
+  a story font that can't be fetched from Google, a `GEO_HIDDEN` slug
+  that matches no story, and the usual API failures. Stale slugs in
+  `TITLE_FONTS`, `EDITOR_PICKS`, `COLLECTION_ORDER` or
+  `FORCE_INCLUDE_SLUGS` (e.g. a story renamed on LessWrong) only log
+  `[DEGRADED]`. Is that the split you want, or should every stale slug
+  stop the build, or none?
+- **Who watches failed builds?** GitHub emails a failed Actions run to
+  the repo owner only. If nobody reads those, a stopped build means new
+  stories silently don't appear.
+- **Fonts for new stories:** fine to take them from the backlog
+  automatically, or would you rather pick each one?
+

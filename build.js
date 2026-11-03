@@ -198,6 +198,26 @@ const COLLECTION_ORDER = [
   'the-origami-men',
 ];
 
+// Every slug written into this file must name a story the APIs return
+// (LessWrong slugs, like 'the-elect-2', are the canonical ones in its post
+// URLs). A GEO_HIDDEN slug that matches nothing fails the build, since the
+// story would otherwise show where it must not (the last good deploy stays
+// live). Any other stale slug only costs a face, a pick mark or a book
+// position, so it logs [DEGRADED] and the build goes on: new stories keep
+// deploying.
+function checkSlugs(posts) {
+  const known = new Set(posts.map(p => p.slug));
+  const stale = slugs => slugs.filter(s => !known.has(s));
+  const geo = stale(GEO_HIDDEN.map(r => r.slug));
+  if (geo.length) throw new Error(`GEO_HIDDEN slugs match no story (renamed on LessWrong?): ${geo.join(', ')}; known: ${[...known].join(', ')}`);
+  const lists = {
+    COLLECTION_ORDER, FORCE_INCLUDE_SLUGS, TITLE_FONTS: Object.keys(TITLE_FONTS), EDITOR_PICKS: [...EDITOR_PICKS],
+  };
+  for (const [name, slugs] of Object.entries(lists)) {
+    for (const s of stale(slugs)) console.error(`[DEGRADED] ${name} names '${s}', which matches no story (renamed on LessWrong?)`);
+  }
+}
+
 // Arrange posts in collection order. Stories not yet in COLLECTION_ORDER are
 // inserted (sorted by karma) before the final entry, so the title story keeps
 // closing the book.
@@ -321,7 +341,7 @@ const SUBSET_FONTS = [
   { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
     text: () => AUTHOR },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
-    text: posts => '△◐←→' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
+    text: posts => '△◐←→↗' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
 
 // The unicode-range of Google Fonts' "latin" subset, which is what the
@@ -362,6 +382,15 @@ async function fetchGoogleSubset(spec, text) {
   usedSubsets.add(`${key}.woff2`);
   if (fs.existsSync(cached)) return fs.readFileSync(cached);
   const url = `https://fonts.googleapis.com/css2?family=${spec.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
+  for (let attempt = 1; ; attempt++) {
+    try { return await downloadSubset(url, cached); } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
+}
+
+async function downloadSubset(url, cached) {
   const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
   const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
   if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
@@ -410,11 +439,49 @@ const TITLE_FONTS = {
   'the-maker-of-mind': ['Turret Road:wght@500', 1.1, 500],
 };
 
+// Editor's picks (Markus, 2026-11-03): marked in the contents list by a
+// faint purple rule in the margin.
+const EDITOR_PICKS = new Set(['that-mad-olympiad-1', 'the-origami-men', 'the-distaff-texts', 'the-company-man']);
+
+// Faces for stories that arrive without a TITLE_FONTS entry: Markus's
+// reviewed picks not yet on a title, ordered so neighbours differ. A new
+// story takes the next one, oldest new story first, so each story keeps
+// its face as more arrive; when the backlog runs out the faces are reused
+// from the top. To pin a face (or change one), add the story to
+// TITLE_FONTS. Left out: Coral Pixels, Wallpoet and Delius Swash Caps
+// (tried on titles, didn't land) and Zen Tokyo Zoo (the book title).
+const TITLE_FONT_BACKLOG = [
+  ['Jersey 10', 1.15, 400],
+  ['League Script', 1.4, 400],
+  ['Climate Crisis', 0.85, 400],
+  ['Josefin Sans:wght@300', 1.05, 300],
+  ['Bungee Shade', 0.9, 400],
+  ['Twinkle Star', 1.2, 400],
+  ['Moirai One', 1.0, 400],
+  ['Urbanist:wght@300', 1.05, 300],
+  ['Tilt Prism', 1.0, 400],
+  ['Tourney', 1.0, 400],
+];
+
+// Slug -> [spec, size, weight] for every story: its pick, or a backlog face.
+function titleFontFor(posts) {
+  const map = new Map();
+  let next = 0;
+  for (const p of [...posts].sort((a, b) => new Date(a.postedAt) - new Date(b.postedAt))) {
+    if (TITLE_FONTS[p.slug]) { map.set(p.slug, TITLE_FONTS[p.slug]); continue; }
+    const f = TITLE_FONT_BACKLOG[next++ % TITLE_FONT_BACKLOG.length];
+    console.log(`Title font for ${p.slug}: ${f[0]} (from the backlog; pin it in TITLE_FONTS to keep it)`);
+    map.set(p.slug, f);
+  }
+  return map;
+}
+
 // Returns Map slug -> { file, size, weight } for the faces that were written.
 async function fetchTitleFonts(posts) {
   const out = new Map();
-  await Promise.all(posts.filter(p => TITLE_FONTS[p.slug]).map(async p => {
-    const [spec, size, weight] = TITLE_FONTS[p.slug];
+  const faces = titleFontFor(posts);
+  await Promise.all(posts.map(async p => {
+    const [spec, size, weight] = faces.get(p.slug);
     const file = `fonts/title-${p.slug}.woff2`;
     try {
       fs.writeFileSync(path.join(OUTPUT_DIR, file), await fetchGoogleSubset(spec, p.title));
@@ -570,7 +637,6 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <link rel="preload" href="${assetUrl(currentSlug ? 'fonts/charis-sil-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2')}" as="font" type="font/woff2" crossorigin>
   <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
-  <script>try{if(localStorage.getItem('order')==='book')document.documentElement.setAttribute('data-order','book')}catch(e){}</script>
 </head>
 <body class="${currentSlug ? 'is-post' : 'is-index'}">
   <a class="skip-link" href="#content">Skip to ${currentSlug ? 'story' : 'contents'}</a>
@@ -641,21 +707,7 @@ ${currentSlug ? `  <header class="nav">
       for(var i=0;i<as.length;i++)if(as[i].offsetParent){location.href=as[i].href;return}
     });
 
-    // Recent / book order. Reorders the DOM so the list numbering follows.
-    var list=document.querySelector('.stories');
-    function setOrder(o){
-      if(o==='book')h.setAttribute('data-order','book');else h.removeAttribute('data-order');
-      try{localStorage.setItem('order',o)}catch(e){}
-      document.querySelectorAll('.order-switch button').forEach(function(btn){btn.setAttribute('aria-pressed',btn.dataset.o===o?'true':'false')});
-      if(!list)return;
-      Array.from(list.querySelectorAll('.story[data-slug]'))
-        .sort(function(x,y){return x.dataset[o]-y.dataset[o]})
-        .forEach(function(li){list.appendChild(li)});
-    }
-    document.querySelectorAll('.order-switch button').forEach(function(btn){btn.addEventListener('click',function(){setOrder(btn.dataset.o)})});
-    if(h.getAttribute('data-order')==='book')setOrder('book');
-
-    // Hovering a title turns it, one letter every 12ms, into Major Mono
+    // Hovering a title turns it, letter by letter at uneven speed, into Major Mono
     // Display; leaving resets it at once. The title (or, if it wraps, each
     // word) keeps its resting box, so nothing around it moves; the mono
     // letters are near title size, never distorted (see .morph in style.css).
@@ -665,6 +717,7 @@ ${currentSlug ? `  <header class="nav">
       var spans=null,text=null,timer=null,n=0,dir=0;
       function split(){
         var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
+        var inline=getComputedStyle(a).display==='inline';
         text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
         var mi=document.createElement('span');mi.className='mi';
         text.split(/(\\s+)/).forEach(function(part){
@@ -692,10 +745,11 @@ ${currentSlug ? `  <header class="nav">
           var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
           var room=a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4;
           a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
-          // Pin to the line height, not the glyph box: an inline-flex shorter
-          // than the line it replaces would shrink the line and move the row.
-          var lh=parseFloat(getComputedStyle(a).lineHeight)||boxH;
-          a.style.boxSizing='border-box';a.style.width=box+'px';a.style.height=lh+'px';a.classList.add('pinned');
+          // An inline title (the contents list) pins to its line height, so
+          // the line it sits on keeps its height; a block-level link (a flex
+          // item in the newer/older row) pins to its own resting box.
+          var h=inline?(parseFloat(getComputedStyle(a).lineHeight)||boxH):boxH;
+          a.style.boxSizing='border-box';a.style.width=box+'px';a.style.height=h+'px';a.classList.add('pinned');
         }else{
           // Wrapped: each word keeps its width and the mono letters shrink to fit.
           a.style.whiteSpace='';
@@ -703,15 +757,21 @@ ${currentSlug ? `  <header class="nav">
           boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
         }
       }
+      // Each letter waits a random 4-30 ms (mean ~13), skewed short, so the
+      // change runs in uneven spurts rather than at a metronome's pace.
       function run(){
-        clearInterval(timer);
-        timer=setInterval(function(){
-          if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm';
-        },12);
+        clearTimeout(timer);
+        (function step(){
+          if(n>=spans.length)return;spans[n++].className='mm';
+          var r=Math.random();timer=setTimeout(step,4+26*r*r);
+        })();
       }
       a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();n=0}run()})});
+      // A resize rescales the titles, so pins measured at the old size are
+      // dropped; the next hover measures afresh.
+      addEventListener('resize',function(){if(!spans)return;clearTimeout(timer);a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned');spans=null});
       // Leaving resets the title at once; the morph only plays forwards.
-      a.addEventListener('mouseleave',function(){dir=-1;clearInterval(timer);if(spans){spans.forEach(function(s){s.className=''});n=0}});
+      a.addEventListener('mouseleave',function(){dir=-1;clearTimeout(timer);if(spans){spans.forEach(function(s){s.className=''});n=0}});
     });
   })();
   </script>
@@ -742,8 +802,6 @@ function buildPostPage(post, allPosts) {
   const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
   const byDate = sortByDate(allPosts);
   const idx = byDate.findIndex(p => p.slug === post.slug);
-  const byBook = bookOrder(allPosts);
-  const bookIdx = byBook.findIndex(p => p.slug === post.slug);
 
   const content = `
     <article>
@@ -755,13 +813,9 @@ function buildPostPage(post, allPosts) {
         ${cleanHtml(post.htmlBody)}
       </div>
       <footer class="post-footer">
-        <nav class="post-nav order-date" aria-label="Newer and older stories">
+        <nav class="post-nav" aria-label="Newer and older stories">
           ${postNavLink(byDate, idx, -1)}
           ${postNavLink(byDate, idx, 1)}
-        </nav>
-        <nav class="post-nav order-book" aria-label="Previous and next in book order">
-          ${postNavLink(byBook, bookIdx, -1)}
-          ${postNavLink(byBook, bookIdx, 1)}
         </nav>
         <p class="colophon">New stories by email: <a href="${SUBSTACK_URL}">Substack</a> · the whole collection as a free <a href="${EPUB_FILENAME}" class="epub-link">EPUB</a></p>
         ${siteFoot()}
@@ -774,21 +828,20 @@ function buildPostPage(post, allPosts) {
 }
 
 function buildIndexPage(posts) {
-  const bookPos = new Map(bookOrder(posts).map((p, i) => [p.slug, i]));
   const rows = sortByDate(posts).map((p, i) => `
-        <li class="story" data-slug="${p.slug}" data-date="${i}" data-book="${bookPos.get(p.slug)}">
-          <span class="title-cell"><a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a> <span class="meta">${whenText(p)}${stats(p)}</span></span>
+        <li class="story${EDITOR_PICKS.has(p.slug) ? ' pick' : ''}" data-slug="${p.slug}"${EDITOR_PICKS.has(p.slug) ? ' title="Editor\'s pick"' : ''}>
+          <span class="title-cell"><a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
         </li>`).join('');
 
   const content = `
     <header class="site-head">
       <div class="head-row">
         <h1 class="site-h1">${AUTHOR}</h1>
-        <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>△<\/a>/, '')}</nav>
+        <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>△<\/a>/, '').replace(/<a[^>]*epub-link[^>]*>EPUB<\/a>/, '')}</nav>
       </div>
-      <div class="head-row">
+      <div class="head-row book-row">
         <h2 class="site-h2">${SITE_TITLE}</h2>
-        <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" class="ico k-recent" data-o="date" aria-pressed="true" aria-label="Newest first" title="Newest first"></button><button type="button" class="ico k-book" data-o="book" aria-pressed="false" aria-label="Book order" title="Book order"></button></span>
+        <a href="${EPUB_FILENAME}" class="epub-dl epub-link" title="The whole collection as a free EPUB" download>EPUB<span aria-hidden="true">↗</span></a>
       </div>
     </header>
     <ol class="stories" style="--n:${posts.length}">${rows}
@@ -1953,6 +2006,7 @@ async function main() {
   const fiction = filterFiction(allPosts);
   const external = await fetchExternalStories();
   fiction.push(...external);
+  checkSlugs(fiction);
   console.log(`Found ${fiction.length} fiction posts (${external.length} external)`);
 
   if (fiction.length === 0) {
