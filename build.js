@@ -828,16 +828,19 @@ ${currentSlug ? `  <header class="nav">
 
     // A title too wide for its space shrinks just enough to fit: --fit
     // scales its CSS size. That is a long title in a wide face in a list
-    // row, or a long word in a story's title, on a phone. Only a row that
-    // keeps its title on one line (the filling list) has a width to fit.
+    // row (with its meta, when the meta shares the line), or a long word in
+    // a story's title, on a phone. Only a row that keeps its title on one
+    // line (the filling list) has a width to fit.
     var rows=document.querySelectorAll('.stories .story'),heads=document.querySelectorAll('.post-header h1');
     function setFit(el,w,room){if(room>0&&w>room)el.style.setProperty('--fit',(room/w).toFixed(3))}
     function fit(){
       rows.forEach(function(li){li.style.removeProperty('--fit')});
       heads.forEach(function(h){h.style.removeProperty('--fit')});
       rows.forEach(function(li){
-        var a=li.querySelector('.story-title'),c=li.querySelector('.title-cell');
-        if(a&&c)setFit(li,a.getBoundingClientRect().width,c.clientWidth-2);
+        var a=li.querySelector('.story-title'),c=li.querySelector('.title-cell'),m=li.querySelector('.meta');
+        if(!a||!c)return;
+        var ms=m&&getComputedStyle(m),beside=ms&&ms.display!=='block'?m.getBoundingClientRect().width+parseFloat(ms.marginLeft)+4:0;
+        setFit(li,a.getBoundingClientRect().width,c.clientWidth-2-beside);
       });
       heads.forEach(function(h){setFit(h,h.scrollWidth,h.clientWidth)});
     }

@@ -113,11 +113,12 @@
 
   /* The contents list filling the window (Contents, below): one row per
      story, never shorter than --row-min; the title is --title-k of the
-     row, capped at --title-cqw of the list's width; its line is
-     --title-lh of the row; the meta scales with the row, clamped. */
+     row, capped at --title-cqw of the list's width (a looser cap: a title
+     still too wide for its row with its meta shrinks alone, --fit); its
+     line is --title-lh of the row; the meta scales with the row, clamped. */
   --row-min:   2.1rem;
   --title-k:   0.56;
-  --title-cqw: 2.6cqw;
+  --title-cqw: 4.2cqw;
   --title-lh:  1;
   --meta-k:    0.27;
   --meta-min:  0.7rem;
@@ -404,6 +405,9 @@ main {
     flex: 1;
     display: grid;
     grid-template-rows: repeat(var(--n), minmax(var(--row-min), 1fr));
+    /* One column, the list's width: an auto column would grow to the
+       widest unwrapped row and push the page sideways. */
+    grid-template-columns: minmax(0, 1fr);
     min-height: calc(var(--n) * var(--row-min));
     container-type: size;
   }
@@ -542,7 +546,7 @@ main {
     /* The meta goes under each title: a row splits about 60/40 between
        title and meta. */
     --title-k:   0.46;
-    --title-cqw: 5.2cqw;
+    --title-cqw: 6.5cqw;
     --title-lh:  0.58;
     --meta-k:    0.2;
     --meta-min:  0.62rem;
