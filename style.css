@@ -19,13 +19,16 @@
    stack relies on an installed font. Latin subsets from
    scripts/fetch-webfonts.py. Inter stands in for the system UI font,
    EB Garamond sets the stories, the reader counts and the book, Fira Mono
-   any code. build.js adds subset faces (the name, the hover face, the
-   marks) and each story's title face in titles.css. */
+   any code, Zallman Caps (Dieter Steffmann's vine-framed capitals, built
+   by scripts/initials-lab-fonts.py --site) the initials. build.js adds
+   subset faces (the name, the hover face, the marks) and each story's
+   title face in titles.css. */
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Initials'; src: url('fonts/initials-zallman-caps-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: block; }
 
 /* --- Tokens ----------------------------------------------------------- */
 
@@ -67,6 +70,7 @@
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --mono:  'Fira Mono', ui-monospace, monospace;
   --name:  'Author Name', var(--serif);  /* Send Flowers, subset to the name */
+  --initial: 'Initials', var(--serif);   /* story and section initials */
 
   /* Type scale. */
   --fs-2xs:  0.7rem;    /* reader counts */
@@ -429,8 +433,8 @@ main {
 /* --- Story: a printed book page ---------------------------------------- */
 /* Treatment A from the reading lab (scripts/reading-lab.js): EB Garamond
    at ~21px on a justified, hyphenated ~62-character line (ragged on
-   phones), 1em indents, a centred spaced-capitals title, a three-line drop
-   cap and a small-caps lead-in. Bringhurst's 66-character ideal and
+   phones), 1em indents, a centred spaced-capitals title, decorated
+   initials and small-caps lead-ins. Bringhurst's 66-character ideal and
    Standard Ebooks' indents. */
 
 .is-post article { max-width: calc(29 * var(--story-size)); margin: 0 auto; }
@@ -473,16 +477,40 @@ main {
 
 .post-body .lead { font-variant-caps: small-caps; letter-spacing: 0.07em; }
 .post-body .caps { font-variant-caps: all-small-caps; letter-spacing: 0.06em; }
-.post-body p.first::first-letter {
-  initial-letter: 3;
-  -webkit-initial-letter: 3;
-  margin-right: 0.1em;
+/* Initials (scripts/initials-lab.js has the research and the other
+   faces): each beginning and resumption of the text is marked, graded as
+   in manuscripts and Bringhurst 4.1.4. The story opens on a three-line
+   capital (.first) and each section after a scene break on a two-line one
+   (.sect), both with a small-caps lead-in; ordinary paragraphs get none.
+   The face's cap height is its whole decorated box, so initial-letter
+   sizes the box, not just the letter inside it. */
+.post-body :is(p.first, p.sect)::first-letter {
+  font-family: var(--initial);
+  font-weight: 400;
   font-variant-caps: normal;
   letter-spacing: 0;
+  initial-letter: 3;
+  -webkit-initial-letter: 3;
+  margin-right: 0.12em;
 }
+.post-body p.sect::first-letter { initial-letter: 2; -webkit-initial-letter: 2; }
+/* A paragraph shorter than its initial still holds it, so the next one
+   starts below the initial instead of wrapping around it. */
+.post-body p.first { min-height: 3lh; }
+.post-body p.sect { min-height: 2lh; }
 @supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
-  .post-body p.first::first-letter { float: left; font-size: 3.9em; line-height: 0.8; margin: 0.06em 0.08em 0 0; }
+  /* A float sized from the box (0.769 em) to three lines, or two. */
+  .post-body :is(p.first, p.sect)::first-letter { float: left; font-size: 4.75em; line-height: 0.77; margin: 0.05em 0.08em 0 0; }
+  .post-body p.sect::first-letter { font-size: 2.8em; }
 }
+/* A leading quotation mark hangs in the margin at text size, left of the
+   initial (Bringhurst 4.1.5). The text keeps its own quote inside
+   ::first-letter, where the initials face draws it as nothing (build.js,
+   scripts/initials-lab-fonts.py); this one is decoration (empty alt), so
+   screen readers say it once. */
+.post-body p.oq { position: relative; }
+.post-body p.oq::before { content: attr(data-q) / ""; position: absolute; top: 0; left: -0.45em; }
+.post-body p.oq:has(> :is(i, em):first-child)::before { font-style: italic; }
 
 /* Headings inside a story, left-aligned in the text face. */
 .post-body :is(h1, h2, h3, h4) {

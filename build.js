@@ -355,20 +355,42 @@ function typeset(body) {
     }
   }
   out = out.replace(/\s+<\/p>/g, '</p>');
-  // Up to five opening words, stopping at a sentence or clause end or a dash.
-  // Only when the story opens on a word (or a quote): an opening like an
-  // indented "[RESPONSE REDACTED]" gets no drop cap.
-  // LessWrong's HTML often opens with inline tags (<span>, <i><span>);
-  // the lead-in goes inside them.
-  return out.replace(/^<p>((?:<(?:span|i|em|b|strong)\b[^>]*>)*)([^<]*)/, (m, open, text) => {
-    if (!/^[\u201c\u2018]?\p{L}/u.test(text)) return m;
-    const head = text.split(/[\u2009\u202f]?\u2014/)[0];
-    const words = head.split(' ');
-    let n = 0;
-    while (n < Math.min(5, head === text ? words.length - 1 : words.length)) { n++; if (/[.,;:!?\u201d]$/.test(words[n - 1])) break; }
-    const lead = words.slice(0, n).join(' ');
-    return `<p class="first">${open}<span class="lead">${lead}</span>${text.slice(lead.length)}`;
-  });
+  // Mark each beginning and resumption of the text (Bringhurst 4.1.4): the
+  // story's first paragraph (.first) and the first after each scene break
+  // (.sect) get an initial (CSS: three lines, two after a break, as in a
+  // manuscript's major and minor initials) and their first words in small
+  // caps, a bridge from the initial into the text.
+  const inline = '((?:<(?:span|i|em|b|strong)\\b[^>]*>)*)([^<]*)';
+  out = out.replace(new RegExp('^<p>' + inline), (m, open, text) => markOpening(m, '', open, text, 'first'));
+  return out.replace(new RegExp('(<hr>\\s*)<p>' + inline, 'g'), (m, hr, open, text) => markOpening(m, hr, open, text, 'sect'));
+}
+
+// One opening paragraph, matched as `before`<p>`open``text`: up to five
+// opening words in a small-caps lead-in, stopping at a sentence or clause
+// end or a dash. Only when the paragraph opens on a word (or a quote): an
+// opening like an indented "[RESPONSE REDACTED]" gets no initial.
+// LessWrong's HTML often opens with inline tags (<span>, <i><span>); the
+// lead-in goes inside them.
+// The initial is the paragraph's ::first-letter, which takes any punctuation
+// touching the letter. Text stays whole for copying, Reader view and
+// screen readers, so:
+// - a leading quotation mark stays in front of the letter; the initials face
+//   draws it as nothing, and CSS hangs a visible one (data-q) in the margin
+//   at text size (Bringhurst 4.1.5);
+// - punctuation right after the letter (I'm) would be drawn at initial size;
+//   a word joiner (U+2060, invisible) ends ::first-letter at the letter.
+function markOpening(m, before, open, text, cls) {
+  if (!/^[\u201c\u2018]?\p{L}/u.test(text)) return m;
+  const q = /^[\u201c\u2018]/.test(text) ? text[0] : '';
+  const rest = text.slice(q.length).replace(/^\p{L}(?=\p{P})/u, '$&\u2060');
+  const head = rest.split(/[\u2009\u202f]?\u2014/)[0];
+  const words = head.split(' ');
+  let n = 0;
+  while (n < Math.min(5, head === rest ? words.length - 1 : words.length)) { n++; if (/[.,;:!?\u201d]$/.test(words[n - 1])) break; }
+  const lead = words.slice(0, n).join(' ');
+  const attrs = q ? ` class="${cls} oq" data-q="${q}"` : ` class="${cls}"`;
+  const body = lead ? `<span class="lead">${q}${lead}</span>${rest.slice(lead.length)}` : q + rest;
+  return `${before}<p${attrs}>${open}${body}`;
 }
 
 function cleanHtml(html, { forFeed = false } = {}) {

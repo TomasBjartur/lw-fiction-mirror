@@ -104,19 +104,44 @@ Every font is served by the site, so every device renders the same:
 nothing relies on fonts the reader has installed. Inter (standing in for
 the system UI font) sets the interface and, in its Light weight, dates and
 reading times; EB Garamond sets story text, headings inside stories, the
-reader counts and the book; Fira Mono any code.
+reader counts and the book; Zallman Caps the initials; Fira Mono any
+code.
 
 Story pages are set as a printed book page (treatment A of the reading
 lab, Markus's pick): EB Garamond at 19-21.5 px on a ~62-character line,
 justified and hyphenated (ragged on phones, where browser justification
 opens gaps), 1em indents, a centred spaced-capitals title over the
-author's name, a three-line drop cap and a small-caps lead-in. The build
-also typesets story text on the page only (`typeset()` in `build.js`;
-the EPUB and feed keep the source): curly quotes, spaced hyphens to em
-dashes, `...` to ellipses, and a lone acronym of 3+ capitals (MIND, AGI)
-in small caps. Runs of capitalised words (a shouted sign, "[RESPONSE
-REDACTED]") keep their full capitals, and a story that opens on anything
-but a word or quote gets no drop cap.
+author's name, and decorated initials with small-caps lead-ins. The
+build also typesets story text on the page only (`typeset()` in
+`build.js`; the EPUB and feed keep the source): curly quotes, spaced
+hyphens to em dashes, `...` to ellipses, and a lone acronym of 3+
+capitals (MIND, AGI) in small caps. Runs of capitalised words (a shouted
+sign, "[RESPONSE REDACTED]") keep their full capitals.
+
+Initials mark each beginning and resumption of the text, graded as in
+manuscripts and in Bringhurst (4.1.4): a three-line initial opens the
+story and a two-line one opens each section after a scene break, each
+followed by a small-caps lead-in. Ordinary paragraphs get none, and
+neither does a paragraph that opens on anything but a word or a quote.
+The face is Zallman Caps, Dieter Steffmann's vine-framed capitals from
+CTAN; `scripts/initials-lab-fonts.py --site 'Zallman Caps'` converts it
+from Type 1 into `fonts/web/` with its cap height set to the whole
+decorated box, so `initial-letter` sizes the box. The initial is the
+paragraph's `::first-letter`, which also takes any punctuation touching
+the letter, so the build keeps the text whole for copying, Reader view
+and screen readers: a leading quotation mark stays in the text, where
+the initials face draws it as nothing, and CSS hangs a visible one in
+the margin at text size (Bringhurst 4.1.5); punctuation right after the
+letter (I'm) is cut off from the initial by an invisible word joiner. A
+paragraph shorter than its initial is held open to the initial's depth,
+so the next paragraph starts below it. Firefox has no `initial-letter`
+and gets a float sized to the same box. Chrome copies a one-letter
+opening word without its space ("Iheard"); Safari and Firefox copy it
+whole. `node scripts/initials-check.mjs <chrome|firefox|webkit>` checks
+every story's initials in a real engine (its header says how to install
+the engines). `scripts/initials-lab.js` writes `dist/initials-lab/`, the
+comparison of faces, frequencies and quote treatments behind this
+choice; a design tool, not part of the site.
 
 While reading, the nav slides away on scrolling down and returns on any
 scroll up, near the top, or on keyboard focus; a hairline across the top
