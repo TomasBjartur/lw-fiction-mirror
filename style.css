@@ -51,7 +51,6 @@
   --link-hover: light-dark(oklch(0.52 0.22 24), oklch(0.80 0.11 24));
   --marker:   light-dark(oklch(0.45 0.17 26),   oklch(0.79 0.10 26));
   --substack: #ff6719; /* Substack's own orange, both themes */
-  --blush:    light-dark(oklch(0.66 0.16 5),    oklch(0.74 0.12 5));
   --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.40 0.09 24));
   /* Editor's pick rule: the link-hover red (also the EPUB mark), dark at
      the top fading to mid, so picks, the book and hovers share one accent. */
@@ -240,9 +239,9 @@ main {
 
 /* Letter-by-letter hover morph (script in build.js). The script pins the
    title's resting box (.pinned; or, for a wrapped title, each word's: --w),
-   so nothing reflows. The mono letters are set near title size
-   (--mono-size), capped by --mfit so the title stays inside its column;
-   they may run past the resting box, so the inline date hides meanwhile.
+   so nothing reflows. The mono letters are set at title size
+   (--mono-size), capped by --mfit so the mono text is no wider than the
+   resting title: the title changes face but keeps its size.
    line-height: 0 keeps the mono glyphs from growing the line box. */
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
 .morph .mq, .morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
@@ -252,9 +251,9 @@ main {
 .title-cell .meta { transition: opacity 0.12s ease-out; }
 .title-cell:has(.mm) .meta { opacity: 0; transition-duration: 0.18s; }
 
-/* Hover: the title turns blush, instantly. */
-.blush { text-decoration: none; }
-.blush:hover, .blush:visited:hover { color: var(--blush); }
+/* Hover: the title turns the accent red of every other hover, instantly. */
+.hover-red { text-decoration: none; }
+.hover-red:hover, .hover-red:visited:hover { color: var(--link-hover); }
 
 /* Metric icons, drawn as masks in currentColor. */
 .k-date     { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'><rect x='3.5' y='5' width='17' height='15.5' rx='2'/><path d='M3.5 10h17M8 3v4M16 3v4'/></svg>"); }
@@ -344,7 +343,7 @@ main {
 .story { padding: 0.1rem 0; }
 
 .story-title {
-  --mono-size: 1.25rem;
+  --mono-size: 1.15rem;
   font-size: calc(1.15rem * var(--ts, 1) * var(--fit, 1));
   /* Absolute, so every row is the same height whatever the title's face. */
   line-height: 1.85rem;
@@ -422,8 +421,7 @@ main {
   .story-title {
     font-size: calc(min(var(--row) * 0.56, 2.6cqw) * var(--ts, 1) * var(--fit, 1));
     line-height: var(--row);
-    /* 8% above the base title size, so a title grows a touch on hover. */
-    --mono-size: calc(min(var(--row) * 0.56, 2.6cqw) * 1.08);
+    --mono-size: min(var(--row) * 0.56, 2.6cqw);
   }
   .story .meta { font-size: clamp(0.7rem, var(--row) * 0.27, 0.95rem); margin-left: 0.6em; }
 }
@@ -457,7 +455,7 @@ main {
   .story-title {
     font-size: calc(min(var(--row) * 0.42, 5.2cqw) * var(--ts, 1) * var(--fit, 1));
     line-height: calc(var(--row) * 0.58);
-    --mono-size: calc(min(var(--row) * 0.42, 5.2cqw) * 1.08);
+    --mono-size: min(var(--row) * 0.42, 5.2cqw);
   }
   .story .meta { display: block; margin: 0; font-size: clamp(0.62rem, var(--row) * 0.2, 0.8rem); line-height: 1.15; }
 }
@@ -484,7 +482,8 @@ main {
   margin-right: -0.16em;
   text-wrap: balance;
 }
-.byline { margin-top: 0.7em; font: italic 400 0.95em/1.3 var(--serif); }
+/* The byline is the author's name in its own face, as in the header. */
+.byline { margin-top: 0.6em; font: 400 1.5em/1.2 'Author Name', var(--serif); letter-spacing: 0; color: var(--ink); }
 .post-meta { justify-content: center; margin-top: 0.7em; font-size: 0.62em; }
 .post-meta .m:first-of-type { margin-left: 0.7rem; }
 .orn { display: block; width: 2.4em; margin: 1.3em auto 0; border-top: 1px solid currentColor; opacity: 0.55; }
@@ -591,7 +590,7 @@ main {
   align-items: center;
   gap: 1rem;
 }
-.post-nav-link { --mono-size: 1.13rem; font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.8rem; }
+.post-nav-link { --mono-size: 1.05rem; font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.8rem; }
 .post-nav-link:visited { color: var(--tc); }
 .post-nav-prev::before { content: '← '; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 .post-nav-next { margin-left: auto; text-align: right; }

@@ -869,11 +869,11 @@ ${currentSlug ? `  <header class="nav">
         var wide=boxes.map(width);
         spans.forEach(function(s){s.className=''});
         if(oneLine){
-          // The link keeps its resting box, so nothing moves; the mono text
-          // may run on to the right, up to the end of the title column (the
-          // date beside it hides meanwhile) or half the newer/older row.
+          // The link keeps its resting box, so nothing moves.
           var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
-          var room=a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4;
+          // The mono text is no wider than the resting title (nor than half
+          // the newer/older row), so the title keeps its size on hover.
+          var room=Math.min(box,a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4);
           a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
           // An inline title (the contents list) pins to its line height, so
           // the line it sits on keeps its height; a block-level link (a flex
@@ -927,7 +927,7 @@ function postNavLink(list, idx, step) {
     const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls} blush morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls} hover-red morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
 function buildPostPage(post, allPosts) {
@@ -965,7 +965,7 @@ function buildPostPage(post, allPosts) {
 function buildIndexPage(posts) {
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story${EDITOR_PICKS.has(p.slug) ? ' pick' : ''}" data-slug="${p.slug}"${EDITOR_PICKS.has(p.slug) ? ' title="Editor\'s pick"' : ''}>
-          <span class="title-cell"><a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
+          <span class="title-cell"><a class="story-title hover-red morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
         </li>`).join('');
 
   const content = `

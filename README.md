@@ -142,12 +142,14 @@ Commit `fonts/subsets/` after a local build that changed it (unused
 files are pruned). CSS and font URLs carry a hash of the file's bytes
 (`?v=`), so no browser or CDN cache serves an old copy after a deploy.
 
-Hovering a title turns it letter by letter (12 ms a letter, forwards
-only; leaving resets it) into Major Mono Display (a build-time subset of
-just the letters the titles use). The title keeps its resting box, so
-nothing on the page moves; the mono letters are set near title size and
-may run on to the end of the title column while the meta beside it
-fades out. Title colours shade from near-black (newest) to dark purple
+Hovering a title turns it red (the accent of every hover) and, letter
+by letter at a random 4-30 ms a letter (forwards only; leaving resets
+it), into Major Mono Display (a build-time subset of just the letters the
+titles use). The title keeps its resting box, so nothing on the page
+moves; the mono letters are set at title size, shrunk if needed so they
+are no wider than the resting title, and the meta beside it fades out.
+Story pages sign the story in the name's face (Send Flowers), as in the
+header. Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.
 
 A small inline script adds the optional extras: arrow keys for
