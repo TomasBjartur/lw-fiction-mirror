@@ -571,14 +571,16 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     if(h.getAttribute('data-order')==='book')setOrder('book');
 
     // Hovering a title turns it, one letter every 50ms, into Major Mono
-    // Display; leaving turns it back the same way. Each letter's rest width
-    // is measured once and kept (see .morph .mm in style.css), so nothing
-    // around the title moves.
+    // Display; leaving turns it back the same way. The title (or, if it
+    // wraps, each word) keeps its resting width and the mono letters share
+    // one size per title, so no glyph is distorted, spacing stays even and
+    // nothing around the title moves (see .morph in style.css).
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
     var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
     document.querySelectorAll('.morph').forEach(function(a){
       var spans=null,text=null,timer=null,n=0,dir=0;
       function split(){
+        var box=a.getBoundingClientRect().width; // before splitting, which can shift kerning
         text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
         text.split(/(\\s+)/).forEach(function(part){
           if(!part)return;
@@ -587,13 +589,24 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
           Array.from(part).forEach(function(ch){var s=document.createElement('span');s.textContent=ch;w.appendChild(s);spans.push(s)});
           a.appendChild(w);
         });
-        var rest=spans.map(function(s){return s.getBoundingClientRect().width});
+        // One line: scale to the whole title, so words keep their normal
+        // spacing. Wrapped: pin each word, so the line breaks cannot move.
+        var oneLine=a.getBoundingClientRect().height<1.6*(parseFloat(getComputedStyle(a).lineHeight)||24);
+        var boxes=oneLine?[a]:Array.from(a.querySelectorAll('.w'));
+        // Measure the text, not the box: a title link can fill its grid cell.
+        var width=function(e){var r=document.createRange();r.selectNodeContents(e);return r.getBoundingClientRect().width};
+        a.style.whiteSpace='nowrap';
+        var rest=boxes.map(width);
         spans.forEach(function(s){s.className='mq'});
-        var wide=spans.map(function(s){return s.getBoundingClientRect().width});
-        spans.forEach(function(s,i){
-          s.className='';s.style.setProperty('--w',rest[i]+'px');
-          s.style.setProperty('--sx',wide[i]>rest[i]?(rest[i]/wide[i]).toFixed(3):'1');
-        });
+        var wide=boxes.map(width);
+        spans.forEach(function(s){s.className=''});
+        // One mono size for every title (0.68em, the longest title's fit), so
+        // all morphs match; a title that needs less still shrinks to fit.
+        a.style.setProperty('--ms',Math.min.apply(null,[0.68].concat(rest.map(function(r,i){return r/wide[i]}))).toFixed(3));
+        if(!oneLine){a.style.whiteSpace='';boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')})}
+        // A link sized by its text (newer/older links) keeps its box; a
+        // grid cell already holds its width.
+        else if(!/grid/.test(getComputedStyle(a.parentElement).display)){a.style.boxSizing='border-box';a.style.width=box+'px'}
       }
       function run(){
         clearInterval(timer);

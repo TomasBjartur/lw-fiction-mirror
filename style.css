@@ -208,19 +208,15 @@ main {
 }
 .post-header h1[class^="t-"] { font-family: var(--heading); font-weight: 500; }
 
-/* Letter-by-letter hover morph (script in build.js). Each morphed letter
-   keeps the width it had at rest (--w), and the wider mono glyph is
-   squeezed into it (--sx), so the line never reflows. line-height: 0 keeps
-   the taller mono glyph from growing the line box. Words are nowrap so
-   the per-letter spans cannot add break points. */
-.morph .w { white-space: nowrap; }
+/* Letter-by-letter hover morph (script in build.js). The script pins the
+   title's resting width (or, for a wrapped title, each word's: --w), so
+   nothing reflows. The mono letters share one size per title (--ms), chosen
+   so the title still fits, so no glyph is distorted and spacing stays
+   even. line-height: 0 keeps the mono glyphs from growing the
+   line box. */
+.morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
 .morph .mq, .morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
-.morph .w > span[style] { display: inline-block; width: var(--w); }
-.morph .mm {
-  line-height: 0;
-  text-align: center;
-  transform: scaleX(var(--sx, 1));
-}
+.morph .mm { font-size: calc(var(--ms, 1) * 1em); line-height: 0; }
 
 /* Hover: the title turns blush, instantly. */
 .blush { text-decoration: none; }

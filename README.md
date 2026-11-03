@@ -78,8 +78,9 @@ the █ redactions) go into a small Noto Sans JP subset the build fetches.
 actually draws with and exits 1 if any came from the device.
 
 Hovering a title turns it letter by letter into Major Mono Display (a
-build-time subset of just the letters the titles use). Each letter keeps
-its resting width, so nothing on the page moves. Title colours shade from
+build-time subset of just the letters the titles use). The mono letters
+are set at one smaller size (0.68em) so every title fits its resting
+width; glyphs are never stretched and nothing on the page moves. Title colours shade from
 near-black (newest) to dark purple (oldest); `dist/titles.css` holds them.
 
 A small inline script adds the optional extras: the dark-mode toggle, a
