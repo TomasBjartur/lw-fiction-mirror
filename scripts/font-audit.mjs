@@ -15,7 +15,10 @@ async function audit(url) {
   const http = browserWs.replace(/^ws/, 'http').replace(/\/devtools\/.*$/, '');
   const pages = await (await fetch(http + '/json/list')).json();
   if (!(await (await fetch(url)).ok)) throw new Error(`${url} is not served`);
-  const page = pages.find(p => p.type === 'page' && p.url.split('#')[0] === url) || pages.find(p => p.type === 'page');
+  // Only the tab showing this URL counts: after a browser relaunch another
+  // (blank) tab can be first, and auditing it would pass a page never seen.
+  const page = pages.find(p => p.type === 'page' && p.url.split('#')[0] === url);
+  if (!page) throw new Error(`no browser tab shows ${url} (tabs: ${pages.filter(p => p.type === 'page').map(p => p.url).join(', ')})`);
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise(r => ws.addEventListener('open', r, { once: true }));
   let id = 0; const waits = new Map();
@@ -45,6 +48,9 @@ async function audit(url) {
   ws.close();
   const fmt = m => [...m].map(([k, v]) => `${k} (${v.glyphs} glyphs: ${[...v.where].join('; ')})`).join('\n    ');
   console.log(`${url}\n  served: ${[...served.keys()].join(', ') || '-'}\n  DEVICE: ${device.size ? '\n    ' + fmt(device) : 'none'}`);
+  // A page with text always draws with some font; none measured means the
+  // audit saw nothing, which must fail rather than pass.
+  if (served.size + device.size === 0) { console.log('  FAILED: no fonts measured (blank or wrong tab)'); return 1; }
   return device.size;
 }
 
