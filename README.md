@@ -98,7 +98,13 @@ the EPUB and feed keep the source): curly quotes, spaced hyphens to em
 dashes, `...` to ellipses, and a lone acronym of 3+ capitals (MIND, AGI)
 in small caps. Runs of capitalised words (a shouted sign, "[RESPONSE
 REDACTED]") keep their full capitals, and a story that opens on anything
-but a word or quote gets no drop cap. Their latin subsets live in `fonts/web/`
+but a word or quote gets no drop cap.
+
+While reading, the nav slides away on scrolling down and returns on any
+scroll up, near the top, or on keyboard focus; a hairline across the top
+fills with progress through the story text, reaching the end at its last
+line rather than the footer. Both copy markusstrasser.org (`Nav.svelte`,
+`ReadingProgress.svelte`). Their latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
 subsets (the nav marks, arrows, and any such character in a story, like
 the █ redactions) go into a small Noto Sans JP subset the build fetches.
