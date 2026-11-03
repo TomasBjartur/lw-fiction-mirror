@@ -82,10 +82,12 @@ has its own display face, from Markus's picks: `TITLE_FONTS` in
 build fetches a subset of just that title's letters per story (cached in
 `.cache/fonts/`); a story without an entry uses the list sans.
 
-Hovering a title turns it letter by letter (25 ms a letter, forwards only; leaving resets it) into Major Mono Display (a
-build-time subset of just the letters the titles use). The mono letters
-are set at one smaller size (0.62em) so every title fits its resting
-width; glyphs are never stretched and nothing on the page moves. Title colours shade from
+Hovering a title turns it letter by letter (12 ms a letter, forwards
+only; leaving resets it) into Major Mono Display (a build-time subset of
+just the letters the titles use). The title keeps its resting box, so
+nothing on the page moves; the mono letters are set near title size and
+may run on to the end of the title column, hiding the date meanwhile.
+The site name is set in Zen Tokyo Zoo, also a build-time subset. Title colours shade from
 near-black (newest) to dark purple (oldest); `dist/titles.css` holds them.
 
 A small inline script adds the optional extras: the dark-mode toggle, a

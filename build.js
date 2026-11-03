@@ -306,6 +306,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
 // - Major Mono Display: the title hover morph (letters of the titles).
+// - Zen Tokyo Zoo as 'Site Title': the site name on the contents page.
 // - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
 //   character in a story that the latin text faces lack. Without it they come from
 //   whatever font the reader's device has. The stacks in style.css put
@@ -313,6 +314,8 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 const SUBSET_FONTS = [
   { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+  { family: 'Zen Tokyo Zoo', as: 'Site Title', file: 'fonts/site-title-zen-tokyo-zoo.woff2', display: 'swap',
+    text: () => SITE_TITLE },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
     text: posts => '△◐←→' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
@@ -385,10 +388,10 @@ const TITLE_FONTS = {
   'penny-s-hands': ['Neonderthaw', 1.6, 400],
   'that-mad-olympiad-1': ['Faster One', 1.0, 400],
   'the-origami-men': ['Foldit:wght@500', 1.15, 500],
-  'our-beloved-monsters': ['Zen Tokyo Zoo', 1.1, 400],
+  'our-beloved-monsters': ['Bungee Spice', 1.0, 400],
   'the-company-man': ['Coral Pixels', 1.05, 400],
-  'the-liar-and-the-scold': ['Tilt Prism', 1.0, 400],
-  'the-maker-of-mind': ['Tourney:wght@500', 1.05, 500],
+  'the-liar-and-the-scold': ['Wallpoet', 1.0, 400],
+  'the-maker-of-mind': ['Turret Road:wght@500', 1.1, 500],
 };
 
 // Returns Map slug -> { file, size, weight } for the faces that were written.
@@ -631,49 +634,56 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     document.querySelectorAll('.order-switch button').forEach(function(btn){btn.addEventListener('click',function(){setOrder(btn.dataset.o)})});
     if(h.getAttribute('data-order')==='book')setOrder('book');
 
-    // Hovering a title turns it, one letter every 25ms, into Major Mono
-    // Display; leaving resets it at once. The title (or, if it
-    // wraps, each word) keeps its resting width and the mono letters share
-    // one size per title, so no glyph is distorted, spacing stays even and
-    // nothing around the title moves (see .morph in style.css).
+    // Hovering a title turns it, one letter every 12ms, into Major Mono
+    // Display; leaving resets it at once. The title (or, if it wraps, each
+    // word) keeps its resting box, so nothing around it moves; the mono
+    // letters are near title size, never distorted (see .morph in style.css).
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
     var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
     document.querySelectorAll('.morph').forEach(function(a){
       var spans=null,text=null,timer=null,n=0,dir=0;
       function split(){
-        var box=a.getBoundingClientRect().width; // before splitting, which can shift kerning
+        var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
         text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
+        var mi=document.createElement('span');mi.className='mi';
         text.split(/(\\s+)/).forEach(function(part){
           if(!part)return;
-          if(/^\\s+$/.test(part)){a.appendChild(document.createTextNode(part));return}
+          if(/^\\s+$/.test(part)){mi.appendChild(document.createTextNode(part));return}
           var w=document.createElement('span');w.className='w';w.setAttribute('aria-hidden','true');
           Array.from(part).forEach(function(ch){var s=document.createElement('span');s.textContent=ch;w.appendChild(s);spans.push(s)});
-          a.appendChild(w);
+          mi.appendChild(w);
         });
-        // One line: scale to the whole title, so words keep their normal
-        // spacing. Wrapped: pin each word, so the line breaks cannot move.
+        a.appendChild(mi);
         var oneLine=a.getBoundingClientRect().height<1.6*(parseFloat(getComputedStyle(a).lineHeight)||24);
-        var boxes=oneLine?[a]:Array.from(a.querySelectorAll('.w'));
-        // Measure the text, not the box: a title link can fill its grid cell.
+        var fontPx=parseFloat(getComputedStyle(a).fontSize);
+        // Measure the text, not the box.
         var width=function(e){var r=document.createRange();r.selectNodeContents(e);return r.getBoundingClientRect().width};
+        var boxes=oneLine?[mi]:Array.from(a.querySelectorAll('.w'));
         a.style.whiteSpace='nowrap';
         var rest=boxes.map(width);
         spans.forEach(function(s){s.className='mq'});
         var wide=boxes.map(width);
         spans.forEach(function(s){s.className=''});
-        // One mono size for every title (0.62em, the tightest title's fit), so
-        // all morphs match; a title that needs less still shrinks to fit.
-        a.style.setProperty('--ms',Math.min.apply(null,[0.62].concat(rest.map(function(r,i){return r/wide[i]}))).toFixed(3));
-        if(!oneLine){a.style.whiteSpace='';boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')})}
-        // A link sized by its text (newer/older links) keeps its box; a
-        // grid cell already holds its width.
-        else if(!/grid/.test(getComputedStyle(a.parentElement).display)){a.style.boxSizing='border-box';a.style.width=box+'px';if(getComputedStyle(a).display==='inline')a.style.display='inline-block'}
+        if(oneLine){
+          // The link keeps its resting box, so nothing moves; the mono text
+          // may run on to the right, up to the end of the title column (the
+          // date beside it hides meanwhile) or half the newer/older row.
+          var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
+          var room=a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4;
+          a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
+          a.style.boxSizing='border-box';a.style.width=box+'px';a.style.height=boxH+'px';a.classList.add('pinned');
+        }else{
+          // Wrapped: each word keeps its width and the mono letters shrink to fit.
+          a.style.whiteSpace='';
+          a.style.setProperty('--mfit',(fontPx*Math.min.apply(null,[1].concat(rest.map(function(r,i){return r/wide[i]})))).toFixed(1)+'px');
+          boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
+        }
       }
       function run(){
         clearInterval(timer);
         timer=setInterval(function(){
           if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm';
-        },25);
+        },12);
       }
       a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();n=0}run()})});
       // Leaving resets the title at once; the morph only plays forwards.

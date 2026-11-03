@@ -214,14 +214,17 @@ main {
 .post-header h1[class^="t-"] { font-family: var(--h1); font-weight: 400; }
 
 /* Letter-by-letter hover morph (script in build.js). The script pins the
-   title's resting width (or, for a wrapped title, each word's: --w), so
-   nothing reflows. The mono letters share one size per title (--ms), chosen
-   so the title still fits, so no glyph is distorted and spacing stays
-   even. line-height: 0 keeps the mono glyphs from growing the
-   line box. */
+   title's resting box (.pinned; or, for a wrapped title, each word's: --w),
+   so nothing reflows. The mono letters are set near title size
+   (--mono-size), capped by --mfit so the title stays inside its column;
+   they may run past the resting box, so the inline date hides meanwhile.
+   line-height: 0 keeps the mono glyphs from growing the line box. */
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
 .morph .mq, .morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
-.morph .mm { font-size: calc(var(--ms, 1) * 1em); line-height: 0; }
+.morph .mm { font-size: min(var(--mono-size, 1.05rem), var(--mfit, 1em)); line-height: 0; }
+.morph.pinned { display: inline-flex; white-space: nowrap; }
+.post-nav-next.morph.pinned { justify-content: flex-end; }
+.title-cell:has(.mm) .when { visibility: hidden; }
 
 /* Hover: the title turns blush, instantly. */
 .blush { text-decoration: none; }
@@ -251,7 +254,7 @@ main {
 .site-h1 {
   margin-bottom: 1.1rem;
   text-box: trim-both cap alphabetic;
-  font-family: var(--h1);
+  font-family: 'Site Title', var(--h1);
   font-size: 2.3rem;
   font-weight: 400;
   line-height: 1.1;
@@ -274,13 +277,15 @@ main {
   display: grid;
   grid-template-columns: subgrid;
   align-items: baseline;
-  padding: 0.2rem 0;
+  padding: 0.1rem 0;
 }
 .story .m { display: contents; }
 
 .story-title {
+  --mono-size: 1.1rem;
   font-size: calc(1.15rem * var(--ts, 1));
-  line-height: 1.35;
+  /* Absolute, so every row is the same height whatever the title's face. */
+  line-height: 1.85rem;
 }
 .story-title:visited { color: var(--tc); }
 
@@ -304,7 +309,9 @@ main {
 
 .src {
   display: inline-flex;
-  align-self: center;
+  align-self: baseline;
+  position: relative;
+  top: 0.1rem;
   width: 0.8rem;
   height: 0.8rem;
 }
@@ -354,6 +361,8 @@ main {
    bare numbers until the grid collapses on narrow screens. */
 @media (min-width: 641px) {
   .story .n:not(:empty)::after { content: none; }
+  /* Every row the same height, however tall a title's face. */
+  .story:not(.story-head) { height: 2.2rem; }
 }
 
 .post-body {
@@ -437,10 +446,12 @@ main {
 .post-nav {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  /* Centre, not baseline: the two links are in different faces, and a
+     hovered (pinned) link's baseline must not nudge the other one. */
+  align-items: center;
   gap: 1rem;
 }
-.post-nav-link { font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.35; }
+.post-nav-link { --mono-size: 1rem; font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.8rem; }
 .post-nav-link:visited { color: var(--tc); }
 .post-nav-prev::before { content: '← '; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 .post-nav-next { margin-left: auto; text-align: right; }
