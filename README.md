@@ -58,7 +58,15 @@ cached in `localStorage` for 24h to stay under the free tier's rate limit.
 
 ## Architecture
 
-Reading requires no JavaScript. The site is light only. The contents
+Reading requires no JavaScript. Light and dark themes follow the
+reader's system setting; the ◐ button cycles System → Light → Dark and
+remembers the choice (a blocking script in `<head>` applies it before
+first paint). Each colour token is written once with `light-dark()` in
+`style.css`; the dark values (warm near-black page, off-white text at
+APCA Lc 88 rather than pure white, accents lifted and desaturated, story
+images dimmed to 85%, interface weight 360 instead of 400) come from a
+research pass on dark-mode reading (Material, Apple HIG, APCA, polarity
+studies). The contents
 page opens with the author's name (Send Flowers) beside the links (EPUB,
 RSS, X, and a Substack-orange Subscribe button that goes to Substack),
 a thin black rule, then the book title (Zen Tokyo Zoo) and the list. On

@@ -497,7 +497,8 @@ async function fetchTitleFonts(posts) {
 function titleColor(rank, n) {
   const t = n > 1 ? rank / (n - 1) : 0;
   const mix = (a, b) => (a + (b - a) * t).toFixed(3);
-  return `oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305)`;
+  // Newest is the highest-contrast in both themes: dark mirrors the ramp.
+  return `light-dark(oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305), oklch(${mix(0.9, 0.76)} ${mix(0.005, 0.12)} 305))`;
 }
 
 // Per-story recency colour and the hover face, written to dist/titles.css.
@@ -602,7 +603,7 @@ function siteFoot() {
 // contents page. Subscribe looks like Substack's own button, so readers
 // know where it goes.
 function navItems(currentSlug) {
-  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>△</a><a href="${EPUB_FILENAME}" class="nav-item epub-link" title="The whole collection as a free EPUB">EPUB</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
+  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>△</a><a href="${EPUB_FILENAME}" class="nav-item epub-link" title="The whole collection as a free EPUB">EPUB</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">◐</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
 }
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
@@ -631,6 +632,8 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
+  <meta name="color-scheme" content="light dark">
+  <script>try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
   <link rel="stylesheet" href="${assetUrl('style.css')}">
   <link rel="stylesheet" href="${assetUrl('titles.css')}">
   <link rel="preload" href="${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
@@ -697,6 +700,22 @@ ${currentSlug ? `  <header class="nav">
   <script>
   (function(){
     var h=document.documentElement;
+
+    // Theme: follows the system until the reader picks; ◐ cycles
+    // System -> Light -> Dark and remembers the choice.
+    var tb=document.getElementById('theme-btn');
+    if(tb){
+      var ORDER=['system','light','dark'],NAME={system:'Theme: follows your system',light:'Theme: light',dark:'Theme: dark'};
+      var cur=function(){return h.getAttribute('data-theme')||'system'};
+      var show=function(){var c=cur();tb.title=NAME[c]+' (click to change)';tb.setAttribute('aria-label',NAME[c]+'. Change theme')};
+      tb.addEventListener('click',function(){
+        var n=ORDER[(ORDER.indexOf(cur())+1)%3];
+        if(n==='system')h.removeAttribute('data-theme');else h.setAttribute('data-theme',n);
+        try{if(n==='system')localStorage.removeItem('theme');else localStorage.setItem('theme',n)}catch(e){}
+        show();
+      });
+      show();
+    }
 
     // Arrow keys step to the newer/older story
     document.addEventListener('keydown',function(e){

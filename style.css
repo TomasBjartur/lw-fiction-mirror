@@ -33,22 +33,33 @@
 }
 
 :root {
-  color-scheme: light;
+  /* Light and dark, each token written once with light-dark(). The page
+     follows the reader's system setting; the ◐ button (System → Light →
+     Dark, remembered) forces one via data-theme. Dark values and their
+     contrast (APCA Lc / WCAG) are from the dark-mode research memo:
+     warm near-black page at Material's #121212 lightness, off-white text
+     at Lc 88 (not pure white), accents lifted in lightness and halved in
+     chroma so they stay in gamut and don't vibrate. */
+  color-scheme: light dark;
 
-  --paper:    oklch(0.99 0.006 85);
-  --paper-2:  oklch(0.965 0.008 82);
-  --ink:      oklch(0.24 0.01 264);
-  --ink-soft: oklch(0.38 0.01 264);
-  --muted:    oklch(0.55 0.01 264);
-  --rule:     oklch(0.88 0.006 264);
-  --rule-strong: oklch(0.24 0.01 264);
-  --link:     oklch(0.47 0.15 264);
-  --link-visited: oklch(0.42 0.14 294);
-  --link-hover: oklch(0.52 0.22 24);
-  --marker:   oklch(0.45 0.17 26);
-  --substack: #ff6719; /* Substack's own orange */
-  --blush:    oklch(0.66 0.16 5);
-  --selection: oklch(0.88 0.1 24 / 0.5);
+  --paper:    light-dark(oklch(0.99 0.006 85),  oklch(0.18 0.006 85));
+  --paper-2:  light-dark(oklch(0.965 0.008 82), oklch(0.215 0.007 82));
+  --ink:      light-dark(oklch(0.24 0.01 264),  oklch(0.91 0.008 85));
+  --ink-soft: light-dark(oklch(0.38 0.01 264),  oklch(0.81 0.008 85));
+  --muted:    light-dark(oklch(0.55 0.01 264),  oklch(0.75 0.01 264));
+  --rule:     light-dark(oklch(0.88 0.006 264), oklch(0.32 0.006 264));
+  --rule-strong: var(--ink);
+  --link:     light-dark(oklch(0.47 0.15 264),  oklch(0.84 0.075 264));
+  --link-visited: light-dark(oklch(0.42 0.14 294), oklch(0.82 0.07 294));
+  --link-hover: light-dark(oklch(0.52 0.22 24), oklch(0.80 0.11 24));
+  --marker:   light-dark(oklch(0.45 0.17 26),   oklch(0.79 0.10 26));
+  --substack: #ff6719; /* Substack's own orange, both themes */
+  --blush:    light-dark(oklch(0.66 0.16 5),    oklch(0.74 0.12 5));
+  --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.40 0.09 24));
+  --pick:     light-dark(oklch(0.5 0.17 305 / 0.3), oklch(0.70 0.12 305 / 0.35));
+  /* Inter's weight in the interface; light text on dark reads heavier,
+     so dark drops it by ~0.9x (below). */
+  --ui-w: 400;
 
   --serif: 'Charis SIL', 'Site Marks', Charter, Georgia, serif;
   --display: 'Cormorant Garamond', 'Site Marks', Garamond, Georgia, serif;
@@ -130,7 +141,7 @@ a:hover { color: var(--link-hover); }
   display: inline-flex;
   align-items: center;
   padding: 0.3rem 0.55rem;
-  font: 400 0.8rem/1 var(--sans);
+  font: var(--ui-w) 0.8rem/1 var(--sans);
   letter-spacing: 0.08em;
   color: var(--ink-soft);
   background: none;
@@ -149,7 +160,7 @@ a:hover { color: var(--link-hover); }
   margin-top: 0.8rem;
   padding-top: 0.6rem;
   border-top: 1px solid color-mix(in oklch, var(--ink) 14%, transparent);
-  font: 400 0.72rem/1.4 var(--sans);
+  font: var(--ui-w) 0.72rem/1.4 var(--sans);
   color: var(--muted);
 }
 .site-foot a { color: inherit; text-decoration: none; }
@@ -318,7 +329,7 @@ main {
   bottom: 18%;
   width: 2px;
   border-radius: 1px;
-  background: oklch(0.5 0.17 305 / 0.3);
+  background: var(--pick);
 }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .story { padding: 0.1rem 0; }
@@ -550,3 +561,25 @@ main {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
   .progress { display: none; }
 }
+
+/* --- Dark ------------------------------------------------------------ */
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+
+/* What light-dark() can't carry: lighter UI weight and dimmed story images
+   (Apple HIG: darken white-ground images; Readium: never invert). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ui-w: 360; }
+  :root:not([data-theme="light"]) .post-body img:not([data-keep-bright]) { filter: brightness(0.85); }
+}
+:root[data-theme="dark"] { --ui-w: 360; }
+:root[data-theme="dark"] .post-body img:not([data-keep-bright]) { filter: brightness(0.85); }
+
+.theme-toggle {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
