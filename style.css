@@ -335,7 +335,7 @@ main {
 .story { padding: 0.1rem 0; }
 
 .story-title {
-  --mono-size: 1.1rem;
+  --mono-size: 1.25rem;
   font-size: calc(1.15rem * var(--ts, 1));
   /* Absolute, so every row is the same height whatever the title's face. */
   line-height: 1.85rem;
@@ -352,7 +352,9 @@ main {
 }
 .story .meta { margin-left: 0.35rem; white-space: nowrap; }
 /* Date and reading time a step larger than the reader counts. */
-.meta .when { font-size: 1.18em; color: var(--ink-soft); }
+/* Date and reading time: Inter Light Italic (the served stand-in for
+   Helvetica), a step larger than the counts in EB Garamond. */
+.meta .when { font: italic 300 1.08em/1 var(--sans); color: var(--ink-soft); }
 .meta .m { display: inline-flex; align-items: baseline; gap: 0.3rem; margin-left: 0.55rem; }
 .meta .n::after {
   content: "";
@@ -410,7 +412,8 @@ main {
   .story-title {
     font-size: calc(min(var(--row) * 0.56, 2.6cqw) * var(--ts, 1));
     line-height: var(--row);
-    --mono-size: min(var(--row) * 0.5, 2.4cqw);
+    /* 8% above the base title size, so a title grows a touch on hover. */
+    --mono-size: calc(min(var(--row) * 0.56, 2.6cqw) * 1.08);
   }
   .story .meta { font-size: clamp(0.7rem, var(--row) * 0.27, 0.95rem); margin-left: 0.6em; }
 }
@@ -516,7 +519,7 @@ main {
   align-items: center;
   gap: 1rem;
 }
-.post-nav-link { --mono-size: 1rem; font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.8rem; }
+.post-nav-link { --mono-size: 1.13rem; font-size: calc(1.05rem * var(--ts, 1)); line-height: 1.8rem; }
 .post-nav-link:visited { color: var(--tc); }
 .post-nav-prev::before { content: '← '; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 .post-nav-next { margin-left: auto; text-align: right; }

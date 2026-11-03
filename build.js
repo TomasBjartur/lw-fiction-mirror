@@ -258,10 +258,19 @@ function formatMonthYear(dateStr) {
   return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+// Minutes to read: 260 words a minute, the mean silent reading rate for
+// English fiction in Brysbaert's 2019 meta-analysis (190 studies; 238 for
+// non-fiction). Rounded to the nearest minute under 10 and to the nearest
+// 5 above, since a reader's own speed varies far more than one minute.
+function readingMinutes(wordCount) {
+  if (!wordCount) return 0;
+  const m = wordCount / 260;
+  return m < 9.5 ? Math.max(1, Math.round(m)) : Math.round(m / 5) * 5;
+}
+
 function estimateReadingTime(wordCount) {
-  if (!wordCount) return '';
-  const minutes = Math.ceil(wordCount / 250);
-  return `${minutes} min read`;
+  const minutes = readingMinutes(wordCount);
+  return minutes ? `${minutes} min read` : '';
 }
 
 const NAMED_ENTITIES = {
@@ -567,7 +576,7 @@ const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.
 
 // Month and reading time, set inline after a title in the contents list.
 function whenText(p) {
-  const mins = p.wordCount ? Math.ceil(p.wordCount / 250) : 0;
+  const mins = readingMinutes(p.wordCount);
   const read = mins ? ` · <span title="${mins} min read">${mins}m</span>` : '';
   return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span>${read}</span>`;
 }
@@ -737,6 +746,9 @@ ${currentSlug ? `  <header class="nav">
       function split(){
         var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
         var inline=getComputedStyle(a).display==='inline';
+        // One line box means one line, however tall the face's glyphs;
+        // counted before splitting, since the letter spans add fragments.
+        var oneLine=a.getClientRects().length===1;
         text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
         var mi=document.createElement('span');mi.className='mi';
         text.split(/(\\s+)/).forEach(function(part){
@@ -747,7 +759,6 @@ ${currentSlug ? `  <header class="nav">
           mi.appendChild(w);
         });
         a.appendChild(mi);
-        var oneLine=a.getBoundingClientRect().height<1.6*(parseFloat(getComputedStyle(a).lineHeight)||24);
         var fontPx=parseFloat(getComputedStyle(a).fontSize);
         // Measure the text, not the box.
         var width=function(e){var r=document.createRange();r.selectNodeContents(e);return r.getBoundingClientRect().width};

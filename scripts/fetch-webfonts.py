@@ -1,7 +1,14 @@
 """Download the latin woff2 subsets of the site's served text faces into
 fonts/web/. Run once when a face changes; the files are committed, so builds
-never depend on Google Fonts. Usage: uv run python3 scripts/fetch-webfonts.py"""
-import pathlib, re, urllib.request
+never depend on Google Fonts.
+Usage: uv run --with fonttools --with brotli python3 scripts/fetch-webfonts.py
+
+Google's css2 files strip OpenType features (old-style figures, small caps),
+so EB Garamond, whose old-style figures the meta line uses, is built from
+the full TTF in the google/fonts repo (pinned at weight 400), subset to the
+same latin range with the layout features the site can use kept. Charis SIL has no
+old-style figures even upstream, so its css2 files lose nothing."""
+import pathlib, re, tempfile, urllib.parse, urllib.request
 
 UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
 FACES = {  # file prefix -> Google css2 family spec
@@ -9,8 +16,15 @@ FACES = {  # file prefix -> Google css2 family spec
     'charis-sil': 'Charis+SIL:ital,wght@0,400;0,700;1,400;1,700',
     'fira-mono': 'Fira+Mono:wght@400',
     'tinos': 'Tinos:wght@400',
-    'eb-garamond': 'EB+Garamond:wght@400',
 }
+RAW = 'https://raw.githubusercontent.com/google/fonts/main/ofl/'
+FULL = [  # output file, repo path, weight to pin a variable font at (or None)
+    ('eb-garamond-latin-normal-400-v1.woff2', 'ebgaramond/EBGaramond[wght].ttf', 400),
+]
+# Google Fonts' "latin" subset; build.js LATIN_RANGES must match it.
+LATIN = ('U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,'
+         'U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,'
+         'U+2212,U+2215,U+FEFF,U+FFFD')
 out = pathlib.Path(__file__).resolve().parent.parent / 'fonts' / 'web'
 
 def get(url):
@@ -31,3 +45,30 @@ for prefix, spec in FACES.items():
         path = out / f'{prefix}-latin-{style}-{weight}-v1.woff2'
         path.write_bytes(data)
         print(path.name, len(data))
+
+from fontTools import subset
+from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
+
+with tempfile.TemporaryDirectory() as tmp:
+    for name, repo_path, wght in FULL:
+        src = pathlib.Path(tmp) / pathlib.Path(repo_path).name
+        src.write_bytes(urllib.request.urlopen(RAW + urllib.parse.quote(repo_path), timeout=60).read())
+        font = TTFont(src)
+        if wght is not None:
+            font = instancer.instantiateVariableFont(font, {'wght': wght})
+        opts = subset.Options()
+        # Shaping basics plus figure styles and small caps; the rest
+        # (swashes, stylistic sets, fractions...) would more than double it.
+        opts.layout_features = ['ccmp', 'locl', 'mark', 'mkmk', 'kern', 'liga', 'calt',
+                                'onum', 'lnum', 'pnum', 'tnum', 'smcp', 'c2sc']
+        opts.flavor = 'woff2'
+        sub = subset.Subsetter(opts)
+        sub.populate(unicodes=subset.parse_unicodes(LATIN))
+        sub.subset(font)
+        font.flavor = 'woff2'
+        font.save(out / name)
+        feats = sorted({r.FeatureTag for r in font['GSUB'].table.FeatureList.FeatureRecord}) if 'GSUB' in font else []
+        if 'onum' not in feats:
+            raise SystemExit(f'{name}: no onum feature after subsetting')
+        print(name, (out / name).stat().st_size, 'features:', ' '.join(feats))

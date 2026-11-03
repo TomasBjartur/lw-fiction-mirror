@@ -73,7 +73,9 @@ a thin black rule, then the book title (Zen Tokyo Zoo) and the list. On
 screens at least 641 px wide and 520 px tall the list fills the window:
 one equal row per story, titles scaled to the row, so every story shows
 without scrolling; rows never go below 2.1rem, so a long list scrolls.
-Each title is followed by its month and reading time and then its
+Each title is followed by its month and reading time in Inter Light
+Italic (reading time at 260 words a minute, Brysbaert's 2019 mean for
+fiction, rounded to the minute under 10 and to 5 minutes above), then its
 LessWrong karma and comments and Substack likes, restacks and comments,
 small, in EB Garamond with old-style figures (LessWrong from the GraphQL
 query, Substack from `/api/v1/archive`; a failed fetch logs `[DEGRADED]`
@@ -90,7 +92,16 @@ inside stories. Their latin subsets live in `fonts/web/`
 subsets (the nav marks, arrows, and any such character in a story, like
 the █ redactions) go into a small Noto Sans JP subset the build fetches.
 `bun scripts/font-audit.mjs <url>...` asks Chrome which fonts each page
-actually draws with and exits 1 if any came from the device.
+actually draws with and exits 1 if any came from the device, or if it
+measured no fonts at all (a blank or wrong tab). EB Garamond is built
+from the full upstream font rather than Google's css2 file, which strips
+the old-style figures.
+
+`scripts/reading-lab.js` (with `scripts/reading-lab-fonts.py` for its
+fonts) writes `dist/reading-lab/`: three alternative story-page
+treatments (book page in EB Garamond, Literata for screens, an editorial
+layout in Alegreya Sans) of three stories, to compare against the
+current page. A design tool, not part of the site.
 
 Each story's title in the contents list (and in the newer/older links)
 has its own display face, from Markus's picks: `TITLE_FONTS` in
