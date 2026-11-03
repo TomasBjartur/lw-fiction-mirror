@@ -65,19 +65,18 @@ from the GraphQL query, Substack from `/api/v1/archive`; a failed fetch
 logs `[DEGRADED]` and the build continues without those numbers). Story
 pages link to the newer and older story.
 
-Each title is set in its own Google Fonts face (`TITLE_FONTS` in
-`build.js`; new stories take a face from `TITLE_FONT_SPARES`). The build
-downloads a subset containing only that title's letters and self-hosts it
-under `dist/fonts/`, so each face is 1–16 KB and readers never contact
-Google. Title colours shade from near-black (newest) to dark purple
-(oldest); `dist/titles.css` holds the generated faces and colours. Story
-text is set in Charter from the system font stack, and the site heading
-in EB Garamond (`fonts/web/`, made by `scripts/subset-fonts.sh`).
+Titles are set in Cormorant Garamond, the display face of
+markusstrasser.org (its self-hosted variable subsets, in `fonts/web/`).
+Hovering a title turns it letter by letter into Major Mono Display; the
+build downloads a Google Fonts subset of just the letters the titles use
+(about 3 KB, self-hosted). Title colours shade from near-black (newest)
+to dark purple (oldest); `dist/titles.css` holds them. Story text is set
+in Charter from the system font stack.
 
 A small inline script adds the optional extras: the dark-mode toggle, a
 recent / book-order switch (remembered in localStorage; book order is
 `COLLECTION_ORDER`, as in the EPUB), arrow keys for newer/older, and a
-hover effect that runs a capital letter through each title. The only
+the hover morph. The only
 external request on the reader's end is the `GEO_HIDDEN` lookup to
 ipapi.co, which runs on every page view (cached 24h) while any rule is
 configured.

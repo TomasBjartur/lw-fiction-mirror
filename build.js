@@ -303,74 +303,33 @@ function cleanHtml(html, { forFeed = false } = {}) {
 const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>';
 // --- Title typography -------------------------------------------------------
 
-// Each story title is set in its own Google Fonts face. The build downloads a
-// subset holding only that title's letters
-// and self-hosts it, so a face costs a few KB and readers never hit Google.
-// Stories missing here take the next face from TITLE_FONT_SPARES.
-const TITLE_FONTS = {
-  'the-company-man': { family: 'Space Grotesk', weight: 500 },
-  'our-beloved-monsters': { family: 'Fraunces', weight: 600 },
-  'that-mad-olympiad-1': { family: 'Bricolage Grotesque', weight: 700 },
-  'the-maker-of-mind': { family: 'Unbounded', weight: 500 },
-  'san-silvestro': { family: 'Cormorant', weight: 600 },
-  'remembering-aubrey-chang': { family: 'Playfair Display', weight: 500 },
-  'lobsang-s-children-1': { family: 'Spectral', weight: 600 },
-  'the-liar-and-the-scold': { family: 'Libre Baskerville' },
-  'the-elect-2': { family: 'DM Serif Display' },
-  'goldfish': { family: 'Gloock' },
-  'customer-satisfaction-opportunities-1': { family: 'Archivo Narrow', weight: 600 },
-  'penny-s-hands': { family: 'Newsreader', weight: 500 },
-  'the-distaff-texts': { family: 'Uncial Antiqua' },
-  'duane-arnold-1': { family: 'Big Shoulders Display', weight: 700 },
-  'the-origami-men': { family: 'EB Garamond', weight: 500 },
-};
-// Earlier picks (2026-11-03 first pass), kept as spares and for comparison.
-const TITLE_FONT_SPARES = [
-  { family: 'Courier Prime', weight: 700 }, { family: 'Pirata One' }, { family: 'Shrikhand' },
-  { family: 'Syne', weight: 700 }, { family: 'IM Fell English' }, { family: 'Bodoni Moda', weight: 500 },
-  { family: 'Alegreya', weight: 500 }, { family: 'Libre Caslon Display' }, { family: 'Abril Fatface' },
-  { family: 'Caveat', weight: 600 }, { family: 'Barlow Condensed', weight: 500 }, { family: 'Young Serif' },
-  { family: 'MedievalSharp' }, { family: 'Space Mono', weight: 700 },
-];
-const TITLE_FONT_FALLBACK = "Georgia, 'Times New Roman', serif";
+// Titles are set in Cormorant Garamond, the display face of markusstrasser.org
+// (fonts/web/, copied from that site's self-hosted subset). On hover they turn
+// letter by letter into Major Mono Display. The build downloads a Google Fonts
+// subset of Major Mono holding only the letters the titles use, so the file is
+// a few KB and readers never contact Google.
+const HOVER_FONT = { family: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2' };
 
-function titleFontFor(slug, i) {
-  return TITLE_FONTS[slug] || TITLE_FONT_SPARES[i % TITLE_FONT_SPARES.length];
+// Fails loud and returns false; the hover then falls back to the system mono.
+async function fetchHoverFont(posts) {
+  const chars = [...new Set(posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')].join('');
+  const url = `https://fonts.googleapis.com/css2?family=${HOVER_FONT.family.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
+  try {
+    const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
+    const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+    if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
+    const res = await fetch(m[1]);
+    if (!res.ok) throw new Error(`font HTTP ${res.status}`);
+    fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
+    fs.writeFileSync(path.join(OUTPUT_DIR, HOVER_FONT.file), Buffer.from(await res.arrayBuffer()));
+    console.log(`Wrote ${HOVER_FONT.file}`);
+    return true;
+  } catch (err) {
+    console.error(`[DEGRADED] hover font (${HOVER_FONT.family}): ${err.message}`);
+    return false;
+  }
 }
 
-// Download one subset font per story into dist/fonts/. Returns slug ->
-// { family, file }; a story whose download fails gets no entry and falls back
-// to TITLE_FONT_FALLBACK, reported as [DEGRADED].
-async function fetchTitleFonts(posts) {
-  const out = new Map();
-  const dir = path.join(OUTPUT_DIR, 'fonts');
-  fs.mkdirSync(dir, { recursive: true });
-  const unknown = posts.filter(p => !TITLE_FONTS[p.slug]);
-  await Promise.all(posts.map(async (p) => {
-    const spec = titleFontFor(p.slug, unknown.indexOf(p));
-    const chars = [...new Set(p.title)].join('');
-    const fam = spec.family.replace(/ /g, '+') + (spec.weight ? `:wght@${spec.weight}` : '');
-    const cssUrl = `https://fonts.googleapis.com/css2?family=${fam}&text=${encodeURIComponent(chars)}`;
-    try {
-      // A modern UA gets woff2 back; the CSS then names one file for this text.
-      const css = await (await fetch(cssUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
-      const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
-      if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
-      const res = await fetch(m[1]);
-      if (!res.ok) throw new Error(`font HTTP ${res.status}`);
-      const file = `fonts/t-${p.slug}.woff2`;
-      fs.writeFileSync(path.join(OUTPUT_DIR, file), Buffer.from(await res.arrayBuffer()));
-      out.set(p.slug, { family: spec.family, weight: spec.weight || 400, file });
-    } catch (err) {
-      console.error(`[DEGRADED] title font for ${p.slug} (${spec.family}): ${err.message}`);
-    }
-  }));
-  console.log(`Wrote ${out.size}/${posts.length} title fonts`);
-  return out;
-}
-
-// Titles shade from near-black (newest) to dark purple (oldest); in dark mode
-// from near-white to pale violet.
 function titleColor(rank, n) {
   const t = n > 1 ? rank / (n - 1) : 0;
   const mix = (a, b) => (a + (b - a) * t).toFixed(3);
@@ -378,14 +337,13 @@ function titleColor(rank, n) {
 }
 
 // Per-story @font-face and colour, written to dist/titles.css.
-function buildTitlesCss(posts, fonts) {
+// Per-story recency colour and the hover face, written to dist/titles.css.
+function buildTitlesCss(posts, hoverFontOk) {
   const byDate = sortByDate(posts);
-  return byDate.map((p, rank) => {
-    const f = fonts.get(p.slug);
-    const face = f ? `@font-face{font-family:'T ${p.slug}';src:url('${f.file}') format('woff2');font-weight:${f.weight};font-display:swap}\n` : '';
-    const family = f ? `'T ${p.slug}', ${TITLE_FONT_FALLBACK}` : TITLE_FONT_FALLBACK;
-    return `${face}.t-${p.slug}{font-family:${family};font-weight:${f ? f.weight : 400};--tc:${titleColor(rank, byDate.length)}}`;
-  }).join('\n') + '\n';
+  const face = hoverFontOk
+    ? `@font-face{font-family:'${HOVER_FONT.family}';src:url('${HOVER_FONT.file}') format('woff2');font-display:block}\n`
+    : '';
+  return face + byDate.map((p, rank) => `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}}`).join('\n') + '\n';
 }
 
 function sortByDate(posts) {
@@ -485,8 +443,8 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="titles.css">${currentSlug ? `
-  <link rel="preload" href="fonts/t-${currentSlug}.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">` : ''}
+  <link rel="stylesheet" href="titles.css">
+  <link rel="preload" href="fonts/cormorant-garamond-latin-v1.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
   <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
   <script>try{var d=document.documentElement,t=localStorage.getItem('theme');if(t)d.setAttribute('data-theme',t);if(localStorage.getItem('order')==='book')d.setAttribute('data-order','book')}catch(e){}</script>
@@ -585,6 +543,29 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     }
     document.querySelectorAll('.order-switch button').forEach(function(btn){btn.addEventListener('click',function(){setOrder(btn.dataset.o)})});
     if(h.getAttribute('data-order')==='book')setOrder('book');
+
+    // Hovering a title turns it, one letter every 50ms, into Major Mono
+    // Display; leaving turns it back the same way.
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
+    document.querySelectorAll('.morph').forEach(function(a){
+      var spans=null,text=null,timer=null,n=0;
+      function split(){
+        text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
+        Array.from(text).forEach(function(ch){
+          var s=document.createElement('span');s.textContent=ch;s.setAttribute('aria-hidden','true');
+          a.appendChild(s);if(/\\S/.test(ch))spans.push(s);
+        });
+      }
+      function run(dir){
+        clearInterval(timer);
+        timer=setInterval(function(){
+          if(dir>0){if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm'}
+          else{if(n<=0)return clearInterval(timer);spans[--n].className=''}
+        },50);
+      }
+      a.addEventListener('mouseenter',function(){if(!spans||a.textContent!==text){split();n=0}run(1)});
+      a.addEventListener('mouseleave',function(){if(spans)run(-1)});
+    });
   })();
   </script>
 </body>
@@ -606,7 +587,7 @@ function postNavLink(list, idx, step) {
     const alt = list[i];
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls} blush t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls} blush morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
 function buildPostPage(post, allPosts) {
@@ -648,7 +629,7 @@ function buildIndexPage(posts) {
   const bookPos = new Map(bookOrder(posts).map((p, i) => [p.slug, i]));
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story" data-slug="${p.slug}" data-date="${i}" data-book="${bookPos.get(p.slug)}">
-          <a class="story-title blush t-${p.slug}" href="${p.slug}.html">${p.title}</a>
+          <a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>
           ${metricCells(p, { when: true })}
         </li>`).join('');
 
@@ -1830,7 +1811,7 @@ async function main() {
     console.log(`Wrote ${LOCAL_IMAGES.size} images to images/`);
   }
 
-  // Write stylesheet and the web subset of the display face (scripts/subset-fonts.sh)
+  // Write stylesheet and the self-hosted display face (fonts/web/)
   fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
   console.log('Wrote style.css');
   const webFonts = path.join(__dirname, 'fonts', 'web');
@@ -1841,8 +1822,8 @@ async function main() {
 
   // Reader metrics and per-title fonts
   attachMetrics(fiction, await fetchSubstackMetrics());
-  const titleFonts = await fetchTitleFonts(fiction);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, titleFonts));
+  const hoverFontOk = await fetchHoverFont(fiction);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, hoverFontOk));
   console.log('Wrote titles.css');
 
   // Write index page

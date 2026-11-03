@@ -3,11 +3,20 @@
    generated into dist/titles.css. Colours are OKLCH light-dark() pairs, and
    the theme toggle only switches color-scheme. */
 
+/* Cormorant Garamond, the display face of markusstrasser.org: its
+   self-hosted variable latin subsets (wght 300-700), copied as-is. */
 @font-face {
-  font-family: 'EB Garamond';
-  src: url('fonts/EBGaramond-latin.woff2') format('woff2');
-  font-weight: 400 800;
+  font-family: 'Cormorant Garamond';
+  src: url('fonts/cormorant-garamond-latin-v1.woff2') format('woff2');
+  font-weight: 300 700;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('fonts/cormorant-garamond-latin-italic-v1.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -30,7 +39,7 @@
   --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.45 0.08 24 / 0.6));
 
   --serif: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, 'Noto Serif', Georgia, serif;
-  --display: 'EB Garamond', Garamond, Georgia, serif;
+  --display: 'Cormorant Garamond', Garamond, Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Noto Sans', sans-serif;
 
   --col: 44rem;
@@ -179,8 +188,12 @@ main {
 
 [class*=" t-"], [class^="t-"] {
   color: var(--tc, var(--ink));
-  font-size-adjust: 0.5;
+  font-family: var(--display);
+  font-weight: 500;
 }
+
+/* Letter-by-letter hover morph (script in build.js). */
+.morph .mm { font-family: 'Major Mono Display', ui-monospace, monospace; font-weight: 400; }
 
 /* Hover: the title turns blush, instantly. */
 .blush { text-decoration: none; }
@@ -211,7 +224,7 @@ main {
   margin-bottom: 1.1rem;
   text-box: trim-both cap alphabetic;
   font-family: var(--display);
-  font-size: 2.1rem;
+  font-size: 2.3rem;
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: 0.01em;
@@ -246,7 +259,7 @@ main {
 .story .m { display: contents; }
 
 .story-title {
-  font-size: 1.22rem;
+  font-size: 1.42rem;
   line-height: 1.2;
 }
 .story-title:visited { color: var(--tc); }
@@ -281,7 +294,7 @@ main {
 
 .post-header h1 {
   text-box: trim-both cap alphabetic;
-  font-size: 2.3rem;
+  font-size: 2.7rem;
   font-weight: inherit;
   line-height: 1.1;
   text-wrap: balance;
@@ -401,7 +414,7 @@ main {
   align-items: baseline;
   gap: 1rem;
 }
-.post-nav-link { font-size: 1.12rem; line-height: 1.25; }
+.post-nav-link { font-size: 1.3rem; line-height: 1.25; }
 .post-nav-link:visited { color: var(--tc); }
 .post-nav-prev::before { content: '← '; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
 .post-nav-next { margin-left: auto; text-align: right; }
