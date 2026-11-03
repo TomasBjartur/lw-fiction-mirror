@@ -15,7 +15,8 @@ const FICTION_TAG_SLUG = 'fiction';
 
 // Site config - edit these
 const SITE_TITLE = 'The Origami Men and Other Stories';
-const SITE_SUBTITLE = 'by Tomás Bjartur';
+const AUTHOR = 'Tomás Bjartur';
+const SITE_SUBTITLE = `by ${AUTHOR}`;
 const SITE_DESCRIPTION = 'Fiction by Tomás Bjartur.';
 const SITE_URL = 'https://tomasbjartur.com';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
@@ -306,7 +307,8 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
 // - Major Mono Display: the title hover morph (letters of the titles).
-// - Zen Tokyo Zoo as 'Site Title': the site name on the contents page.
+// - Zen Tokyo Zoo as 'Site Title': the book title on the contents page.
+// - Send Flowers as 'Author Name': the author's name, the contents page h1.
 // - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
 //   character in a story that the latin text faces lack. Without it they come from
 //   whatever font the reader's device has. The stacks in style.css put
@@ -314,8 +316,10 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 const SUBSET_FONTS = [
   { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
-  { family: 'Zen Tokyo Zoo', as: 'Site Title', file: 'fonts/site-title-zen-tokyo-zoo.woff2', display: 'swap',
+  { family: 'Zen Tokyo Zoo', as: 'Site Title', file: 'fonts/site-title-zen-tokyo-zoo.woff2', display: 'block',
     text: () => SITE_TITLE },
+  { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
+    text: () => AUTHOR },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
     text: posts => '△◐←→' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
@@ -335,12 +339,27 @@ function textOf(html = '') {
 }
 
 // Fetches a Google Fonts `text=` subset (spec as in css2, e.g. 'Astloch:wght@700')
-// and returns the woff2 bytes. Results are cached in .cache/fonts/ by spec and
-// text, so rebuilds don't wait on Google (~5 s a font).
+// and returns the woff2 bytes. Results are kept in fonts/subsets/ by spec and
+// text, and that folder is committed: CI builds use the committed files and
+// only ask Google when a title or story adds characters. A fetch that fails
+// stops the build, so a deploy never ships a title in the wrong face (the
+// last good deploy stays live). Commit fonts/subsets/ after a local build.
+const SUBSET_DIR = path.join(__dirname, 'fonts', 'subsets');
+const usedSubsets = new Set();
+
+// Deletes subset files this build did not use, so the committed set holds
+// only the current titles' and stories' characters.
+function pruneSubsets() {
+  for (const f of fs.readdirSync(SUBSET_DIR)) {
+    if (f.endsWith('.woff2') && !usedSubsets.has(f)) fs.unlinkSync(path.join(SUBSET_DIR, f));
+  }
+}
+
 async function fetchGoogleSubset(spec, text) {
   const chars = [...new Set(text)].sort().join('');
   const key = require('crypto').createHash('sha1').update(spec + '\n' + chars).digest('hex').slice(0, 16);
-  const cached = path.join(__dirname, '.cache', 'fonts', `${key}.woff2`);
+  const cached = path.join(SUBSET_DIR, `${key}.woff2`);
+  usedSubsets.add(`${key}.woff2`);
   if (fs.existsSync(cached)) return fs.readFileSync(cached);
   const url = `https://fonts.googleapis.com/css2?family=${spec.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
   const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
@@ -354,28 +373,25 @@ async function fetchGoogleSubset(spec, text) {
   return buf;
 }
 
-// Fails loud: returns the fonts that were written; a missing one logs
-// [DEGRADED] and its characters fall back to the next face in the stack.
+// Writes every subset font; any failure throws (see fetchGoogleSubset).
 async function fetchSubsetFonts(posts) {
   fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
-  const results = await Promise.all(SUBSET_FONTS.map(async f => {
+  return Promise.all(SUBSET_FONTS.map(async f => {
     try {
       fs.writeFileSync(path.join(OUTPUT_DIR, f.file), await fetchGoogleSubset(f.family, f.text(posts)));
-      console.log(`Wrote ${f.file}`);
-      return f;
     } catch (err) {
-      console.error(`[DEGRADED] subset font (${f.family}): ${err.message}`);
-      return null;
+      throw new Error(`subset font ${f.family}: ${err.message}`);
     }
+    console.log(`Wrote ${f.file}`);
+    return f;
   }));
-  return results.filter(Boolean);
 }
 
 // Each story's title has its own display face, picked by Markus from his
 // "reviewed and cool experimental fonts" (2026-11-03). [Google css2 spec,
 // size factor against the list's base size, weight]. The build fetches a
-// subset of just that title's letters per story; a story missing here, or a
-// failed fetch, falls back to the list's sans.
+// subset of just that title's letters per story; a story missing here falls
+// back to the list's sans, and a failed fetch stops the build.
 const TITLE_FONTS = {
   'duane-arnold-1': ['Monoton', 0.95, 400],
   'san-silvestro': ['Ballet', 1.7, 400],
@@ -389,8 +405,8 @@ const TITLE_FONTS = {
   'that-mad-olympiad-1': ['Faster One', 1.0, 400],
   'the-origami-men': ['Foldit:wght@500', 1.15, 500],
   'our-beloved-monsters': ['Bungee Spice', 1.0, 400],
-  'the-company-man': ['Coral Pixels', 1.05, 400],
-  'the-liar-and-the-scold': ['Wallpoet', 1.0, 400],
+  'the-company-man': ['Tilt Warp', 1.0, 400],
+  'the-liar-and-the-scold': ['Workbench', 1.05, 400],
   'the-maker-of-mind': ['Turret Road:wght@500', 1.1, 500],
 };
 
@@ -402,10 +418,10 @@ async function fetchTitleFonts(posts) {
     const file = `fonts/title-${p.slug}.woff2`;
     try {
       fs.writeFileSync(path.join(OUTPUT_DIR, file), await fetchGoogleSubset(spec, p.title));
-      out.set(p.slug, { file, size, weight });
     } catch (err) {
-      console.error(`[DEGRADED] title font for ${p.slug} (${spec}): ${err.message}`);
+      throw new Error(`title font for ${p.slug} (${spec}): ${err.message}`);
     }
+    out.set(p.slug, { file, size, weight });
   }));
   console.log(`Title fonts: ${out.size}/${posts.length} stories`);
   return out;
@@ -414,17 +430,17 @@ async function fetchTitleFonts(posts) {
 function titleColor(rank, n) {
   const t = n > 1 ? rank / (n - 1) : 0;
   const mix = (a, b) => (a + (b - a) * t).toFixed(3);
-  return `light-dark(oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305), oklch(${mix(0.94, 0.78)} ${mix(0.005, 0.11)} 305))`;
+  return `oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305)`;
 }
 
 // Per-story recency colour and the hover face, written to dist/titles.css.
 function buildTitlesCss(posts, subsetFonts, titleFonts) {
   const byDate = sortByDate(posts);
   const face = subsetFonts
-    .map(f => `@font-face{font-family:'${f.as}';src:url('${f.file}') format('woff2');font-display:${f.display}}\n`)
+    .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2');font-display:${f.display}}\n`)
     .join('');
   const titleFaces = [...titleFonts].map(([slug, f]) =>
-    `@font-face{font-family:'tf-${slug}';src:url('${f.file}') format('woff2');font-weight:${f.weight};font-display:swap}\n`).join('');
+    `@font-face{font-family:'tf-${slug}';src:url('${assetUrl(f.file)}') format('woff2');font-weight:${f.weight};font-display:block}\n`).join('');
   return face + titleFaces + byDate.map((p, rank) => {
     const f = titleFonts.get(p.slug);
     const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}` : '';
@@ -481,8 +497,6 @@ function attachMetrics(posts, substack) {
 const ICON_LW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-4.6 6L18 18l-6-4.6L6 18l4.6-6L6 6l6 4.6z" opacity=".55"/><path d="M12 0l2.2 9.8L24 12l-9.8 2.2L12 24l-2.2-9.8L0 12l9.8-2.2z"/></svg>';
 const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.4H0zM0 2.7h11v1.4H0zM0 5.4h11V12L5.5 9 0 12z"/></svg>';
 
-// Metric cells. `cells` keeps every slot (blank when a story isn't on a
-// platform) so rows line up as columns on the contents page.
 // Month and reading time, set inline after a title in the contents list.
 function whenText(p) {
   const mins = p.wordCount ? Math.ceil(p.wordCount / 250) : 0;
@@ -490,20 +504,39 @@ function whenText(p) {
   return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span>${read}</span>`;
 }
 
-function metricCells(p) {
+// Reader counts from LessWrong and Substack, each group led by its source
+// icon (a link to the story there); a number's kind is the small icon after it.
+function stats(p) {
   const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}</span>`;
   const lw = p.lw
-    ? `<a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}`
-    : '<span class="src"></span><span class="n"></span><span class="n"></span>';
+    ? `<span class="m"><a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}</span>`
+    : '';
   const ss = p.ss
-    ? `<a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}`
-    : '<span class="src"></span><span class="n"></span><span class="n"></span><span class="n"></span>';
-  return `<span class="m m-lw">${lw}</span><span class="m m-ss">${ss}</span>`;
+    ? `<span class="m"><a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}</span>`
+    : '';
+  return lw + ss;
 }
 
 // --- Pages -------------------------------------------------------------------
 
 const FAVICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23a0734f'/%3E%3Ctext x='50' y='73' font-size='62' text-anchor='middle' font-family='Georgia,serif' fill='%23fff'%3ET%3C/text%3E%3C/svg%3E";
+
+// The bird from markusstrasser.org's Icon.svelte.
+const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
+const X_HANDLE = 'BjarturTomas';
+const X_URL = `https://x.com/${X_HANDLE}`;
+
+// One line at the foot of every page.
+function siteFoot() {
+  return `<p class="site-foot">© ${new Date().getFullYear()} ${AUTHOR} · <a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a></p>`;
+}
+
+// Site links: in the fixed bar on story pages, beside the title on the
+// contents page. Subscribe looks like Substack's own button, so readers
+// know where it goes.
+function navItems(currentSlug) {
+  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>△</a><a href="${EPUB_FILENAME}" class="nav-item epub-link" title="The whole collection as a free EPUB">EPUB</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
+}
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
   const pageTitle = title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`;
@@ -513,7 +546,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   const ogTitle = title || `${SITE_TITLE} · ${SITE_SUBTITLE}`;
 
   return `<!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -531,31 +564,23 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="titles.css">
-  <link rel="preload" href="fonts/inter-latin-normal-300-700-v1.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
-  <link rel="preload" href="fonts/${currentSlug ? 'charis-sil-latin-normal-400-v1' : 'tinos-latin-normal-400-v1'}.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="${assetUrl('style.css')}">
+  <link rel="stylesheet" href="${assetUrl('titles.css')}">
+  <link rel="preload" href="${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
+  <link rel="preload" href="${assetUrl(currentSlug ? 'fonts/charis-sil-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2')}" as="font" type="font/woff2" crossorigin>
   <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
-  <script>try{var d=document.documentElement,t=localStorage.getItem('theme');if(t)d.setAttribute('data-theme',t);if(localStorage.getItem('order')==='book')d.setAttribute('data-order','book')}catch(e){}</script>
+  <script>try{if(localStorage.getItem('order')==='book')document.documentElement.setAttribute('data-order','book')}catch(e){}</script>
 </head>
 <body class="${currentSlug ? 'is-post' : 'is-index'}">
   <a class="skip-link" href="#content">Skip to ${currentSlug ? 'story' : 'contents'}</a>
 
-  <header class="nav">
-    <nav class="navbar" aria-label="Site">
-      <a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>△</a>
-      <a href="${EPUB_FILENAME}" class="nav-item epub-link" title="The whole collection as a free EPUB">/epub</a>
-      <a href="feed.xml" class="nav-item nav-rss">/rss</a>
-      <button type="button" class="nav-item theme-toggle" id="theme-btn" aria-label="Toggle dark mode">◐</button>
-      <form class="subscribe" action="${SUBSTACK_BASE}/subscribe" method="get">
-        <input type="email" name="email" placeholder="💌 email" aria-label="Email address for new stories" autocomplete="email" required>
-        <button type="submit" title="Subscribe on Substack">→</button>
-      </form>
-    </nav>${currentSlug ? '\n    <div class="progress" aria-hidden="true"></div>' : ''}
+${currentSlug ? `  <header class="nav">
+    <nav class="navbar" aria-label="Site">${navItems(currentSlug)}</nav>
+    <div class="progress" aria-hidden="true"></div>
   </header>
 
-  <main id="content" tabindex="-1">
+` : ''}  <main id="content" tabindex="-1">
     ${content}
   </main>
 
@@ -575,6 +600,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         if(!(eq(loc.city,r.city)&&eq(loc.region,r.region)&&eq(loc.country,r.country)))return;
         var els=document.querySelectorAll('[data-slug="'+r.slug+'"]');
         for(var i=0;i<els.length;i++)els[i].remove();
+        var ol=document.querySelector('.stories');if(ol)ol.style.setProperty('--n',ol.querySelectorAll('.story').length);
         var navs=document.querySelectorAll('[data-geo-slug="'+r.slug+'"]');
         for(var k=0;k<navs.length;k++){var a=navs[k],h=a.getAttribute('data-alt-href');
           if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label');a.className=a.className.replace(/\\bt-\\S+/,'t-'+a.getAttribute('data-alt-slug'))}
@@ -604,12 +630,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
 
   <script>
   (function(){
-    // Theme toggle
-    var h=document.documentElement,b=document.getElementById('theme-btn');
-    function isDark(){var t=h.getAttribute('data-theme');return t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches)}
-    function updateTheme(){b.setAttribute('aria-pressed',isDark()?'true':'false');b.setAttribute('aria-label',isDark()?'Switch to light mode':'Switch to dark mode')}
-    b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}updateTheme()});
-    updateTheme();
+    var h=document.documentElement;
 
     // Arrow keys step to the newer/older story
     document.addEventListener('keydown',function(e){
@@ -671,7 +692,10 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
           var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
           var room=a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4;
           a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
-          a.style.boxSizing='border-box';a.style.width=box+'px';a.style.height=boxH+'px';a.classList.add('pinned');
+          // Pin to the line height, not the glyph box: an inline-flex shorter
+          // than the line it replaces would shrink the line and move the row.
+          var lh=parseFloat(getComputedStyle(a).lineHeight)||boxH;
+          a.style.boxSizing='border-box';a.style.width=box+'px';a.style.height=lh+'px';a.classList.add('pinned');
         }else{
           // Wrapped: each word keeps its width and the mono letters shrink to fit.
           a.style.whiteSpace='';
@@ -725,7 +749,7 @@ function buildPostPage(post, allPosts) {
     <article>
       <header class="post-header">
         <h1 class="t-${post.slug}">${post.title}</h1>
-        <p class="post-meta"><span class="when">${meta}</span>${metricCells(post)}</p>
+        <p class="post-meta meta"><span class="when">${meta}</span>${stats(post)}</p>
       </header>
       <div class="post-body">
         ${cleanHtml(post.htmlBody)}
@@ -740,6 +764,7 @@ function buildPostPage(post, allPosts) {
           ${postNavLink(byBook, bookIdx, 1)}
         </nav>
         <p class="colophon">New stories by email: <a href="${SUBSTACK_URL}">Substack</a> · the whole collection as a free <a href="${EPUB_FILENAME}" class="epub-link">EPUB</a></p>
+        ${siteFoot()}
       </footer>
     </article>`;
 
@@ -752,26 +777,44 @@ function buildIndexPage(posts) {
   const bookPos = new Map(bookOrder(posts).map((p, i) => [p.slug, i]));
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story" data-slug="${p.slug}" data-date="${i}" data-book="${bookPos.get(p.slug)}">
-          <span class="title-cell"><a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a> ${whenText(p)}</span>
-          ${metricCells(p)}
+          <span class="title-cell"><a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a> <span class="meta">${whenText(p)}${stats(p)}</span></span>
         </li>`).join('');
 
   const content = `
-    <h1 class="site-h1">${SITE_TITLE}</h1>
-    <ol class="stories">
-        <li class="story story-head">
-          <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" class="ico k-recent" data-o="date" aria-pressed="true" aria-label="Newest first" title="Newest first"></button><button type="button" class="ico k-book" data-o="book" aria-pressed="false" aria-label="Book order" title="Book order"></button></span>
-          <span class="m m-lw"><span class="src"></span><span class="n ico k-karma" title="LessWrong karma"></span><span class="n ico k-cmts" title="LessWrong comments"></span></span>
-          <span class="m m-ss"><span class="src"></span><span class="n ico k-likes" title="Substack likes"></span><span class="n ico k-restacks" title="Substack restacks"></span><span class="n ico k-cmts" title="Substack comments"></span></span>
-        </li>${rows}
-    </ol>`;
+    <header class="site-head">
+      <div class="head-row">
+        <h1 class="site-h1">${AUTHOR}</h1>
+        <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>△<\/a>/, '')}</nav>
+      </div>
+      <div class="head-row">
+        <h2 class="site-h2">${SITE_TITLE}</h2>
+        <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" class="ico k-recent" data-o="date" aria-pressed="true" aria-label="Newest first" title="Newest first"></button><button type="button" class="ico k-book" data-o="book" aria-pressed="false" aria-label="Book order" title="Book order"></button></span>
+      </div>
+    </header>
+    <ol class="stories" style="--n:${posts.length}">${rows}
+    </ol>
+    ${siteFoot()}`;
 
   return pageShell(content, null, posts, null);
 }
 
-// The stylesheet lives in style.css so it can be edited as CSS.
+// URL of a file already written to dist/, stamped with a hash of its bytes,
+// so a browser or CDN holding an older copy fetches the new one at once and
+// every reader sees the current CSS and fonts.
+const assetVersions = new Map();
+function assetUrl(rel) {
+  if (!assetVersions.has(rel)) {
+    const bytes = fs.readFileSync(path.join(OUTPUT_DIR, rel));
+    assetVersions.set(rel, require('crypto').createHash('sha1').update(bytes).digest('hex').slice(0, 10));
+  }
+  return `${rel}?v=${assetVersions.get(rel)}`;
+}
+
+// The stylesheet lives in style.css so it can be edited as CSS; font URLs get
+// their content stamp (the fonts must be in dist/ first).
 function buildStylesheet() {
-  return fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+  return fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8')
+    .replace(/url\('(fonts\/[^']+\.woff2)'\)/g, (_, rel) => `url('${assetUrl(rel)}')`);
 }
 
 // --- RSS feed ---
@@ -1933,18 +1976,19 @@ async function main() {
     console.log(`Wrote ${LOCAL_IMAGES.size} images to images/`);
   }
 
-  // Write stylesheet and the self-hosted display face (fonts/web/)
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
-  console.log('Wrote style.css');
+  // Self-hosted text faces (fonts/web/), then the stylesheet that stamps them
   const webFonts = path.join(__dirname, 'fonts', 'web');
   fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
   for (const name of fs.readdirSync(webFonts).filter(n => n.endsWith('.woff2'))) {
     fs.copyFileSync(path.join(webFonts, name), path.join(OUTPUT_DIR, 'fonts', name));
   }
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
+  console.log('Wrote style.css');
 
   // Reader metrics and per-title fonts
   attachMetrics(fiction, await fetchSubstackMetrics());
   const [subsetFonts, titleFonts] = await Promise.all([fetchSubsetFonts(fiction), fetchTitleFonts(fiction)]);
+  pruneSubsets();
   fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, subsetFonts, titleFonts));
   console.log('Wrote titles.css');
 

@@ -1,13 +1,13 @@
 /* The Origami Men and Other Stories — site stylesheet.
    Copied to dist/style.css by build.js; per-story title faces and colours are
-   generated into dist/titles.css. Colours are OKLCH light-dark() pairs, and
-   the theme toggle only switches color-scheme. */
+   generated into dist/titles.css. Light only; colours are OKLCH. */
 
 /* Every face is served from fonts/ so all devices render the same; no
    stack may rely on an installed font. Latin subsets, fetched by
    scripts/fetch-webfonts.py (Cormorant copied from markusstrasser.org).
    Inter stands in for the system UI font (SF/Segoe/Roboto), Charis SIL is
-   the open build of Charter, Tinos has the metrics of Times New Roman. */
+   the open build of Charter, Tinos has the metrics of Times New Roman,
+   EB Garamond sets the quiet meta line. */
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-italic-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
@@ -15,6 +15,7 @@
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-700-v1.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Tinos'; src: url('fonts/tinos-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face {
   font-family: 'Cormorant Garamond';
@@ -32,27 +33,29 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  --paper:    light-dark(oklch(0.99 0.006 85),  oklch(0.185 0.004 270));
-  --paper-2:  light-dark(oklch(0.965 0.008 82), oklch(0.215 0.005 270));
-  --ink:      light-dark(oklch(0.24 0.01 264),  oklch(0.9 0.008 85));
-  --ink-soft: light-dark(oklch(0.38 0.01 264),  oklch(0.8 0.008 85));
-  --muted:    light-dark(oklch(0.55 0.01 264),  oklch(0.64 0.008 85));
-  --rule:     light-dark(oklch(0.88 0.006 264), oklch(0.3 0.005 270));
-  --rule-strong: light-dark(oklch(0.24 0.01 264), oklch(0.6 0.008 85));
-  --link:     light-dark(oklch(0.47 0.15 264),  oklch(0.76 0.1 264));
-  --link-visited: light-dark(oklch(0.42 0.14 294), oklch(0.74 0.1 300));
-  --link-hover: light-dark(oklch(0.52 0.22 24), oklch(0.72 0.16 30));
-  --marker:   light-dark(oklch(0.45 0.17 26),   oklch(0.68 0.14 26));
-  --substack: oklch(0.67 0.19 45);
-  --blush:    light-dark(oklch(0.66 0.16 5),    oklch(0.8 0.11 5));
-  --selection: light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.45 0.08 24 / 0.6));
+  --paper:    oklch(0.99 0.006 85);
+  --paper-2:  oklch(0.965 0.008 82);
+  --ink:      oklch(0.24 0.01 264);
+  --ink-soft: oklch(0.38 0.01 264);
+  --muted:    oklch(0.55 0.01 264);
+  --rule:     oklch(0.88 0.006 264);
+  --rule-strong: oklch(0.24 0.01 264);
+  --link:     oklch(0.47 0.15 264);
+  --link-visited: oklch(0.42 0.14 294);
+  --link-hover: oklch(0.52 0.22 24);
+  --marker:   oklch(0.45 0.17 26);
+  --substack: #ff6719; /* Substack's own orange */
+  --blush:    oklch(0.66 0.16 5);
+  --selection: oklch(0.88 0.1 24 / 0.5);
 
   --serif: 'Charis SIL', 'Site Marks', Charter, Georgia, serif;
   --display: 'Cormorant Garamond', 'Site Marks', Garamond, Georgia, serif;
   --sans: 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
   --mono: 'Fira Mono', ui-monospace, monospace;
+  /* Dates, reading times and reader counts. */
+  --meta: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   /* Faces as on markusstrasser.org: Cormorant for headings (name, essay
      titles), the sans for the lists of titles. */
   --title: var(--sans);
@@ -65,8 +68,6 @@
   --nav-h: 2.6rem;
 }
 
-:root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"]  { color-scheme: dark; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -129,49 +130,47 @@ a:hover { color: var(--link-hover); }
   display: inline-flex;
   align-items: center;
   padding: 0.3rem 0.55rem;
-  font: inherit;
-  font-size: 0.95rem;
-  color: var(--link);
+  font: 400 0.8rem/1 var(--sans);
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
   background: none;
   border: 0;
   border-radius: 3px;
-  text-decoration: underline;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
 }
-.nav-item:visited { color: var(--link); }
+.nav-item:visited { color: var(--ink-soft); }
+.nav-x svg, .x-link svg { width: 1em; height: 1em; fill: currentColor; opacity: 0.5; transition: opacity 0.15s ease; }
+.nav-x:hover svg, .x-link:hover svg { opacity: 1; }
+.nav-x svg { width: 0.95rem; height: 0.95rem; }
+
+.site-foot { margin-top: 0.8rem; font: 400 0.72rem/1.4 var(--sans); color: var(--muted); }
+.site-foot a { color: inherit; text-decoration: none; }
+.x-link { display: inline-flex; align-items: center; gap: 0.3em; }
+.x-link:hover { color: var(--ink); }
 .nav-item:hover, .nav-item[aria-current="page"] {
   color: var(--link-hover);
   background: color-mix(in oklch, var(--link-hover) 10%, transparent);
 }
 .nav-home { text-decoration: none; color: var(--marker); }
 .nav-home:visited { color: var(--marker); }
-.theme-toggle { text-decoration: none; color: var(--muted); margin-left: auto; }
-
-.subscribe { display: flex; height: 1.85rem; margin-left: 0.4rem; }
-.subscribe input {
-  width: 10.5rem;
-  min-width: 0;
-  padding: 0 0.4rem;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-right: 0;
-  border-radius: 3px 0 0 3px;
+.nav-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  padding: 0.3rem 0.75rem;
+  font: 500 0.85rem/1 var(--sans);
+  color: #fff;
+  background: var(--substack);
+  border-radius: 6px;
+  text-decoration: none;
 }
-.subscribe input:focus-visible { outline-offset: -1px; }
-.subscribe button {
-  width: 2.6rem;
-  font: 700 0.95rem/1 var(--sans);
-  color: var(--paper);
-  background: var(--ink);
-  border: 1px solid var(--ink);
-  border-radius: 0 3px 3px 0;
-  cursor: pointer;
-}
-.subscribe button:hover { background: var(--marker); border-color: var(--marker); }
+.nav-sub:visited, .nav-sub:hover { color: #fff; }
+.nav-sub:hover { background: color-mix(in oklch, var(--substack) 88%, black); }
+.nav-sub svg { width: 0.7rem; height: 0.75rem; fill: currentColor; }
+.site-head .nav-sub { margin-left: 0.5rem; }
 
 /* Reading progress: a hairline over the nav rule, driven by scroll. */
 .progress { display: none; }
@@ -200,6 +199,8 @@ main {
   margin: 0 auto;
   padding: calc(var(--nav-h) + 2.1rem) 0 3rem;
 }
+/* The contents page has no bar: its links sit beside the title. */
+.is-index main { padding-top: 2.6rem; }
 
 /* --- Titles: per-story face (titles.css) and recency colour ---------- */
 
@@ -224,7 +225,8 @@ main {
 .morph .mm { font-size: min(var(--mono-size, 1.05rem), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
-.title-cell:has(.mm) .when { visibility: hidden; }
+.title-cell .meta { transition: opacity 0.12s ease-out; }
+.title-cell:has(.mm) .meta { opacity: 0; transition-duration: 0.18s; }
 
 /* Hover: the title turns blush, instantly. */
 .blush { text-decoration: none; }
@@ -251,35 +253,39 @@ main {
 
 /* --- Contents -------------------------------------------------------- */
 
+/* The author's name with the site links beside it, then the book title
+   with the order switch. */
+.site-head { margin-bottom: 1.2rem; }
+.head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 1rem;
+}
+.head-row:first-child { padding-bottom: 0.35rem; border-bottom: 1px solid var(--ink); }
+.head-row + .head-row { margin-top: 0.6rem; padding-left: 1.4rem; }
+.site-head .navbar { width: auto; min-height: 0; gap: 0; border: 0; margin-left: auto; }
+.site-head .nav-item { padding: 0.15rem 0.35rem; }
+.site-head .order-switch { margin-left: auto; align-self: center; }
+
 .site-h1 {
-  margin-bottom: 1.1rem;
-  text-box: trim-both cap alphabetic;
+  font-family: 'Author Name', var(--h1);
+  font-size: 2.9rem;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.site-h2 {
   font-family: 'Site Title', var(--h1);
-  font-size: 2.3rem;
+  font-size: 1.5rem;
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: 0.01em;
-  color: var(--ink);
+  color: var(--ink-soft);
 }
 
-/* One grid for the whole list so metric columns line up; each row is a
-   subgrid and the metric groups dissolve into it. */
-.stories {
-  list-style: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, auto) repeat(4, auto);
-  column-gap: 0.55rem;
-  align-items: baseline;
-}
-
-.story {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: subgrid;
-  align-items: baseline;
-  padding: 0.1rem 0;
-}
-.story .m { display: contents; }
+.stories { list-style: none; }
+.story { padding: 0.1rem 0; }
 
 .story-title {
   --mono-size: 1.1rem;
@@ -289,37 +295,78 @@ main {
 }
 .story-title:visited { color: var(--tc); }
 
-.story .n {
-  font: 300 0.8rem/1 var(--title);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+/* Date, reading time and reader counts: small, in the quiet text face,
+   set right after the title. */
+.meta {
+  font: 400 0.7rem/1 var(--meta);
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
-.story-head { padding-bottom: 0.1rem; }
-.story-head .n { color: var(--muted); opacity: 0.75; }
-.story .when, .post-meta .when {
-  font: italic 300 0.78rem/1 var(--sans);
+.story .meta { margin-left: 0.35rem; white-space: nowrap; }
+/* Date and reading time a step larger than the reader counts. */
+.meta .when { font-size: 1.18em; color: var(--ink-soft); }
+.meta .m { display: inline-flex; align-items: baseline; gap: 0.3rem; margin-left: 0.55rem; }
+.meta .n::after {
+  content: "";
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 0.12em;
+  vertical-align: -0.02em;
+  background: currentColor;
+  opacity: 0.7;
+  -webkit-mask: var(--ico) center / contain no-repeat;
+  mask: var(--ico) center / contain no-repeat;
 }
-.story .when {
-  margin-left: 0.3rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.m-lw .src { margin-left: 0.6rem; }
 
 .src {
   display: inline-flex;
-  align-self: baseline;
-  position: relative;
-  top: 0.1rem;
-  width: 0.8rem;
-  height: 0.8rem;
+  align-self: center;
+  width: 0.7rem;
+  height: 0.7rem;
 }
 .src svg { width: 100%; height: 100%; fill: currentColor; }
-.m-ss .src { margin-left: 0.6rem; }
 .src-lw { color: var(--ink-soft); }
 .src-ss { color: var(--substack); }
 .src:hover { opacity: 0.7; }
+
+/* Wide enough and tall enough: the contents page fills the window. Slim
+   side margins; the list takes the height left under the header, split into
+   one equal row per story (--n, set by the build), and titles scale with the
+   row (cq units of the list), capped by the width. So every story shows
+   without scrolling and no height is left over. */
+@media (min-width: 780px) and (min-height: 520px) {
+  .is-index main {
+    width: auto;
+    height: 100dvh;
+    margin: 0 clamp(1rem, 3vw, 2.5rem);
+    padding: 1.2rem 0 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .is-index .site-head { flex: none; margin-bottom: 1.6rem; }
+  .is-index .site-foot { flex: none; }
+  .stories {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    container-type: size;
+    /* Rows never drop below 2.1rem: once there are too many stories to
+       fit, the list runs past the window and the page scrolls. */
+    grid-template-rows: repeat(var(--n), minmax(2.1rem, 1fr));
+  }
+  /* cq units resolve against the list only inside it, so the row size is
+     defined on the rows. */
+  .story { --row: max(2.1rem, 100cqh / var(--n)); display: flex; align-items: center; min-height: 0; padding: 0; }
+  .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
+  .story-title {
+    font-size: calc(min(var(--row) * 0.56, 2.6cqw) * var(--ts, 1));
+    line-height: var(--row);
+    --mono-size: min(var(--row) * 0.5, 2.4cqw);
+  }
+  .story .meta { font-size: clamp(0.7rem, var(--row) * 0.27, 0.95rem); margin-left: 0.6em; }
+}
 
 /* --- Story ----------------------------------------------------------- */
 
@@ -333,37 +380,8 @@ main {
   text-wrap: balance;
 }
 
-.post-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.7rem;
-  font: 300 0.8rem/1.2 var(--title);
-  color: var(--muted);
-}
-.post-meta .m { display: inline-flex; align-items: center; gap: 0.35rem; }
-.post-meta .m:empty, .post-meta .m:not(:has(a)) { display: none; }
-.post-meta .m-ss .src { margin-left: 0.4rem; }
-.post-meta .n { font-variant-numeric: tabular-nums; }
-.post-meta .n::after, .story .n:not(:empty)::after {
-  content: "";
-  display: inline-block;
-  width: 0.7em;
-  height: 0.7em;
-  margin-left: 0.15em;
-  vertical-align: -0.05em;
-  background: currentColor;
-  -webkit-mask: var(--ico) center / contain no-repeat;
-  mask: var(--ico) center / contain no-repeat;
-}
-/* In the aligned contents grid the header carries the icons; rows show
-   bare numbers until the grid collapses on narrow screens. */
-@media (min-width: 641px) {
-  .story .n:not(:empty)::after { content: none; }
-  /* Every row the same height, however tall a title's face. */
-  .story:not(.story-head) { height: 2.2rem; }
-}
+.post-meta { margin-top: 0.7rem; font-size: 0.8rem; }
+.post-meta .m:first-of-type { margin-left: 0.7rem; }
 
 .post-body {
   max-width: var(--measure);
@@ -469,24 +487,13 @@ main {
   html { font-size: 16px; }
   .nav-rss { display: none; }
   .nav-item { padding: 0.3rem 0.4rem; }
-  .subscribe input { width: 7.5rem; }
 
-  .stories { display: block; }
-  .story {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 0.35rem;
-    padding: 0.3rem 0;
-  }
-  .title-cell { flex: 1 1 100%; }
-  .story-head .m { display: none !important; }
-  .story .m { display: inline-flex; align-items: center; gap: 0.3rem; }
-  .story .m:is(.m-lw, .m-ss):not(:has(a)) { display: none; }
-  .story .m-lw .src, .story .m-ss .src { margin-left: 0.5rem; }
-  .story .n:empty { display: none; }
+  .story { padding: 0.3rem 0; }
+  .story .meta { display: block; margin: 0.1rem 0 0; white-space: normal; }
+  .story .meta .m:first-of-type { margin-left: 0.55rem; }
 
-  .site-h1 { font-size: 1.7rem; }
+  .site-h1 { font-size: 2.3rem; }
+  .site-h2 { font-size: 1.2rem; }
   .post-header h1 { font-size: 1.95rem; }
   .post-nav { flex-direction: column; gap: 0.4rem; }
   .post-nav-next { margin-left: 0; text-align: left; }
@@ -495,7 +502,6 @@ main {
 /* --- Print: the story alone ------------------------------------------ */
 
 @media print {
-  :root { color-scheme: light; }
   html { font-size: 11pt; }
   .nav, .skip-link, .post-footer { display: none !important; }
   main { width: auto; padding: 0; }

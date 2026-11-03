@@ -58,39 +58,54 @@ cached in `localStorage` for 24h to stay under the free tier's rate limit.
 
 ## Architecture
 
-Reading requires no JavaScript. The contents page is a numbered list,
-newest first, with each story's LessWrong karma and comments and its
-Substack likes, restacks and comments, fetched at build time (LessWrong
-from the GraphQL query, Substack from `/api/v1/archive`; a failed fetch
-logs `[DEGRADED]` and the build continues without those numbers). Story
-pages link to the newer and older story.
+Reading requires no JavaScript. The site is light only. The contents
+page opens with the author's name (Send Flowers) beside the links (EPUB,
+RSS, X, and a Substack-orange Subscribe button that goes to Substack),
+a thin black rule, then the book title (Zen Tokyo Zoo) and the list. On
+screens at least 780 px wide and 520 px tall the list fills the window:
+one equal row per story, titles scaled to the row, so every story shows
+without scrolling; rows never go below 2.1rem, so a long list scrolls.
+Each title is followed by its month and reading time and then its
+LessWrong karma and comments and Substack likes, restacks and comments,
+small, in EB Garamond with old-style figures (LessWrong from the GraphQL
+query, Substack from `/api/v1/archive`; a failed fetch logs `[DEGRADED]`
+and the build continues without those numbers). Story pages link to the
+newer and older story.
 
 Every font is served by the site, so every device renders the same:
-nothing relies on fonts the reader has installed. The faces follow
-markusstrasser.org: Cormorant Garamond for headings, Inter (standing in
-for the system UI font) for the list of titles and the interface, Charis
-SIL (the open build of Charter) for story text and Fira Mono for code.
-Their latin subsets live in `fonts/web/` (`scripts/fetch-webfonts.py`
-refreshes them). Characters outside those subsets (the nav marks,
-arrows, and any such character in a story, like the █ redactions) go into a small Noto Sans JP subset the build fetches.
+nothing relies on fonts the reader has installed. Inter (standing in for
+the system UI font) sets the interface, Charis SIL (the open build of
+Charter) story text, Tinos (Times New Roman's metrics) story titles, EB
+Garamond the meta line, Fira Mono code and Cormorant Garamond headings
+inside stories. Their latin subsets live in `fonts/web/`
+(`scripts/fetch-webfonts.py` refreshes them). Characters outside those
+subsets (the nav marks, arrows, and any such character in a story, like
+the █ redactions) go into a small Noto Sans JP subset the build fetches.
 `bun scripts/font-audit.mjs <url>...` asks Chrome which fonts each page
 actually draws with and exits 1 if any came from the device.
 
 Each story's title in the contents list (and in the newer/older links)
 has its own display face, from Markus's picks: `TITLE_FONTS` in
 `build.js` maps slug to [Google css2 spec, size factor, weight]. The
-build fetches a subset of just that title's letters per story (cached in
-`.cache/fonts/`); a story without an entry uses the list sans.
+build fetches a subset of just that title's letters per story; a story
+without an entry uses the list sans. These subsets, and the name, book
+title, hover and marks subsets, are kept in `fonts/subsets/`, which is
+committed: CI builds use those files and only ask Google when a title or
+story adds characters. A fetch that fails stops the build, so the last
+good deploy stays live instead of shipping a title in a fallback face.
+Commit `fonts/subsets/` after a local build that changed it (unused
+files are pruned). CSS and font URLs carry a hash of the file's bytes
+(`?v=`), so no browser or CDN cache serves an old copy after a deploy.
 
 Hovering a title turns it letter by letter (12 ms a letter, forwards
 only; leaving resets it) into Major Mono Display (a build-time subset of
 just the letters the titles use). The title keeps its resting box, so
 nothing on the page moves; the mono letters are set near title size and
-may run on to the end of the title column, hiding the date meanwhile.
-The site name is set in Zen Tokyo Zoo, also a build-time subset. Title colours shade from
-near-black (newest) to dark purple (oldest); `dist/titles.css` holds them.
+may run on to the end of the title column while the meta beside it
+fades out. Title colours shade from near-black (newest) to dark purple
+(oldest); `dist/titles.css` holds them.
 
-A small inline script adds the optional extras: the dark-mode toggle, a
+A small inline script adds the optional extras: a
 recent / book-order switch (remembered in localStorage; book order is
 `COLLECTION_ORDER`, as in the EPUB), arrow keys for newer/older, and the hover
 morph. The only
