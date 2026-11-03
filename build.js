@@ -842,7 +842,7 @@ ${currentSlug ? `  <header class="nav">
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
     var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
     document.querySelectorAll('.morph').forEach(function(a){
-      var spans=null,text=null,timer=null,n=0,dir=0;
+      var spans=null,text=null,timer=null,left=null,dir=0;
       function split(){
         var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
         var inline=getComputedStyle(a).display==='inline';
@@ -887,21 +887,25 @@ ${currentSlug ? `  <header class="nav">
           boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
         }
       }
-      // Each letter waits a random 4-30 ms (mean ~13), skewed short, so the
-      // change runs in uneven spurts rather than at a metronome's pace.
+      // The change sweeps left to right but not in strict order: each step
+      // turns one of the next three unchanged letters (two at once a quarter
+      // of the time), then waits 4-40 ms, mostly short with rare pauses (cubed
+      // random; browsers clamp chained timers to 4 ms). About 9.6 ms a letter.
       function run(){
         clearTimeout(timer);
         (function step(){
-          if(n>=spans.length)return;spans[n++].className='mm';
-          var r=Math.random();timer=setTimeout(step,4+26*r*r);
+          if(!left.length)return;
+          for(var k=Math.random()<0.25?2:1;k>0&&left.length;k--)
+            spans[left.splice(Math.floor(Math.random()*Math.min(3,left.length)),1)[0]].className='mm';
+          var r=Math.random();timer=setTimeout(step,2+38*r*r*r);
         })();
       }
-      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();n=0}run()})});
+      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left)left=spans.map(function(_,i){return i});run()})});
       // A resize rescales the titles, so pins measured at the old size are
       // dropped; the next hover measures afresh.
       addEventListener('resize',function(){if(!spans)return;clearTimeout(timer);a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned');spans=null});
       // Leaving resets the title at once; the morph only plays forwards.
-      a.addEventListener('mouseleave',function(){dir=-1;clearTimeout(timer);if(spans){spans.forEach(function(s){s.className=''});n=0}});
+      a.addEventListener('mouseleave',function(){dir=-1;clearTimeout(timer);if(spans){spans.forEach(function(s){s.className=''});left=null}});
     });
   })();
   </script>
