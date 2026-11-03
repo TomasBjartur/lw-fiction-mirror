@@ -232,6 +232,11 @@ function formatDate(dateStr) {
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+function formatMonthYear(dateStr) {
+  const d = new Date(dateStr);
+  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 function estimateReadingTime(wordCount) {
   if (!wordCount) return '';
   const minutes = Math.ceil(wordCount / 250);
@@ -299,29 +304,33 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // --- Title typography -------------------------------------------------------
 
 // Each story title is set in its own Google Fonts face. The build downloads a
-// subset holding only that title's letters (both cases, for the hover ripple)
+// subset holding only that title's letters
 // and self-hosts it, so a face costs a few KB and readers never hit Google.
 // Stories missing here take the next face from TITLE_FONT_SPARES.
 const TITLE_FONTS = {
-  'the-company-man': { family: 'Courier Prime', weight: 700 },
-  'our-beloved-monsters': { family: 'Pirata One' },
-  'that-mad-olympiad-1': { family: 'Shrikhand' },
-  'the-maker-of-mind': { family: 'Syne', weight: 700 },
-  'san-silvestro': { family: 'IM Fell English' },
-  'remembering-aubrey-chang': { family: 'Bodoni Moda', weight: 500 },
-  'lobsang-s-children-1': { family: 'Alegreya', weight: 500 },
-  'the-liar-and-the-scold': { family: 'Libre Caslon Display' },
-  'the-elect-2': { family: 'Abril Fatface' },
-  'goldfish': { family: 'Caveat', weight: 600 },
-  'customer-satisfaction-opportunities-1': { family: 'Barlow Condensed', weight: 500 },
-  'penny-s-hands': { family: 'Young Serif' },
-  'the-distaff-texts': { family: 'MedievalSharp' },
-  'duane-arnold-1': { family: 'Space Mono', weight: 700 },
+  'the-company-man': { family: 'Space Grotesk', weight: 500 },
+  'our-beloved-monsters': { family: 'Fraunces', weight: 600 },
+  'that-mad-olympiad-1': { family: 'Bricolage Grotesque', weight: 700 },
+  'the-maker-of-mind': { family: 'Unbounded', weight: 500 },
+  'san-silvestro': { family: 'Cormorant', weight: 600 },
+  'remembering-aubrey-chang': { family: 'Playfair Display', weight: 500 },
+  'lobsang-s-children-1': { family: 'Spectral', weight: 600 },
+  'the-liar-and-the-scold': { family: 'Libre Baskerville' },
+  'the-elect-2': { family: 'DM Serif Display' },
+  'goldfish': { family: 'Gloock' },
+  'customer-satisfaction-opportunities-1': { family: 'Archivo Narrow', weight: 600 },
+  'penny-s-hands': { family: 'Newsreader', weight: 500 },
+  'the-distaff-texts': { family: 'Uncial Antiqua' },
+  'duane-arnold-1': { family: 'Big Shoulders Display', weight: 700 },
   'the-origami-men': { family: 'EB Garamond', weight: 500 },
 };
+// Earlier picks (2026-11-03 first pass), kept as spares and for comparison.
 const TITLE_FONT_SPARES = [
-  { family: 'Fraunces', weight: 600 }, { family: 'Unbounded', weight: 500 },
-  { family: 'Instrument Serif' }, { family: 'Gloock' }, { family: 'DM Serif Display' },
+  { family: 'Courier Prime', weight: 700 }, { family: 'Pirata One' }, { family: 'Shrikhand' },
+  { family: 'Syne', weight: 700 }, { family: 'IM Fell English' }, { family: 'Bodoni Moda', weight: 500 },
+  { family: 'Alegreya', weight: 500 }, { family: 'Libre Caslon Display' }, { family: 'Abril Fatface' },
+  { family: 'Caveat', weight: 600 }, { family: 'Barlow Condensed', weight: 500 }, { family: 'Young Serif' },
+  { family: 'MedievalSharp' }, { family: 'Space Mono', weight: 700 },
 ];
 const TITLE_FONT_FALLBACK = "Georgia, 'Times New Roman', serif";
 
@@ -339,7 +348,7 @@ async function fetchTitleFonts(posts) {
   const unknown = posts.filter(p => !TITLE_FONTS[p.slug]);
   await Promise.all(posts.map(async (p) => {
     const spec = titleFontFor(p.slug, unknown.indexOf(p));
-    const chars = [...new Set(p.title + p.title.toUpperCase() + p.title.toLowerCase())].join('');
+    const chars = [...new Set(p.title)].join('');
     const fam = spec.family.replace(/ /g, '+') + (spec.weight ? `:wght@${spec.weight}` : '');
     const cssUrl = `https://fonts.googleapis.com/css2?family=${fam}&text=${encodeURIComponent(chars)}`;
     try {
@@ -375,7 +384,7 @@ function buildTitlesCss(posts, fonts) {
     const f = fonts.get(p.slug);
     const face = f ? `@font-face{font-family:'T ${p.slug}';src:url('${f.file}') format('woff2');font-weight:${f.weight};font-display:swap}\n` : '';
     const family = f ? `'T ${p.slug}', ${TITLE_FONT_FALLBACK}` : TITLE_FONT_FALLBACK;
-    return `${face}.t-${p.slug}{font-family:${family};font-weight:${f ? f.weight : 400};--tc:${titleColor(rank, byDate.length)};view-transition-name:t-${p.slug}}`;
+    return `${face}.t-${p.slug}{font-family:${family};font-weight:${f ? f.weight : 400};--tc:${titleColor(rank, byDate.length)}}`;
   }).join('\n') + '\n';
 }
 
@@ -430,15 +439,19 @@ const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.
 
 // Metric cells. `cells` keeps every slot (blank when a story isn't on a
 // platform) so rows line up as columns on the contents page.
-function metricCells(p) {
-  const n = (v, unit, label) => `<span class="n" data-u="${unit}" title="${v} ${label}">${v}</span>`;
+function metricCells(p, { when = false } = {}) {
+  const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}</span>`;
+  const mins = p.wordCount ? Math.ceil(p.wordCount / 250) : '';
+  const whenCells = when
+    ? `<span class="m m-when"><span class="n k-date" title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span><span class="n k-read" title="${mins} min read">${mins}m</span></span>`
+    : '';
   const lw = p.lw
-    ? `<a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, '▲', 'karma')}${n(p.lw.comments, 'c', 'comments')}`
+    ? `<a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}`
     : '<span class="src"></span><span class="n"></span><span class="n"></span>';
   const ss = p.ss
-    ? `<a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, '♥', 'likes')}${n(p.ss.restacks, '↻', 'restacks')}${n(p.ss.comments, 'c', 'comments')}`
+    ? `<a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}`
     : '<span class="src"></span><span class="n"></span><span class="n"></span><span class="n"></span>';
-  return `<span class="m m-lw">${lw}</span><span class="m m-ss">${ss}</span>`;
+  return `${whenCells}<span class="m m-lw">${lw}</span><span class="m m-ss">${ss}</span>`;
 }
 
 // --- Pages -------------------------------------------------------------------
@@ -516,7 +529,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         for(var i=0;i<els.length;i++)els[i].remove();
         var navs=document.querySelectorAll('[data-geo-slug="'+r.slug+'"]');
         for(var k=0;k<navs.length;k++){var a=navs[k],h=a.getAttribute('data-alt-href');
-          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label');a.className=a.className.replace(/\\bt-\\S+/,'t-'+a.getAttribute('data-alt-slug'));a.removeAttribute('aria-label')}
+          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label');a.className=a.className.replace(/\\bt-\\S+/,'t-'+a.getAttribute('data-alt-slug'))}
           else{a.removeAttribute('href');a.textContent=''}}
         var eps=document.querySelectorAll('.epub-link');
         for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
@@ -572,38 +585,6 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     }
     document.querySelectorAll('.order-switch button').forEach(function(btn){btn.addEventListener('click',function(){setOrder(btn.dataset.o)})});
     if(h.getAttribute('data-order')==='book')setOrder('book');
-
-    // Title ripple: while a title is hovered, a capital runs through it one
-    // letter every 50ms, lifting its neighbours like a wave.
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
-    var LIFT=[-0.2,-0.09,-0.03];
-    document.querySelectorAll('.ripple').forEach(function(a){
-      var spans=null,text,timer=null,pos=-1;
-      function split(){
-        text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
-        Array.from(text).forEach(function(ch){
-          var s=document.createElement('span');s.textContent=ch;s.setAttribute('aria-hidden','true');
-          if(/\\S/.test(ch)){s.className='rl';spans.push(s)}
-          a.appendChild(s);
-        });
-      }
-      function paint(){
-        for(var i=0;i<spans.length;i++){
-          var d=Math.abs(i-pos),s=spans[i],ch=s.dataset.ch||(s.dataset.ch=s.textContent);
-          s.textContent=d===0?ch.toUpperCase():ch;
-          s.classList.toggle('on',d===0);
-          s.style.transform=d<LIFT.length?'translateY('+LIFT[d]+'em)':'';
-        }
-      }
-      function step(){pos++;if(pos>spans.length+6)pos=0;paint()}
-      a.addEventListener('mouseenter',function(){
-        if(!spans||a.textContent!==text)split();
-        a.classList.add('rippling');pos=-1;clearInterval(timer);timer=setInterval(step,50);
-      });
-      a.addEventListener('mouseleave',function(){
-        clearInterval(timer);a.classList.remove('rippling');pos=-99;if(spans)paint();
-      });
-    });
   })();
   </script>
 </body>
@@ -625,7 +606,7 @@ function postNavLink(list, idx, step) {
     const alt = list[i];
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls} ripple t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
+  return `<a href="${target.slug}.html" class="post-nav-link ${cls} blush t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
 function buildPostPage(post, allPosts) {
@@ -667,17 +648,18 @@ function buildIndexPage(posts) {
   const bookPos = new Map(bookOrder(posts).map((p, i) => [p.slug, i]));
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story" data-slug="${p.slug}" data-date="${i}" data-book="${bookPos.get(p.slug)}">
-          <a class="story-title ripple t-${p.slug}" href="${p.slug}.html">${p.title}</a>
-          ${metricCells(p)}
+          <a class="story-title blush t-${p.slug}" href="${p.slug}.html">${p.title}</a>
+          ${metricCells(p, { when: true })}
         </li>`).join('');
 
   const content = `
     <h1 class="site-h1">${SITE_TITLE}</h1>
     <ol class="stories">
         <li class="story story-head">
-          <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" data-o="date" aria-pressed="true">recent</button> · <button type="button" data-o="book" aria-pressed="false">book order</button></span>
-          <span class="m m-lw" aria-hidden="true"><span class="src">LessWrong</span><span class="n">karma</span><span class="n">cmts</span></span>
-          <span class="m m-ss" aria-hidden="true"><span class="src">Substack</span><span class="n">likes</span><span class="n">restacks</span><span class="n">cmts</span></span>
+          <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" class="ico k-recent" data-o="date" aria-pressed="true" aria-label="Newest first" title="Newest first"></button><button type="button" class="ico k-book" data-o="book" aria-pressed="false" aria-label="Book order" title="Book order"></button></span>
+          <span class="m m-when"><span class="n ico k-date" title="Published"></span><span class="n ico k-read" title="Reading time"></span></span>
+          <span class="m m-lw"><span class="src"></span><span class="n ico k-karma" title="LessWrong karma"></span><span class="n ico k-cmts" title="LessWrong comments"></span></span>
+          <span class="m m-ss"><span class="src"></span><span class="n ico k-likes" title="Substack likes"></span><span class="n ico k-restacks" title="Substack restacks"></span><span class="n ico k-cmts" title="Substack comments"></span></span>
         </li>${rows}
     </ol>`;
 
