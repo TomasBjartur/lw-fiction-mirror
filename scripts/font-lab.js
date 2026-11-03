@@ -8,7 +8,7 @@ const path = require('path');
 
 const dist = path.join(__dirname, '..', 'dist');
 const index = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
-const stories = [...index.matchAll(/<li class="story" data-slug="([^"]+)"[^>]*>\s*<a class="story-title[^"]*" href="[^"]+">([^<]+)<\/a>/g)]
+const stories = [...index.matchAll(/<li class="story" data-slug="([^"]+)"[^>]*>[\s\S]*?<a class="story-title[^"]*" href="[^"]+">([^<]+)<\/a>/g)]
   .map(m => ({ slug: m[1], title: m[2] }));
 if (stories.length === 0) throw new Error('no stories found in dist/index.html; run node build.js first');
 

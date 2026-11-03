@@ -71,13 +71,12 @@ markusstrasser.org: Cormorant Garamond for headings, Inter (standing in
 for the system UI font) for the list of titles and the interface, Charis
 SIL (the open build of Charter) for story text and Fira Mono for code.
 Their latin subsets live in `fonts/web/` (`scripts/fetch-webfonts.py`
-refreshes them). Characters outside those subsets (the katakana list
-numbers, the nav marks, arrows, and any such character in a story, like
-the █ redactions) go into a small Noto Sans JP subset the build fetches.
+refreshes them). Characters outside those subsets (the nav marks,
+arrows, and any such character in a story, like the █ redactions) go into a small Noto Sans JP subset the build fetches.
 `bun scripts/font-audit.mjs <url>...` asks Chrome which fonts each page
 actually draws with and exits 1 if any came from the device.
 
-Hovering a title turns it letter by letter into Major Mono Display (a
+Hovering a title turns it letter by letter (25 ms a letter) into Major Mono Display (a
 build-time subset of just the letters the titles use). The mono letters
 are set at one smaller size (0.62em) so every title fits its resting
 width; glyphs are never stretched and nothing on the page moves. Title colours shade from

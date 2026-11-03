@@ -261,9 +261,8 @@ main {
    subgrid and the metric groups dissolve into it. */
 .stories {
   list-style: none;
-  counter-reset: story;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) repeat(2, auto) repeat(3, auto) repeat(4, auto);
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto) repeat(4, auto);
   column-gap: 0.55rem;
   align-items: baseline;
 }
@@ -275,13 +274,6 @@ main {
   align-items: baseline;
   padding: 0.2rem 0;
 }
-.story::before {
-  counter-increment: story;
-  content: counter(story, katakana) "、";
-  color: var(--marker);
-  font-size: 0.95rem;
-}
-.story-head::before { content: ""; counter-increment: none; }
 .story .m { display: contents; }
 
 .story-title {
@@ -291,15 +283,20 @@ main {
 .story-title:visited { color: var(--tc); }
 
 .story .n {
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
+  font: italic 500 0.95rem/1 var(--display);
+  font-variant-numeric: oldstyle-nums tabular-nums;
   text-align: right;
   color: var(--muted);
 }
 .story-head { padding-bottom: 0.1rem; }
 .story-head .n { color: var(--muted); opacity: 0.75; }
-.story .k-date { text-align: left; white-space: nowrap; }
-.m-when .k-date { padding-right: 0.15rem; }
+.story .when {
+  margin-left: 0.3rem;
+  font: italic 500 0.95rem/1 var(--display);
+  font-variant-numeric: oldstyle-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .m-lw .src { margin-left: 0.6rem; }
 
 .src {
@@ -332,14 +329,15 @@ main {
   align-items: center;
   gap: 0.35rem;
   margin-top: 0.7rem;
-  font-size: 0.75rem;
+  font: italic 500 0.98rem/1.2 var(--display);
+  font-variant-numeric: oldstyle-nums;
   color: var(--muted);
 }
 .post-meta .m { display: inline-flex; align-items: center; gap: 0.35rem; }
 .post-meta .m:empty, .post-meta .m:not(:has(a)) { display: none; }
 .post-meta .m-ss .src { margin-left: 0.4rem; }
-.post-meta .n { font-variant-numeric: tabular-nums; }
-.post-meta .n::after, .story .n:not(:empty, .k-date, .k-read)::after {
+.post-meta .n { font-variant-numeric: oldstyle-nums tabular-nums; }
+.post-meta .n::after, .story .n:not(:empty)::after {
   content: "";
   display: inline-block;
   width: 0.7em;
@@ -468,11 +466,9 @@ main {
     column-gap: 0.35rem;
     padding: 0.3rem 0;
   }
-  .story::before { flex: 0 0 1.9rem; }
-  .story-title { flex: 1 1 calc(100% - 2.3rem); }
+  .title-cell { flex: 1 1 100%; }
   .story-head .m { display: none !important; }
   .story .m { display: inline-flex; align-items: center; gap: 0.3rem; }
-  .story .m-when { margin-left: 2.25rem; }
   .story .m:is(.m-lw, .m-ss):not(:has(a)) { display: none; }
   .story .m-lw .src, .story .m-ss .src { margin-left: 0.5rem; }
   .story .n:empty { display: none; }

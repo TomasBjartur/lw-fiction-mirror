@@ -306,16 +306,15 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
 // - Major Mono Display: the title hover morph (letters of the titles).
-// - Noto Sans JP as 'Site Marks': the katakana list numbers and the nav and
-//   arrow marks, which the latin text faces lack. Without it they come from
+// - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
+//   character in a story that the latin text faces lack. Without it they come from
 //   whatever font the reader's device has. The stacks in style.css put
 //   'Site Marks' right after each text face.
-const KATAKANA = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヰヱヲン';
 const SUBSET_FONTS = [
   { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
-    text: posts => KATAKANA + '、△◐←→' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
+    text: posts => '△◐←→' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
 
 // The unicode-range of Google Fonts' "latin" subset, which is what the
@@ -422,19 +421,22 @@ const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.
 
 // Metric cells. `cells` keeps every slot (blank when a story isn't on a
 // platform) so rows line up as columns on the contents page.
-function metricCells(p, { when = false } = {}) {
+// Month and reading time, set inline after a title in the contents list.
+function whenText(p) {
+  const mins = p.wordCount ? Math.ceil(p.wordCount / 250) : 0;
+  const read = mins ? ` · <span title="${mins} min read">${mins}m</span>` : '';
+  return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span>${read}</span>`;
+}
+
+function metricCells(p) {
   const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}</span>`;
-  const mins = p.wordCount ? Math.ceil(p.wordCount / 250) : '';
-  const whenCells = when
-    ? `<span class="m m-when"><span class="n k-date" title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span><span class="n k-read" title="${mins} min read">${mins}m</span></span>`
-    : '';
   const lw = p.lw
     ? `<a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}`
     : '<span class="src"></span><span class="n"></span><span class="n"></span>';
   const ss = p.ss
     ? `<a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}`
     : '<span class="src"></span><span class="n"></span><span class="n"></span><span class="n"></span>';
-  return `${whenCells}<span class="m m-lw">${lw}</span><span class="m m-ss">${ss}</span>`;
+  return `<span class="m m-lw">${lw}</span><span class="m m-ss">${ss}</span>`;
 }
 
 // --- Pages -------------------------------------------------------------------
@@ -570,7 +572,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     document.querySelectorAll('.order-switch button').forEach(function(btn){btn.addEventListener('click',function(){setOrder(btn.dataset.o)})});
     if(h.getAttribute('data-order')==='book')setOrder('book');
 
-    // Hovering a title turns it, one letter every 50ms, into Major Mono
+    // Hovering a title turns it, one letter every 25ms, into Major Mono
     // Display; leaving turns it back the same way. The title (or, if it
     // wraps, each word) keeps its resting width and the mono letters share
     // one size per title, so no glyph is distorted, spacing stays even and
@@ -606,14 +608,14 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         if(!oneLine){a.style.whiteSpace='';boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')})}
         // A link sized by its text (newer/older links) keeps its box; a
         // grid cell already holds its width.
-        else if(!/grid/.test(getComputedStyle(a.parentElement).display)){a.style.boxSizing='border-box';a.style.width=box+'px'}
+        else if(!/grid/.test(getComputedStyle(a.parentElement).display)){a.style.boxSizing='border-box';a.style.width=box+'px';if(getComputedStyle(a).display==='inline')a.style.display='inline-block'}
       }
       function run(){
         clearInterval(timer);
         timer=setInterval(function(){
           if(dir>0){if(n>=spans.length)return clearInterval(timer);spans[n++].className='mm'}
           else{if(n<=0)return clearInterval(timer);spans[--n].className=''}
-        },50);
+        },25);
       }
       a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();n=0}run()})});
       a.addEventListener('mouseleave',function(){dir=-1;if(spans)run()});
@@ -681,8 +683,8 @@ function buildIndexPage(posts) {
   const bookPos = new Map(bookOrder(posts).map((p, i) => [p.slug, i]));
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story" data-slug="${p.slug}" data-date="${i}" data-book="${bookPos.get(p.slug)}">
-          <a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>
-          ${metricCells(p, { when: true })}
+          <span class="title-cell"><a class="story-title blush morph t-${p.slug}" href="${p.slug}.html">${p.title}</a> ${whenText(p)}</span>
+          ${metricCells(p)}
         </li>`).join('');
 
   const content = `
@@ -690,7 +692,6 @@ function buildIndexPage(posts) {
     <ol class="stories">
         <li class="story story-head">
           <span class="order-switch" role="group" aria-label="Order stories by"><button type="button" class="ico k-recent" data-o="date" aria-pressed="true" aria-label="Newest first" title="Newest first"></button><button type="button" class="ico k-book" data-o="book" aria-pressed="false" aria-label="Book order" title="Book order"></button></span>
-          <span class="m m-when"><span class="n ico k-date" title="Published"></span><span class="n ico k-read" title="Reading time"></span></span>
           <span class="m m-lw"><span class="src"></span><span class="n ico k-karma" title="LessWrong karma"></span><span class="n ico k-cmts" title="LessWrong comments"></span></span>
           <span class="m m-ss"><span class="src"></span><span class="n ico k-likes" title="Substack likes"></span><span class="n ico k-restacks" title="Substack restacks"></span><span class="n ico k-cmts" title="Substack comments"></span></span>
         </li>${rows}
