@@ -8,6 +8,7 @@ FACES = {  # file prefix -> Google css2 family spec
     'inter': 'Inter:ital,wght@0,300..700;1,300..700',
     'charis-sil': 'Charis+SIL:ital,wght@0,400;0,700;1,400;1,700',
     'fira-mono': 'Fira+Mono:wght@400',
+    'tinos': 'Tinos:wght@400',
 }
 out = pathlib.Path(__file__).resolve().parent.parent / 'fonts' / 'web'
 

@@ -470,7 +470,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="titles.css">
   <link rel="preload" href="fonts/inter-latin-normal-300-700-v1.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
-  <link rel="preload" href="fonts/${currentSlug ? 'charis-sil-latin-normal-400-v1' : 'cormorant-garamond-latin-v1'}.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/${currentSlug ? 'charis-sil-latin-normal-400-v1' : 'tinos-latin-normal-400-v1'}.woff2" as="font" type="font/woff2" crossorigin>
   <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
   <script>try{var d=document.documentElement,t=localStorage.getItem('theme');if(t)d.setAttribute('data-theme',t);if(localStorage.getItem('order')==='book')d.setAttribute('data-order','book')}catch(e){}</script>
@@ -600,9 +600,9 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         spans.forEach(function(s){s.className='mq'});
         var wide=boxes.map(width);
         spans.forEach(function(s){s.className=''});
-        // One mono size for every title (0.68em, the longest title's fit), so
+        // One mono size for every title (0.62em, the tightest title's fit), so
         // all morphs match; a title that needs less still shrinks to fit.
-        a.style.setProperty('--ms',Math.min.apply(null,[0.68].concat(rest.map(function(r,i){return r/wide[i]}))).toFixed(3));
+        a.style.setProperty('--ms',Math.min.apply(null,[0.62].concat(rest.map(function(r,i){return r/wide[i]}))).toFixed(3));
         if(!oneLine){a.style.whiteSpace='';boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')})}
         // A link sized by its text (newer/older links) keeps its box; a
         // grid cell already holds its width.

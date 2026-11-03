@@ -7,13 +7,14 @@
    stack may rely on an installed font. Latin subsets, fetched by
    scripts/fetch-webfonts.py (Cormorant copied from markusstrasser.org).
    Inter stands in for the system UI font (SF/Segoe/Roboto), Charis SIL is
-   the open build of Charter. */
+   the open build of Charter, Tinos has the metrics of Times New Roman. */
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-italic-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-700-v1.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Tinos'; src: url('fonts/tinos-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face {
   font-family: 'Cormorant Garamond';
@@ -56,6 +57,8 @@
      titles), the sans for the lists of titles. */
   --title: var(--sans);
   --heading: var(--display);
+  /* Page titles (site name, story title): Times New Roman, served as Tinos. */
+  --h1: 'Tinos', 'Site Marks', 'Times New Roman', Times, serif;
 
   --col: 44rem;
   --measure: 38rem;
@@ -204,9 +207,9 @@ main {
 [class*=" t-"], [class^="t-"] {
   color: var(--tc, var(--ink));
   font-family: var(--title);
-  font-weight: 400;
+  font-weight: 300;
 }
-.post-header h1[class^="t-"] { font-family: var(--heading); font-weight: 500; }
+.post-header h1[class^="t-"] { font-family: var(--h1); font-weight: 400; }
 
 /* Letter-by-letter hover morph (script in build.js). The script pins the
    title's resting width (or, for a wrapped title, each word's: --w), so
@@ -246,7 +249,7 @@ main {
 .site-h1 {
   margin-bottom: 1.1rem;
   text-box: trim-both cap alphabetic;
-  font-family: var(--display);
+  font-family: var(--h1);
   font-size: 2.3rem;
   font-weight: 400;
   line-height: 1.1;

@@ -79,7 +79,7 @@ actually draws with and exits 1 if any came from the device.
 
 Hovering a title turns it letter by letter into Major Mono Display (a
 build-time subset of just the letters the titles use). The mono letters
-are set at one smaller size (0.68em) so every title fits its resting
+are set at one smaller size (0.62em) so every title fits its resting
 width; glyphs are never stretched and nothing on the page moves. Title colours shade from
 near-black (newest) to dark purple (oldest); `dist/titles.css` holds them.
 
