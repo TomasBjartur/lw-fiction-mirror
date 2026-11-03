@@ -75,8 +75,8 @@
   /* Type scale. */
   --fs-2xs:  0.7rem;    /* reader counts */
   --fs-xs:   0.8rem;    /* footer, captions, the story's meta line, arrows */
-  --fs-s:    0.9rem;    /* nav labels */
-  --fs-nav-text: 1rem;  /* EB Garamond at the cap height of the nav labels */
+  --fs-s:    1rem;      /* nav labels */
+  --fs-nav-text: calc(var(--fs-s) * 1.12);  /* EB Garamond at the nav labels' cap height (0.65 vs Inter's 0.73) */
   --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
   --fs-name: 2.9rem;    /* the name on the contents page */
   --fs-book: clamp(1.2rem, 3vw, 1.65rem);  /* the book under the rule: a title's size */
