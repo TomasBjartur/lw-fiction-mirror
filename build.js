@@ -517,7 +517,7 @@ const TITLE_FONTS = {
   'duane-arnold-1': ['Monoton', 0.95, 400],
   'san-silvestro': ['Ballet', 1.7, 400],
   'the-distaff-texts': ['Astloch:wght@700', 1.35, 700],
-  'customer-satisfaction-opportunities-1': ['Bitcount Ink', 1.0, 400],
+  'customer-satisfaction-opportunities-1': ['Bitcount Prop Double Ink', 1.0, 400],
   'the-elect-2': ['Jacques Francois Shadow', 1.1, 400],
   'goldfish': ['Kalnia Glaze:wght@500', 1.1, 500],
   'lobsang-s-children-1': ['Shizuru', 1.15, 400],
