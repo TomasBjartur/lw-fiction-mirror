@@ -84,8 +84,8 @@ a:hover { color: var(--link-hover); }
   justify-content: center;
   padding-top: 0.3rem;
   background: color-mix(in oklch, var(--paper) 94%, transparent);
-  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
+  view-transition-name: nav;
 }
 
 .navbar {
@@ -176,6 +176,13 @@ main {
 
 /* --- Titles: per-story face (titles.css) and recency colour ---------- */
 
+/* Page-to-page morph: titles carry view-transition-name t-<slug> in
+   titles.css, so a contents row or next link grows into the story's h1. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+::view-transition-group(*) { animation-duration: 260ms; }
+
 [class*=" t-"], [class^="t-"] {
   color: var(--tc, var(--ink));
   font-size-adjust: 0.5;
@@ -190,7 +197,8 @@ main {
 /* --- Contents -------------------------------------------------------- */
 
 .site-h1 {
-  margin-bottom: 0.9rem;
+  margin-bottom: 1.1rem;
+  text-box: trim-both cap alphabetic;
   font-family: var(--display);
   font-size: 2.1rem;
   font-weight: 400;
@@ -259,6 +267,7 @@ main {
 .post-header { margin-bottom: 1.4rem; }
 
 .post-header h1 {
+  text-box: trim-both cap alphabetic;
   font-size: 2.3rem;
   font-weight: inherit;
   line-height: 1.1;
@@ -270,7 +279,7 @@ main {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
-  margin-top: 0.4rem;
+  margin-top: 0.7rem;
   font-size: 0.75rem;
   color: var(--muted);
 }

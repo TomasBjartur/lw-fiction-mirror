@@ -375,7 +375,7 @@ function buildTitlesCss(posts, fonts) {
     const f = fonts.get(p.slug);
     const face = f ? `@font-face{font-family:'T ${p.slug}';src:url('${f.file}') format('woff2');font-weight:${f.weight};font-display:swap}\n` : '';
     const family = f ? `'T ${p.slug}', ${TITLE_FONT_FALLBACK}` : TITLE_FONT_FALLBACK;
-    return `${face}.t-${p.slug}{font-family:${family};font-weight:${f ? f.weight : 400};--tc:${titleColor(rank, byDate.length)}}`;
+    return `${face}.t-${p.slug}{font-family:${family};font-weight:${f ? f.weight : 400};--tc:${titleColor(rank, byDate.length)};view-transition-name:t-${p.slug}}`;
   }).join('\n') + '\n';
 }
 
@@ -472,7 +472,9 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="titles.css">
+  <link rel="stylesheet" href="titles.css">${currentSlug ? `
+  <link rel="preload" href="fonts/t-${currentSlug}.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">` : ''}
+  <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
   <script>try{var d=document.documentElement,t=localStorage.getItem('theme');if(t)d.setAttribute('data-theme',t);if(localStorage.getItem('order')==='book')d.setAttribute('data-order','book')}catch(e){}</script>
 </head>
