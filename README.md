@@ -181,9 +181,13 @@ by letter, into Major Mono Display (a build-time subset of just the
 letters the titles use). The letters change in a loose left-to-right
 sweep: each step turns one of the next three, sometimes two at once,
 after a random 4-40 ms, about 10 ms a letter. The morph only plays
-forwards; leaving resets it. The title keeps its resting box, so nothing on the page
-moves; the mono letters are set at title size, shrunk if needed so they
-are no wider than the resting title, and the meta beside it fades out.
+forwards; leaving resets it. The title keeps its resting box, so nothing
+on the page moves. Major Mono is wider than every title face, so the
+mono text takes the geometric mean of the size that matches the title's
+width and the size that matches its letters' height, set 0.08em tight:
+a hovered title grows a little wider and a little shorter, never much of
+either. It may run past the title (the meta beside it fades out) up to
+the end of the column, where it shrinks to fit.
 Story pages sign the story in the name's face (Send Flowers), as in the
 header. Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.

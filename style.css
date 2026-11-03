@@ -92,6 +92,7 @@
   --w-strong: 600;
   --track-label: 0.08em;  /* letter-spaced sans labels: nav, EPUB */
   --track-caps:  0.16em;  /* the story title's spaced capitals */
+  --track-mono: -0.08em;  /* the hover face, into its 0.09em sidebearings */
 
   /* Space. */
   --s-1: 0.25rem;
@@ -305,7 +306,7 @@ main {
    base size) and --mfit (the most that fits the room to the end of the
    column). line-height: 0 keeps the mono glyphs from growing the line. */
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
-.morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; }
+.morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); }
 .morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }

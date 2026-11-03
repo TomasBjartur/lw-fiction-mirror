@@ -878,18 +878,20 @@ ${currentSlug ? `  <header class="nav">
     // letters keep the title's size, never distorted (see .morph in style.css).
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
     var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
-    // The mono letters keep the title's size: never below its base size
-    // (before the face's own size factor, --ts), and as tall as the title's
-    // letters on average (the mean of its x-height and its capitals), so a
-    // title never shrinks on hover; Major Mono is unicase, so one height.
+    // The mono text keeps the title's width and height about equally: its
+    // size is the geometric mean of the size that makes it as wide as the
+    // title and the size that makes its letters as tall as the title's (the
+    // mean of x-height and capitals; Major Mono is unicase, so one height).
+    // Major Mono is wider than every title face, so a hovered title grows a
+    // little wider and a little shorter, never much of either.
     var cx=document.createElement('canvas').getContext('2d');
     function up(font,t){cx.font=font;return cx.measureText(t).actualBoundingBoxAscent}
-    function monoSize(a,t,fontPx){
-      var cs=getComputedStyle(a),ts=parseFloat(cs.getPropertyValue('--ts'))||1;
+    function heightSize(a,t,fontPx){
+      var cs=getComputedStyle(a);
       var xs=(t.match(/[acemnorsuvwxz]/g)||[]).join('')||t;
       var f=cs.fontStyle+' '+cs.fontWeight+' '+fontPx+'px '+cs.fontFamily,mf='400 100px "Major Mono Display"';
       var h=(up(f,xs)+up(f,t))/2,m=(up(mf,xs)+up(mf,t))/200;
-      return Math.max(fontPx/ts,m>0?h/m:0);
+      return m>0?h/m:fontPx;
     }
     document.querySelectorAll('.morph').forEach(function(a){
       var spans=null,text=null,timer=null,left=null,dir=0;
@@ -910,7 +912,6 @@ ${currentSlug ? `  <header class="nav">
         });
         a.appendChild(mi);
         var fontPx=parseFloat(getComputedStyle(a).fontSize);
-        a.style.setProperty('--mono-size',monoSize(a,text,fontPx).toFixed(1)+'px');
         // Measure the text, not the box.
         var width=function(e){var r=document.createRange();r.selectNodeContents(e);return r.getBoundingClientRect().width};
         var boxes=oneLine?[mi]:Array.from(a.querySelectorAll('.w'));
@@ -919,12 +920,14 @@ ${currentSlug ? `  <header class="nav">
         spans.forEach(function(s){s.className='mq'});
         var wide=boxes.map(width);
         spans.forEach(function(s){s.className=''});
+        var widthSize=fontPx*Math.min.apply(null,rest.map(function(r,i){return r/wide[i]}));
+        a.style.setProperty('--mono-size',Math.sqrt(heightSize(a,text,fontPx)*widthSize).toFixed(1)+'px');
         if(oneLine){
           // The link keeps its resting box, so nothing moves.
           var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
-          // The mono text keeps the title's size and may run on to the end
-          // of the title column (the meta beside it fades meanwhile) or half
-          // the newer/older row; only there does it shrink to fit.
+          // The mono text may run past the title, up to the end of the title
+          // column (the meta beside it fades meanwhile) or half the
+          // newer/older row; only there does it shrink further to fit.
           var room=a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4;
           a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
           // An inline title (the contents list) pins to its line height, so
