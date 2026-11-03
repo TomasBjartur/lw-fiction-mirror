@@ -4,22 +4,23 @@ never depend on Google Fonts.
 Usage: uv run --with fonttools --with brotli python3 scripts/fetch-webfonts.py
 
 Google's css2 files strip OpenType features (old-style figures, small caps),
-so EB Garamond, whose old-style figures the meta line uses, is built from
-the full TTF in the google/fonts repo (pinned at weight 400), subset to the
-same latin range with the layout features the site can use kept. Charis SIL has no
-old-style figures even upstream, so its css2 files lose nothing."""
+so EB Garamond (story text and the meta line: old-style figures, small
+caps) is built from the full TTFs in the google/fonts repo, pinned at
+weights 400 and 700, subset to the same latin range with the layout
+features the site can use kept."""
 import pathlib, re, tempfile, urllib.parse, urllib.request
 
 UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
 FACES = {  # file prefix -> Google css2 family spec
     'inter': 'Inter:ital,wght@0,300..700;1,300..700',
-    'charis-sil': 'Charis+SIL:ital,wght@0,400;0,700;1,400;1,700',
     'fira-mono': 'Fira+Mono:wght@400',
     'tinos': 'Tinos:wght@400',
 }
 RAW = 'https://raw.githubusercontent.com/google/fonts/main/ofl/'
 FULL = [  # output file, repo path, weight to pin a variable font at (or None)
     ('eb-garamond-latin-normal-400-v1.woff2', 'ebgaramond/EBGaramond[wght].ttf', 400),
+    ('eb-garamond-latin-italic-400-v1.woff2', 'ebgaramond/EBGaramond-Italic[wght].ttf', 400),
+    ('eb-garamond-latin-normal-700-v1.woff2', 'ebgaramond/EBGaramond[wght].ttf', 700),
 ]
 # Google Fonts' "latin" subset; build.js LATIN_RANGES must match it.
 LATIN = ('U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,'

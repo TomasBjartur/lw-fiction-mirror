@@ -5,17 +5,14 @@
 /* Every face is served from fonts/ so all devices render the same; no
    stack may rely on an installed font. Latin subsets, fetched by
    scripts/fetch-webfonts.py (Cormorant copied from markusstrasser.org).
-   Inter stands in for the system UI font (SF/Segoe/Roboto), Charis SIL is
-   the open build of Charter, Tinos has the metrics of Times New Roman,
-   EB Garamond sets the quiet meta line. */
+   Inter stands in for the system UI font (SF/Segoe/Roboto), Tinos has the
+   metrics of Times New Roman, EB Garamond sets stories and the meta line. */
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-italic-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: italic; font-display: swap; }
-@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
-@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
-@font-face { font-family: 'Charis SIL'; src: url('fonts/charis-sil-latin-italic-700-v1.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Tinos'; src: url('fonts/tinos-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-700-v1.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Fira Mono'; src: url('fonts/fira-mono-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face {
   font-family: 'Cormorant Garamond';
@@ -61,7 +58,8 @@
      so dark drops it by ~0.9x (below). */
   --ui-w: 400;
 
-  --serif: 'Charis SIL', 'Site Marks', Charter, Georgia, serif;
+  /* Story text: EB Garamond, the book page Markus picked in the lab. */
+  --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --display: 'Cormorant Garamond', 'Site Marks', Garamond, Georgia, serif;
   --sans: 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
   --mono: 'Fira Mono', ui-monospace, monospace;
@@ -231,7 +229,7 @@ main {
   font-family: var(--tf, var(--title)), var(--title);
   font-weight: var(--tw, 300);
 }
-.post-header h1[class^="t-"] { font-family: var(--h1); font-weight: 400; }
+.post-header h1[class^="t-"] { font-family: var(--serif); font-weight: 400; color: var(--ink); }
 
 /* Letter-by-letter hover morph (script in build.js). The script pins the
    title's resting box (.pinned; or, for a wrapped title, each word's: --w),
@@ -418,40 +416,68 @@ main {
   .story .meta { font-size: clamp(0.7rem, var(--row) * 0.27, 0.95rem); margin-left: 0.6em; }
 }
 
-/* --- Story ----------------------------------------------------------- */
+/* --- Story: a printed book page ------------------------------------- */
+/* Treatment A from the reading lab (scripts/reading-lab.js): EB Garamond
+   at ~21px on a justified, hyphenated ~62-character line (ragged on
+   phones), 1em indents, a centred spaced-capitals title, a three-line drop
+   cap and a small-caps lead-in. Bringhurst's 66-character ideal and
+   Standard Ebooks' indents; the size follows Rello et al. 2016. */
 
-.post-header { margin-bottom: 1.4rem; }
-
-.post-header h1 {
-  text-box: trim-both cap alphabetic;
-  font-size: 2.7rem;
-  font-weight: inherit;
-  line-height: 1.1;
-  text-wrap: balance;
+.is-post article {
+  --story-size: clamp(19px, 14.4px + 0.45vw, 21.5px);
+  max-width: calc(29 * var(--story-size));
+  margin: 0 auto;
 }
 
-.post-meta { margin-top: 0.7rem; font-size: 0.8rem; }
+.post-header { margin: 0.6rem 0 2.2rem; text-align: center; font-size: var(--story-size); }
+.post-header h1 {
+  font-size: 1.55em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  margin-right: -0.16em;
+  text-wrap: balance;
+}
+.byline { margin-top: 0.7em; font: italic 400 0.95em/1.3 var(--serif); }
+.post-meta { justify-content: center; margin-top: 0.7em; font-size: 0.62em; }
 .post-meta .m:first-of-type { margin-left: 0.7rem; }
+.orn { display: block; width: 2.4em; margin: 1.3em auto 0; border-top: 1px solid currentColor; opacity: 0.55; }
 
 .post-body {
-  max-width: var(--measure);
   font-family: var(--serif);
-  font-size: 1.06rem;
-  line-height: 1.58;
+  font-size: var(--story-size);
+  line-height: 1.5;
+  text-align: justify;
   hyphens: auto;
   -webkit-hyphens: auto;
-  hyphenate-limit-chars: 7 3 3;
-  font-variant-numeric: oldstyle-nums;
+  hyphenate-limit-chars: 6 3 2;
+  text-wrap: pretty;
+  font-kerning: normal;
+  font-variant-numeric: oldstyle-nums proportional-nums;
   font-variant-ligatures: common-ligatures;
   overflow-wrap: break-word;
 }
 
-/* Book paragraphs: indented, no gap; flush after any break. */
-.post-body p { text-indent: 1.3em; text-wrap: pretty; hanging-punctuation: first; }
+/* Book paragraphs: 1em indent, no gap; flush after any break. */
+.post-body p { text-indent: 1em; hanging-punctuation: first; orphans: 2; widows: 2; }
 .post-body > p:first-child,
 .post-body :is(h1, h2, h3, h4, hr, blockquote, figure, ul, ol, pre, table, div) + p,
 .post-body blockquote p,
 .post-body li p { text-indent: 0; }
+
+.post-body .lead { font-variant-caps: small-caps; letter-spacing: 0.07em; }
+.post-body .caps { font-variant-caps: all-small-caps; letter-spacing: 0.06em; }
+.post-body p.first::first-letter {
+  initial-letter: 3;
+  -webkit-initial-letter: 3;
+  margin-right: 0.1em;
+  font-variant-caps: normal;
+  letter-spacing: 0;
+}
+@supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
+  .post-body p.first::first-letter { float: left; font-size: 3.9em; line-height: 0.8; margin: 0.06em 0.08em 0 0; }
+}
+.end-mark { margin-top: 2em; text-align: center; letter-spacing: 0.5em; color: var(--muted); font-family: var(--serif); }
 
 .post-body h1, .post-body h2, .post-body h3, .post-body h4 {
   margin: 1.6em 0 0.6em;
@@ -483,10 +509,9 @@ main {
   overflow: visible;
 }
 .post-body hr::before {
-  content: '*\2003*\2003*';
-  font-size: 0.95rem;
+  content: '*\2002*\2002*';
+  letter-spacing: 0.1em;
   line-height: 1;
-  color: var(--muted);
 }
 
 .post-body img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
@@ -498,10 +523,11 @@ main {
 .post-body code { padding: 0.1em 0.3em; background: var(--paper-2); border-radius: 3px; }
 .post-body pre code { padding: 0; background: none; }
 
-@media (min-width: 900px) {
-  .post-body { text-align: justify; }
-  .post-body :is(h1, h2, h3, h4, figcaption) { text-align: left; }
-  .post-body hr { text-align: center; }
+.post-body :is(h1, h2, h3, h4, figcaption) { text-align: left; }
+/* Browsers justify greedily, line by line; at ~43 characters that opens
+   visible gaps, so phones go ragged and keep the hyphenation. */
+@media (max-width: 520px) {
+  .post-body { text-align: left; hyphenate-limit-chars: 7 3 3; }
 }
 
 .post-footer {

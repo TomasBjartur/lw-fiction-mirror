@@ -84,10 +84,21 @@ newer and older story.
 
 Every font is served by the site, so every device renders the same:
 nothing relies on fonts the reader has installed. Inter (standing in for
-the system UI font) sets the interface, Charis SIL (the open build of
-Charter) story text, Tinos (Times New Roman's metrics) story titles, EB
-Garamond the meta line, Fira Mono code and Cormorant Garamond headings
-inside stories. Their latin subsets live in `fonts/web/`
+the system UI font) sets the interface, EB Garamond story text, story
+titles and the meta line, Fira Mono code and Cormorant Garamond headings
+inside stories.
+
+Story pages are set as a printed book page (treatment A of the reading
+lab, Markus's pick): EB Garamond at 19-21.5 px on a ~62-character line,
+justified and hyphenated (ragged on phones, where browser justification
+opens gaps), 1em indents, a centred spaced-capitals title over the
+author's name, a three-line drop cap and a small-caps lead-in. The build
+also typesets story text on the page only (`typeset()` in `build.js`;
+the EPUB and feed keep the source): curly quotes, spaced hyphens to em
+dashes, `...` to ellipses, and a lone acronym of 3+ capitals (MIND, AGI)
+in small caps. Runs of capitalised words (a shouted sign, "[RESPONSE
+REDACTED]") keep their full capitals, and a story that opens on anything
+but a word or quote gets no drop cap. Their latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
 subsets (the nav marks, arrows, and any such character in a story, like
 the █ redactions) go into a small Noto Sans JP subset the build fetches.

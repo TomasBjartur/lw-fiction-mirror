@@ -308,6 +308,63 @@ function escapeAttr(str) {
     .replace(/</g, '&lt;');
 }
 
+// Book typesetting for story pages (the reading lab's treatment A, picked
+// by Markus 2026-11-04): typographer's quotes, dashes and ellipses in text
+// nodes only (tags and attributes untouched; the source mixes straight and
+// curly), acronyms of 3+ capitals wrapped for small caps, and the opening
+// words of the first paragraph wrapped for a small-caps lead-in under the
+// drop cap. Feed and EPUB keep the source text.
+function smarten(text) {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/(^|[\s(\[\u2014\u2013])"/g, '$1\u201c')
+    .replace(/"/g, '\u201d')
+    .replace(/(^|[\s(\[\u2014\u2013\u201c])'/g, '$1\u2018')
+    .replace(/'/g, '\u2019')
+    .replace(/ - /g, '\u202f\u2014\u2009') // a dash never starts a line
+    .replace(/\.\.\./g, '\u2026')
+    .replace(/ {2,}/g, ' ');
+}
+
+function typeset(body) {
+  // A quote at the start of a text node that follows an inline tag keeps
+  // the previous character's context; code is left alone.
+  let out = '', prev = ' ', inCode = 0;
+  for (const part of body.split(/(<[^>]+>)/)) {
+    if (part.startsWith('<')) {
+      if (/^<(pre|code)\b/i.test(part)) inCode++;
+      else if (/^<\/(pre|code)>/i.test(part)) inCode = Math.max(0, inCode - 1);
+      if (/^<\/?(p|hr|div|blockquote|li|h\d)\b/i.test(part)) prev = ' ';
+      out += part;
+    } else if (inCode) {
+      out += part;
+    } else {
+      const t = smarten(prev + part).slice(1);
+      // Only a lone acronym (MIND, AGI): a run of capitalised words is
+      // shouting, a sign or a redaction ("GIVE ME MONEY FOR FENT",
+      // "[RESPONSE REDACTED]") and keeps the author's full capitals.
+      out += t.replace(/(^|[^A-Z\s]\s*|[a-z][^A-Za-z]*)\b([A-Z]{3,})\b(?!\W{0,3}[A-Z]{2,}\b)/g, (m, before, word) =>
+        /[A-Z]{2,}\W{0,3}$/.test(before) ? m : `${before}<span class="caps">${word}</span>`);
+      if (part) prev = part.slice(-1);
+    }
+  }
+  out = out.replace(/\s+<\/p>/g, '</p>');
+  // Up to five opening words, stopping at a sentence or clause end or a dash.
+  // Only when the story opens on a word (or a quote): an opening like an
+  // indented "[RESPONSE REDACTED]" gets no drop cap.
+  // LessWrong's HTML often opens with inline tags (<span>, <i><span>);
+  // the lead-in goes inside them.
+  return out.replace(/^<p>((?:<(?:span|i|em|b|strong)\b[^>]*>)*)([^<]*)/, (m, open, text) => {
+    if (!/^[\u201c\u2018]?\p{L}/u.test(text)) return m;
+    const head = text.split(/[\u2009\u202f]?\u2014/)[0];
+    const words = head.split(' ');
+    let n = 0;
+    while (n < Math.min(5, head === text ? words.length - 1 : words.length)) { n++; if (/[.,;:!?\u201d]$/.test(words[n - 1])) break; }
+    const lead = words.slice(0, n).join(' ');
+    return `<p class="first">${open}<span class="lead">${lead}</span>${text.slice(lead.length)}`;
+  });
+}
+
 function cleanHtml(html, { forFeed = false } = {}) {
   if (!html) return '';
   // Remove LW-specific widgets, voting buttons, etc.
@@ -646,7 +703,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <link rel="stylesheet" href="${assetUrl('style.css')}">
   <link rel="stylesheet" href="${assetUrl('titles.css')}">
   <link rel="preload" href="${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
-  <link rel="preload" href="${assetUrl(currentSlug ? 'fonts/charis-sil-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2')}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="${assetUrl(currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2')}" as="font" type="font/woff2" crossorigin>
   <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
   <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
 </head>
@@ -837,11 +894,14 @@ function buildPostPage(post, allPosts) {
     <article>
       <header class="post-header">
         <h1 class="t-${post.slug}">${post.title}</h1>
+        <p class="byline">${AUTHOR}</p>
         <p class="post-meta meta"><span class="when">${meta}</span>${stats(post)}</p>
+        <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">
-        ${cleanHtml(post.htmlBody)}
+        ${typeset(cleanHtml(post.htmlBody).trim())}
       </div>
+      <p class="end-mark" aria-hidden="true">· · ·</p>
       <footer class="post-footer">
         <nav class="post-nav" aria-label="Newer and older stories">
           ${postNavLink(byDate, idx, -1)}

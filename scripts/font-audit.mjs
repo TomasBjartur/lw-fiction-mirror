@@ -8,17 +8,21 @@ import { execSync } from 'node:child_process';
 
 const sh = c => execSync(c, { encoding: 'utf8' }).trim();
 async function audit(url) {
-  sh(`agent-browser open ${JSON.stringify(url)}`);
-  sh('agent-browser wait 1200');
-  // Read the CDP address per page: the agent-browser daemon can relaunch.
-  const browserWs = sh('agent-browser get cdp-url').replace(/^"|"$/g, '');
-  const http = browserWs.replace(/^ws/, 'http').replace(/\/devtools\/.*$/, '');
-  const pages = await (await fetch(http + '/json/list')).json();
   if (!(await (await fetch(url)).ok)) throw new Error(`${url} is not served`);
   // Only the tab showing this URL counts: after a browser relaunch another
   // (blank) tab can be first, and auditing it would pass a page never seen.
-  const page = pages.find(p => p.type === 'page' && p.url.split('#')[0] === url);
-  if (!page) throw new Error(`no browser tab shows ${url} (tabs: ${pages.filter(p => p.type === 'page').map(p => p.url).join(', ')})`);
+  // A relaunch mid-open leaves only blank tabs, so open again, up to 3 times.
+  let page, pages = [];
+  for (let attempt = 1; attempt <= 3 && !page; attempt++) {
+    sh(`agent-browser open ${JSON.stringify(url)}`);
+    sh('agent-browser wait 1200');
+    // Read the CDP address per page: the agent-browser daemon can relaunch.
+    const browserWs = sh('agent-browser get cdp-url').replace(/^"|"$/g, '');
+    const http = browserWs.replace(/^ws/, 'http').replace(/\/devtools\/.*$/, '');
+    pages = await (await fetch(http + '/json/list')).json();
+    page = pages.find(p => p.type === 'page' && p.url.split('#')[0] === url);
+  }
+  if (!page) throw new Error(`no browser tab shows ${url} after 3 opens (tabs: ${pages.filter(p => p.type === 'page').map(p => p.url).join(', ')})`);
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise(r => ws.addEventListener('open', r, { once: true }));
   let id = 0; const waits = new Map();
