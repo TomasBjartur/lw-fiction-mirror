@@ -276,13 +276,28 @@ main {
 .dl-ico { width: 1em; height: 1em; margin-left: 0.25em; vertical-align: -0.12em; }
 
 /* --- Footer ----------------------------------------------------------- */
+/* One centred row, each item centred on the row's middle, so the X icon
+   and the EPUB mark sit level with the text. Where the row does not fit
+   (a story's column, phones) the book takes its own centred line, without
+   a separator left dangling at the end of the first. */
 
 .site-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: 0.5em;
   margin-top: var(--s-3);
   padding-top: var(--s-2);
   border-top: 1px solid var(--rule);
   font: var(--w-ui) var(--fs-xs)/1.4 var(--sans);
   color: var(--muted);
+}
+.foot-book-item { display: contents; }
+.site-foot { container: foot / inline-size; }
+@container foot (width < 44em) {
+  .foot-book-item { display: flex; flex-basis: 100%; justify-content: center; }
+  .foot-book-item > .sep { display: none; }
 }
 .x-link { display: inline-flex; align-items: center; gap: 0.3em; }
 

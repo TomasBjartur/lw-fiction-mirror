@@ -703,7 +703,8 @@ const X_URL = `https://x.com/${X_HANDLE}`;
 function siteFoot() {
   // The book with its separator, so a phone's contents page (where the
   // book sits under the name) can drop it and keep the footer to a line.
-  return `<p class="site-foot">© ${new Date().getFullYear()} ${AUTHOR} · <a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item"> · ${bookLink('foot-book')}</span></p>`;
+  const sep = '<span class="sep" aria-hidden="true">·</span>';
+  return `<p class="site-foot"><span>© ${new Date().getFullYear()} ${AUTHOR}</span>${sep}<a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item">${sep}${bookLink('foot-book')}</span></p>`;
 }
 
 // Site links: in the fixed bar on story pages, beside the title on the
