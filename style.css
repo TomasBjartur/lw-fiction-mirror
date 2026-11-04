@@ -11,6 +11,7 @@
      max-width 32.5em  520px, story text goes ragged (justified lines gap there)
      min-width 65em    1040px, the book joins the name's row on the contents page
      max-width 19.5em  312px, zoomed phones: the marks go under the name
+     max-width 13.75em 220px, more zoom: Subscribe takes its own row in the story bar
      pointer: coarse   larger hit areas and form controls
    Colours are OKLCH, each written once for light and dark with
    light-dark(); browsers older than that (Safari 17.5, May 2024) are not
@@ -905,6 +906,24 @@ main {
   .site-head { grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "nav" "rule" "book"; }
   .site-head .navbar { justify-self: end; }
   .nav .nav-epub { display: none; }
+}
+
+/* Narrower than the story bar's own contents, 13.6em at any text size, which on
+   a phone means more page zoom (Safari at 200% lays a 393px phone out at 196px):
+   the bar's items wrap, so Subscribe takes a second row, and everything else
+   that had a fixed line gives way. The name's width is 5.5 times its size. */
+@media (max-width: 13.75em) {
+  :root {
+    --nav-h: 5.25rem;
+    --fs-name: min(1.5rem, (100vw - 2 * var(--gutter)) / 5.6);
+  }
+  .navbar { flex-wrap: wrap; }
+  .site-head .navbar { justify-self: stretch; justify-content: flex-end; }
+  .post-meta .m { white-space: normal; }
+  .post-meta .n { white-space: nowrap; }
+  .site-signup .subscribe { flex-wrap: wrap; }
+  .subscribe-field { flex-basis: 100%; }
+  .site-signup button { flex: 1; }
 }
 
 /* --- Fingers ---------------------------------------------------------- */
