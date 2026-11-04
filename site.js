@@ -211,20 +211,27 @@
     }
     // The whole title changes left to right, one letter at a time; each
     // waits a random time before the next, mostly short with rare pauses
-    // (cubed random; browsers clamp chained timers to 4 ms). A layout
-    // change under the pointer can fire mouseenter again; 'running' keeps
-    // a second chain from starting on the same letter queue.
+    // (cubed random). A layout change under the pointer can fire mouseenter
+    // again; 'running' keeps a second chain from starting on the same queue.
     function stop(){timers.forEach(clearTimeout);timers=[];running=false}
     function run(){
       if(running)return;
       running=true;
       // A title longer than 20 letters speeds up letter by letter, so the
-      // sweep finishes in about the time a 20-letter title would.
-      var pace=Math.min(1,20/spans.length);
+      // sweep finishes in about the time a 20-letter title would. Letters
+      // follow the clock, not the timer: where a step is slow to draw (Safari
+      // takes about 90 ms a step on Customer Satisfaction Opportunities, whose
+      // glyphs are OpenType SVG), several turn together and the sweep still
+      // takes the same time.
+      var pace=Math.min(1,20/spans.length),next=performance.now();
       (function step(){
+        var now=performance.now();
+        while(left.length&&next<=now){
+          spans[left.shift()].className='mm';
+          var r=Math.random();next+=pace*(2.7+51.4*r*r*r);
+        }
         if(!left.length){running=false;return}
-        spans[left.shift()].className='mm';
-        var r=Math.random();timers.push(setTimeout(step,pace*(2.7+51.4*r*r*r)));
+        timers.push(setTimeout(step,next-now));
       })();
     }
     a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});

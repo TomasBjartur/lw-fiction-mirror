@@ -235,9 +235,13 @@ its faces are one more `text=` subset per family, kept in the same
 Hovering a title turns it, letter by letter, red (the accent of every
 hover) and into Major Mono Display (a build-time subset of just the
 letters the titles use). The whole title changes strictly left to right,
-one letter at a time, each after a random wait (4-55 ms, mostly short).
+one letter at a time, each after a random wait (3-54 ms, mostly short).
 A title longer than 20 letters speeds up letter by letter, so the sweep
-finishes in about the time a 20-letter title would. Each
+finishes in about the time a 20-letter title would. The waits follow the
+clock rather than the timer: where a step is slow to draw (Safari takes
+about 90 ms a step on Customer Satisfaction Opportunities, whose glyphs
+are OpenType SVG) several letters turn together and the sweep still takes
+the same time. Each
 letter turns red as it changes; the rest keep the title's colour. The morph only plays
 forwards; leaving resets it. The title keeps its resting box, so nothing
 on the page moves. Major Mono is wider than every title face, so the
