@@ -1,7 +1,7 @@
 /* The Origami Men and Other Stories — site stylesheet.
    Copied to dist/style.css by build.js (font URLs get a content hash); the
-   per-story title faces, sizes and colours are generated into
-   dist/titles.css as --tf, --tw, --ts and --tc on each .t-<slug>.
+   per-story title faces, sizes, strokes and colours are generated into
+   dist/titles.css as --tf, --tw, --ts, --tk and --tc on each .t-<slug>.
 
    How it is organised: every colour, size, space and duration is a token
    in :root, and components only use tokens. Breakpoints change tokens, or
@@ -332,7 +332,7 @@ main {
 
 /* --- Story titles ----------------------------------------------------- */
 /* In the contents list and the newer/older links: each story's own face,
-   weight, size factor and recency colour from titles.css; --fit shrinks
+   weight, size factor, stroke and recency colour from titles.css; --fit shrinks
    a title too wide for its row (script in build.js). */
 
 .story-title, .post-nav-link {
@@ -341,6 +341,7 @@ main {
   font-size: calc(var(--title-size) * var(--ts, 1) * var(--fit, 1));
   line-height: var(--title-line);
   color: var(--tc, var(--ink));
+  -webkit-text-stroke: var(--tk, 0) currentColor;
 }
 
 /* Hover morph (script in build.js): the title turns, letter by letter,
@@ -350,7 +351,7 @@ main {
    match the title's width and its letter height) and --mfit (the most
    that fits its room). line-height: 0 keeps the mono glyphs from growing the line. */
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
-.morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); }
+.morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); -webkit-text-stroke: 0; }
 .morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }

@@ -519,7 +519,8 @@ async function fetchSubsetFonts(posts) {
 
 // Each story's title has its own display face, picked by Markus from his
 // "reviewed and cool experimental fonts" (2026-11-03). [Google css2 spec,
-// size factor against the list's base size, weight]. The build fetches a
+// size factor against the list's base size, weight, and optionally a stroke
+// in em that thickens a face whose outlines are hairlines]. The build fetches a
 // subset of just that title's letters per story; a story missing here falls
 // back to the list's sans, and a failed fetch stops the build.
 const TITLE_FONTS = {
@@ -529,9 +530,9 @@ const TITLE_FONTS = {
   'customer-satisfaction-opportunities-1': ['Bitcount Prop Double Ink', 1.0, 400],
   'the-elect-2': ['Jacques Francois Shadow', 1.1, 400],
   'goldfish': ['Kalnia Glaze:wght@500', 1.1, 500],
-  'lobsang-s-children-1': ['Shizuru', 1.15, 400],
-  'remembering-aubrey-chang': ['Send Flowers', 1.4, 400],
-  'penny-s-hands': ['Neonderthaw', 1.6, 400],
+  'lobsang-s-children-1': ['Tilt Prism', 1.0, 400],
+  'remembering-aubrey-chang': ['Moirai One', 1.1, 400, 0.01],
+  'penny-s-hands': ['League Script', 1.4, 400],
   'that-mad-olympiad-1': ['Faster One', 1.0, 400],
   'the-origami-men': ['Foldit:wght@500', 1.15, 500],
   'our-beloved-monsters': ['Bungee Spice', 1.0, 400],
@@ -550,21 +551,20 @@ const EDITOR_PICKS = new Set(['that-mad-olympiad-1', 'the-origami-men', 'the-dis
 // its face as more arrive; when the backlog runs out the faces are reused
 // from the top. To pin a face (or change one), add the story to
 // TITLE_FONTS. Left out: Coral Pixels, Wallpoet and Delius Swash Caps
-// (tried on titles, didn't land) and Zen Tokyo Zoo (the book title).
+// (tried on titles, didn't land), Shizuru and Neonderthaw ("too
+// familiar" on titles), Send Flowers (the author's name) and Zen Tokyo
+// Zoo (the book title).
 const TITLE_FONT_BACKLOG = [
   ['Jersey 10', 1.15, 400],
-  ['League Script', 1.4, 400],
   ['Climate Crisis', 0.85, 400],
   ['Josefin Sans:wght@300', 1.05, 300],
   ['Bungee Shade', 0.9, 400],
   ['Twinkle Star', 1.2, 400],
-  ['Moirai One', 1.0, 400],
   ['Urbanist:wght@300', 1.05, 300],
-  ['Tilt Prism', 1.0, 400],
   ['Tourney', 1.0, 400],
 ];
 
-// Slug -> [spec, size, weight] for every story: its pick, or a backlog face.
+// Slug -> [spec, size, weight, stroke?] for every story: its pick, or a backlog face.
 function titleFontFor(posts) {
   const map = new Map();
   let next = 0;
@@ -577,19 +577,19 @@ function titleFontFor(posts) {
   return map;
 }
 
-// Returns Map slug -> { file, size, weight } for the faces that were written.
+// Returns Map slug -> { file, size, weight, stroke } for the faces that were written.
 async function fetchTitleFonts(posts) {
   const out = new Map();
   const faces = titleFontFor(posts);
   await Promise.all(posts.map(async p => {
-    const [spec, size, weight] = faces.get(p.slug);
+    const [spec, size, weight, stroke = 0] = faces.get(p.slug);
     const file = `fonts/title-${p.slug}.woff2`;
     try {
       fs.writeFileSync(path.join(OUTPUT_DIR, file), await fetchGoogleSubset(spec, p.title));
     } catch (err) {
       throw new Error(`title font for ${p.slug} (${spec}): ${err.message}`);
     }
-    out.set(p.slug, { file, size, weight });
+    out.set(p.slug, { file, size, weight, stroke });
   }));
   console.log(`Title fonts: ${out.size}/${posts.length} stories`);
   return out;
@@ -612,7 +612,7 @@ function buildTitlesCss(posts, subsetFonts, titleFonts) {
     `@font-face{font-family:'tf-${slug}';src:url('${assetUrl(f.file)}') format('woff2');font-weight:${f.weight};font-display:block}\n`).join('');
   return face + titleFaces + byDate.map((p, rank) => {
     const f = titleFonts.get(p.slug);
-    const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}` : '';
+    const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}${f.stroke ? `;--tk:${f.stroke}em` : ''}` : '';
     return `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}${font}}`;
   }).join('\n') + '\n';
 }

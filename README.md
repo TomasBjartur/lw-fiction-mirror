@@ -172,7 +172,8 @@ current page. A design tool, not part of the site.
 
 Each story's title in the contents list (and in the newer/older links)
 has its own display face, from Markus's picks: `TITLE_FONTS` in
-`build.js` maps slug to [Google css2 spec, size factor, weight]. The
+`build.js` maps slug to [Google css2 spec, size factor, weight, and an
+optional stroke in em for faces drawn in hairlines]. The
 build fetches a subset of just that title's letters per story; a story
 without an entry uses the list sans. These subsets, and the name, book
 title, hover and marks subsets, are kept in `fonts/subsets/`, which is
