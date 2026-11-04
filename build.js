@@ -904,7 +904,7 @@ ${currentSlug ? `  <header class="nav">
       return m>0?h/m:fontPx;
     }
     document.querySelectorAll('.morph').forEach(function(a){
-      var spans=null,text=null,timer=null,left=null,dir=0;
+      var spans=null,words=null,text=null,timers=[],left=null,dir=0;
       function split(){
         var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
         var inline=getComputedStyle(a).display==='inline';
@@ -914,13 +914,14 @@ ${currentSlug ? `  <header class="nav">
         // the letter spans add fragments.
         var lr=document.createRange();lr.selectNodeContents(a);
         var oneLine=lr.getClientRects().length===1,textW=lr.getBoundingClientRect().width;
-        text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];
+        text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];words=[];
         var mi=document.createElement('span');mi.className='mi';
         text.split(/(\\s+)/).forEach(function(part){
           if(!part)return;
           if(/^\\s+$/.test(part)){mi.appendChild(document.createTextNode(part));return}
           var w=document.createElement('span');w.className='w';w.setAttribute('aria-hidden','true');
-          Array.from(part).forEach(function(ch){var s=document.createElement('span');s.textContent=ch;w.appendChild(s);spans.push(s)});
+          var g=[];words.push(g);
+          Array.from(part).forEach(function(ch){var s=document.createElement('span');s.textContent=ch;w.appendChild(s);g.push(spans.length);spans.push(s)});
           mi.appendChild(w);
         });
         a.appendChild(mi);
@@ -966,25 +967,32 @@ ${currentSlug ? `  <header class="nav">
           boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
         }
       }
-      // The change sweeps left to right but not in strict order: each step
-      // turns one of the next three unchanged letters (two at once a quarter
-      // of the time), then waits 4-52 ms, mostly short with rare pauses (cubed
-      // random; browsers clamp chained timers to 4 ms). About 12.5 ms a letter.
+      // Every word changes at once, each on its own clock, sweeping left to
+      // right but not in strict order: each step turns one of the word's
+      // next three unchanged letters (two at once a quarter of the time),
+      // then waits, mostly short with rare pauses (cubed random; browsers
+      // clamp chained timers to 4 ms). The wait is 4-52 ms times the number
+      // of words, so the title as a whole changes at the pace of one sweep,
+      // about 12.5 ms a letter, shared among its words.
+      function stop(){timers.forEach(clearTimeout);timers=[]}
       function run(){
-        clearTimeout(timer);
-        (function step(){
-          if(!left.length)return;
-          for(var k=Math.random()<0.25?2:1;k>0&&left.length;k--)
-            spans[left.splice(Math.floor(Math.random()*Math.min(3,left.length)),1)[0]].className='mm';
-          var r=Math.random();timer=setTimeout(step,2.6+49.4*r*r*r);
-        })();
+        stop();
+        var m=left.length;
+        left.forEach(function(l){
+          (function step(){
+            if(!l.length)return;
+            for(var k=Math.random()<0.25?2:1;k>0&&l.length;k--)
+              spans[l.splice(Math.floor(Math.random()*Math.min(3,l.length)),1)[0]].className='mm';
+            var r=Math.random();timers.push(setTimeout(step,m*(2.6+49.4*r*r*r)));
+          })();
+        });
       }
-      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left)left=spans.map(function(_,i){return i});run()})});
+      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left)left=words.map(function(g){return g.slice()});run()})});
       // A resize rescales the titles, so pins measured at the old size are
       // dropped; the next hover measures afresh.
-      addEventListener('resize',function(){if(!spans)return;clearTimeout(timer);a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null});
+      addEventListener('resize',function(){if(!spans)return;stop();a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null});
       // Leaving resets the title at once; the morph only plays forwards.
-      a.addEventListener('mouseleave',function(){dir=-1;clearTimeout(timer);if(spans){spans.forEach(function(s){s.className=''});left=null}});
+      a.addEventListener('mouseleave',function(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}});
     });
   })();
   </script>

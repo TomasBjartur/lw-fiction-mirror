@@ -182,9 +182,10 @@ files are pruned). CSS and font URLs carry a hash of the file's bytes
 
 Hovering a title turns it red (the accent of every hover) and, letter
 by letter, into Major Mono Display (a build-time subset of just the
-letters the titles use). The letters change in a loose left-to-right
-sweep: each step turns one of the next three, sometimes two at once,
-after a random 4-52 ms, about 12.5 ms a letter. The morph only plays
+letters the titles use). Every word changes at once, each in its own
+loose left-to-right sweep: each step turns one of the word's next three
+letters, sometimes two at once, after a random 4-52 ms times the number
+of words, so the whole title changes at about 12.5 ms a letter. The morph only plays
 forwards; leaving resets it. The title keeps its resting box, so nothing
 on the page moves. Major Mono is wider than every title face, so the
 mono text takes the geometric mean of the size that matches the title's
