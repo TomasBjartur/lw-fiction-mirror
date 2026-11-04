@@ -199,7 +199,7 @@ const canon = `
     <p class="note">The most admired typefaces, each served by the site so every device shows the same thing. Where the classic itself cannot be served (Helvetica, Futura, Gill Sans, Optima, Didot), the row shows its best open revival and names the original. Three titles per face; codes like <b>K12</b>.</p>
     ${CANON.map(([group, faces]) => `<h3>${group}</h3><table>${faces.map(([name, what, spec]) => {
       const st = canonStyle(spec);
-      return `<tr><td class="code">K${++k}</td><td class="face"><b>${name}</b><br><span>${what}</span></td><td class="ttl" style="${st.css}">${samples.map(s => `<a href="${s.slug}.html">${s.title}</a>`).join('<i>·</i>')}</td></tr>`;
+      return `<tr><td class="code">K${++k}</td><td class="face"><b>${name}</b><br><span>${what}</span></td><td class="ttl" style="${st.css}">${samples.map(s => `<a href="${s.slug}/">${s.title}</a>`).join('<i>·</i>')}</td></tr>`;
     }).join('')}</table>`).join('')}
   </section>`;
 
@@ -210,7 +210,7 @@ const sections = DIRECTIONS.map(d => `
     <ol>${stories.map((s, i) => {
       const st = d.styles[i % d.styles.length];
       const label = (st.css.match(/font-family:'([^']+)'/) || [])[1];
-      return `<li><a href="${s.slug}.html" style="${st.css};color:${titleColor(i, stories.length)}">${s.title}</a><span class="f">${d.id}${i + 1} · ${label}</span></li>`;
+      return `<li><a href="${s.slug}/" style="${st.css};color:${titleColor(i, stories.length)}">${s.title}</a><span class="f">${d.id}${i + 1} · ${label}</span></li>`;
     }).join('')}</ol>
   </section>`).join('');
 

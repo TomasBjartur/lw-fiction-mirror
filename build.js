@@ -909,9 +909,17 @@ function navItems(currentSlug, base = '') {
 function pageShell(content, title, posts, currentSlug, opts = {}) {
   const pageTitle = title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`;
   const description = opts.description || SITE_DESCRIPTION;
-  const canonicalUrl = currentSlug ? `${SITE_URL}/${currentSlug}.html` : `${SITE_URL}/`;
+  const canonicalUrl = opts.canonicalUrl || (currentSlug ? `${SITE_URL}/${currentSlug}/` : `${SITE_URL}/`);
   const ogType = currentSlug ? 'article' : 'website';
   const ogTitle = title || `${SITE_TITLE} · ${SITE_SUBTITLE}`;
+  // Pages in a subdirectory (the title-fonts specimen) pass '../' so every
+  // root-relative asset and link resolves from the site root.
+  const base = opts.base || '';
+  const styles = opts.styles || [];
+  const preloads = opts.preload || [
+    currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2',
+    'fonts/urbanist-meta.woff2',
+  ];
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -920,6 +928,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${pageTitle}</title>
   <meta name="description" content="${escapeAttr(description)}">
+  ${opts.robots ? `<meta name="robots" content="${opts.robots}">` : ''}
   <link rel="canonical" href="${canonicalUrl}">
   <link rel="icon" href="${FAVICON_SVG}">
   <meta property="og:type" content="${ogType}">
@@ -934,24 +943,27 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <meta name="color-scheme" content="light dark">
   <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
-  <link rel="stylesheet" href="${assetUrl('style.css')}">
-  <link rel="stylesheet" href="${assetUrl('titles.css')}">
-  <link rel="preload" href="${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
-  <link rel="preload" href="${assetUrl(currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2')}" as="font" type="font/woff2" crossorigin>
-  <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*.html"},"eagerness":"moderate"}]}</script>
-  <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
+  <link rel="stylesheet" href="${base}${assetUrl('style.css')}">
+  <link rel="stylesheet" href="${base}${assetUrl('titles.css')}">
+  ${styles.map(s => `<link rel="stylesheet" href="${base}${assetUrl(s)}">`).join('\n  ')}
+  <link rel="preload" href="${base}${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
+  ${preloads.map(f => `<link rel="preload" href="${base}${assetUrl(f)}" as="font" type="font/woff2" crossorigin>`).join('\n  ')}
+  <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*/"},"eagerness":"moderate"}]}</script>
+  <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="${base}feed.xml">
 </head>
-<body class="${currentSlug ? 'is-post' : 'is-index'}">
-  <a class="skip-link" href="#content">Skip to ${currentSlug ? 'story' : 'contents'}</a>
+<body class="${opts.bodyClass || (currentSlug ? 'is-post' : 'is-index')}">
+  <a class="skip-link" href="#content">Skip to ${opts.skipLabel || (currentSlug ? 'story' : 'contents')}</a>
 
-${currentSlug ? `  <header class="nav">
-    <nav class="navbar" aria-label="Site">${navItems(currentSlug)}</nav>
+${(currentSlug || opts.nav) ? `  <header class="nav">
+    <nav class="navbar" aria-label="Site">${navItems(currentSlug || (opts.nav ? 'page' : null), base)}</nav>
   </header>
-  <div class="reading-progress" aria-hidden="true"><div class="progress-bar"></div></div>
-
-` : ''}  <main id="content" tabindex="-1">
+` : ''}${currentSlug ? `  <div class="reading-progress" aria-hidden="true"><div class="progress-bar"></div></div>
+` : ''}
+  <main id="content" tabindex="-1">
     ${content}
   </main>
+
+  ${siteFoot(base)}
 
   <script>
   (function(){
@@ -960,7 +972,7 @@ ${currentSlug ? `  <header class="nav">
     // VPN and the RSS feed all bypass it. Fails open by design — if the
     // lookup errors, times out or is blocked, nothing is hidden.
     var RULES=${JSON.stringify(GEO_HIDDEN)},CUR=${JSON.stringify(currentSlug)};
-    var ALT_EPUB=${JSON.stringify(EPUB_FILENAME_ALT)};
+    var ALT_EPUB=${JSON.stringify(base + EPUB_FILENAME_ALT)};
     if(!RULES.length)return;
     var KEY='geo',TTL=864e5;
     function eq(a,b){return !b||String(a||'').toLowerCase()===String(b).toLowerCase()}
@@ -976,7 +988,7 @@ ${currentSlug ? `  <header class="nav">
           else{a.removeAttribute('href');a.textContent=''}}
         var eps=document.querySelectorAll('.epub-link');
         for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
-        if(CUR===r.slug)location.replace('index.html');
+        if(CUR===r.slug)location.replace(${JSON.stringify(base || 'index.html')});
       });
     }
     var cached=null;
@@ -1267,22 +1279,43 @@ function buildPostPage(post, allPosts) {
       <p class="end-mark" aria-hidden="true">· · ·</p>
       <footer class="post-footer">
         <nav class="post-nav" aria-label="Newer and older stories">
-          ${postNavLink(byDate, idx, -1)}
-          ${postNavLink(byDate, idx, 1)}
+          ${postNavLink(byDate, idx, -1, '../')}
+          ${postNavLink(byDate, idx, 1, '../')}
         </nav>
-        ${siteFoot()}
       </footer>
     </article>`;
 
   return pageShell(content, post.title, allPosts, post.slug, {
     description: extractExcerpt(post.htmlBody),
+    base: '../',
   });
+}
+
+// Old /slug.html links keep working: a tiny page that sends the reader to
+// the story's clean /slug/ URL. Static GitHub Pages cannot return a 301,
+// so this is the HTML equivalent (meta refresh plus script), with a
+// canonical so search engines see only the clean page.
+function buildPostRedirect(post) {
+  const href = `${post.slug}/`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(post.title)} — ${escapeHtml(SITE_TITLE)}</title>
+<link rel="canonical" href="${SITE_URL}/${post.slug}/">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=${href}">
+<script>location.replace(${JSON.stringify(href)})</script>
+</head>
+<body><p><a href="${href}">${escapeHtml(post.title)}</a></p></body>
+</html>`;
 }
 
 function buildIndexPage(posts) {
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story${EDITOR_PICKS.has(p.slug) ? ' pick' : ''}" data-slug="${p.slug}"${EDITOR_PICKS.has(p.slug) ? ' title="Editor\'s pick"' : ''}>
-          <span class="title-cell"><a class="story-title morph t-${p.slug}" href="${p.slug}.html">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
+          <span class="title-cell"><a class="story-title morph t-${p.slug}" href="${p.slug}/">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
         </li>`).join('');
 
   const content = `
@@ -1293,8 +1326,7 @@ function buildIndexPage(posts) {
       <hr class="head-rule">
     </header>
     <ol class="stories" style="--n:${posts.length}">${rows}
-    </ol>
-    ${siteFoot()}`;
+    </ol>`;
 
   return pageShell(content, null, posts, null);
 }
@@ -1334,11 +1366,14 @@ function buildRssFeed(posts) {
   const buildDate = new Date().toUTCString();
   const items = byDate.map(p => {
     const pubDate = new Date(p.postedAt).toUTCString();
-    const link = `${SITE_URL}/${p.slug}.html`;
+    const link = `${SITE_URL}/${p.slug}/`;
+    // Keep the old .html URL as the GUID: it is the item's stable identity,
+    // and changing it would make every story reappear as new in readers.
+    const guid = `${SITE_URL}/${p.slug}.html`;
     return `    <item>
       <title>${escapeXml(p.title)}</title>
       <link>${link}</link>
-      <guid isPermaLink="true">${link}</guid>
+      <guid isPermaLink="true">${guid}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(p.title)} — ${estimateReadingTime(p.wordCount)}</description>
       <content:encoded><![CDATA[${cleanHtml(p.htmlBody, { forFeed: true }).replace(/src="images\//g, `src="${SITE_URL}/images/`)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
@@ -2489,20 +2524,43 @@ async function main() {
 
   // Reader metrics and per-title fonts
   attachMetrics(fiction, await fetchSubstackMetrics());
-  const [subsetFonts, titleFonts] = await Promise.all([fetchSubsetFonts(fiction), fetchTitleFonts(fiction)]);
+  const assignedFaces = titleFontFor(fiction);
+  const titleFaceList = titleFaceCatalog(fiction, assignedFaces);
+  const [subsetFonts, titleFonts, specimenFiles] = await Promise.all([
+    fetchSubsetFonts(fiction),
+    fetchTitleFonts(fiction, assignedFaces),
+    fetchTitleFontSpecimens(titleFaceList),
+  ]);
   pruneSubsets();
   fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, subsetFonts, titleFonts));
   console.log('Wrote titles.css');
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'title-fonts.css'), buildTitleFontsCss(titleFaceList, specimenFiles));
+  console.log('Wrote title-fonts.css');
 
   // Write index page
   fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), buildIndexPage(fiction));
   console.log('Wrote index.html');
 
-  // Write individual post pages
+  // Write the title-fonts specimen page
+  const titleFontsDir = path.join(OUTPUT_DIR, 'title-fonts');
+  fs.mkdirSync(titleFontsDir, { recursive: true });
+  fs.writeFileSync(path.join(titleFontsDir, 'index.html'), buildTitleFontsPage(fiction, titleFaceList, specimenFiles));
+  console.log('Wrote title-fonts/index.html');
+
+  // Success page for the footer email signup
+  const subscribedDir = path.join(OUTPUT_DIR, 'subscribed');
+  fs.mkdirSync(subscribedDir, { recursive: true });
+  fs.writeFileSync(path.join(subscribedDir, 'index.html'), buildSuccessPage(fiction));
+  console.log('Wrote subscribed/index.html');
+
+  // Write individual post pages as clean directory URLs (/slug/) and keep
+  // the old /slug.html paths as redirects, so existing links still resolve.
   for (const post of fiction) {
-    const filename = `${post.slug}.html`;
-    fs.writeFileSync(path.join(OUTPUT_DIR, filename), buildPostPage(post, fiction));
-    console.log(`Wrote ${filename}`);
+    const dir = path.join(OUTPUT_DIR, post.slug);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction));
+    fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(post));
+    console.log(`Wrote ${post.slug}/index.html (+ ${post.slug}.html redirect)`);
   }
 
   // Generate cover (shared by the EPUB and og:image)

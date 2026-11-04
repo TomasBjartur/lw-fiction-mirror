@@ -39,8 +39,11 @@ try { pw = require('playwright'); } catch {
 }
 
 const dist = new URL('../dist/', import.meta.url);
-const stories = fs.readdirSync(dist).filter(f => f.endsWith('.html') &&
-  fs.readFileSync(new URL(f, dist), 'utf8').includes('class="post-body"'));
+const stories = fs.readdirSync(dist, { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => `${d.name}/`)
+  .filter(s => fs.existsSync(new URL(`${s}index.html`, dist)) &&
+    fs.readFileSync(new URL(`${s}index.html`, dist), 'utf8').includes('class="post-body"'));
 if (!stories.length) { console.error('no story pages in dist/: run node build.js'); process.exit(2); }
 const sizes = [[1024, 800], [390, 664]];
 
@@ -98,12 +101,12 @@ for (const [w, h] of sizes) {
   if (clips) {
     fs.mkdirSync(clips, { recursive: true });
     const tag = path.join(clips, `${engine}-${w}`);
-    await load('the-company-man.html');
+    await load('the-company-man/');
     await clip(page, 'p.first', `${tag}-open.png`, 4);
     await clip(page, 'p.sect', `${tag}-sect.png`, 3);
-    await load('goldfish.html');
+    await load('goldfish/');
     await clip(page, 'p.first', `${tag}-short.png`, 5);
-    await load('the-origami-men.html');
+    await load('the-origami-men/');
     await clip(page, 'p.oq', `${tag}-quote.png`, 3);
   }
   await ctx.close();

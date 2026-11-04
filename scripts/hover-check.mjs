@@ -32,8 +32,11 @@ try { pw = require('playwright'); } catch {
 }
 
 const dist = new URL('../dist/', import.meta.url);
-const stories = fs.readdirSync(dist).filter(f => f.endsWith('.html') &&
-  fs.readFileSync(new URL(f, dist), 'utf8').includes('class="post-nav"'));
+const stories = fs.readdirSync(dist, { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => `${d.name}/`)
+  .filter(s => fs.existsSync(new URL(`${s}index.html`, dist)) &&
+    fs.readFileSync(new URL(`${s}index.html`, dist), 'utf8').includes('class="post-nav"'));
 if (!stories.length) { console.error('no story pages in dist/: run node build.js'); process.exit(2); }
 const sizes = [[1440, 900], [1024, 768], [700, 900]];
 const TOL = 0.03, FAR = 0.4;

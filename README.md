@@ -5,6 +5,7 @@ A static site that mirrors fiction posts from [LessWrong](https://www.lesswrong.
 ## How it works
 
 - `build.js` queries the LessWrong GraphQL API for posts tagged "Fiction" (plus a hardcoded list of external stories) and generates static HTML + CSS
+- Story pages are written as `dist/<slug>/index.html`, so their URLs are `/<slug>/`; each old `dist/<slug>.html` path is a redirect stub, so existing links still land on the clean page
 - Story images are downloaded and self-hosted under `dist/images/`
 - An EPUB of the collection, an RSS feed (`feed.xml`), and a shareable cover image (`cover.png`, also used for social previews) are generated in the same pass
 - A GitHub Action rebuilds every 6 hours and deploys `dist/` to GitHub Pages
@@ -14,8 +15,12 @@ A static site that mirrors fiction posts from [LessWrong](https://www.lesswrong.
 ```bash
 npm install
 node build.js
-# Open dist/index.html in a browser
+python3 -m http.server 8787 -d dist
+# Open http://localhost:8787/
 ```
+
+A local server, not `file://`, because story URLs are clean directories
+(`/duane-arnold-1/`). The old `.html` paths still redirect.
 
 Requires Node 18+ and the `canvas` package (used for cover text rendering). The cover typeface, EB Garamond (SIL OFL), is bundled in `fonts/` so local and CI builds render identically.
 
@@ -76,8 +81,8 @@ the layout tokens can't express (its header lists the breakpoints). The
 contents
 page opens with the author's name (Send Flowers), the book and the links
 (RSS, X, and a Substack-orange Subscribe button that goes to Substack)
-above a thin grey rule. The book is its title in the text face,
-italic and plain (no link), followed by "EPUB" and a download mark in the accent red, the one
+above a thin grey rule. The book is its title in Urbanist Light,
+plain (no link), followed by "EPUB" and a download mark in the accent red, the one
 link, underlined, that downloads the EPUB. From 1040 px up it sits in the
 nav, its EPUB link a nav item level with RSS and X; on narrower screens it goes below the
 rule, indented to the list, at story-title size. The footer carries it
@@ -89,7 +94,14 @@ writes it to `favicon.svg` from the name's font subset. On screens at least 520 
 or less where that would not fit, titles scaled to the row, so every
 story shows without scrolling (on phones, with the browser's toolbars
 showing); spare height stays under the list and the footer sits at the
-bottom of the window. On
+bottom of the window. The footer is the last row of a one-column grid
+that fills the window on every page, so a short story's footer still
+sits at the bottom; the author's signature (Homemade Apple, subset) is
+at its right. The footer also carries the email signup, copied from
+markusstrasser.org's form; its Formspree endpoint is
+`NEWSLETTER_FORM_ACTION` in `build.js`, a placeholder until Tomás's form
+ID is supplied (the nav Subscribe button still goes to Substack), and a
+successful signup lands on `/subscribed/`. On
 phones (640 px and under) the meta sits on its own line under each
 title. Rows never go below 1.9rem, so a long list scrolls. A title too
 wide for its space (a long title in a wide face in a list row, or a long
@@ -98,7 +110,7 @@ Each title is followed by its month and reading time in Inter Light,
 upright, the month a weight up (reading time at 260 words a minute, Brysbaert's 2019 mean for
 fiction, rounded to the minute under 10 and to 5 minutes above), then its
 LessWrong karma and comments and Substack likes, restacks and comments,
-small, in EB Garamond with old-style figures (LessWrong from the GraphQL
+small, in Urbanist Light (LessWrong from the GraphQL
 query, Substack from `/api/v1/archive`; a failed fetch logs `[DEGRADED]`
 and the build continues without those numbers). Story pages link to the
 newer and older story; the list wraps, so the newest story's "newer" link
@@ -106,10 +118,10 @@ is the oldest story and the oldest's "older" link is the newest.
 
 Every font is served by the site, so every device renders the same:
 nothing relies on fonts the reader has installed. Inter (standing in for
-the system UI font) sets the interface and, in its Light weight, dates and
-reading times; EB Garamond sets story text, headings inside stories, the
-reader counts and the book; Zallman Caps the initials; Fira Mono any
-code.
+the system UI font) sets the interface; Urbanist, in its Light weight,
+sets dates, reading times and the reader counts; EB Garamond sets story
+text, headings inside stories and the book; Zallman Caps the initials;
+Fira Mono any code; Homemade Apple the footer signature.
 
 Story pages are set as a printed book page (treatment A of the reading
 lab, Markus's pick): EB Garamond at 19-21.5 px on a ~62-character line,
@@ -152,8 +164,8 @@ tool, not part of the site.
 While reading, the nav slides away on scrolling down and returns on any
 scroll up, near the top, or on keyboard focus; a hairline across the top
 fills with progress through the story text, reaching the end at its last
-line rather than the footer (CSS scroll-driven animations; the nav's
-slide is the only script). Both copy markusstrasser.org (`Nav.svelte`,
+line rather than the footer. The nav slide and progress bar are small
+scripts copied from markusstrasser.org (`Nav.svelte`,
 `ReadingProgress.svelte`). Their latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
 subsets (the nav marks, arrows, and any such character in a story, like
@@ -184,12 +196,19 @@ Commit `fonts/subsets/` after a local build that changed it (unused
 files are pruned). CSS and font URLs carry a hash of the file's bytes
 (`?v=`), so no browser or CDN cache serves an old copy after a deploy.
 
+`dist/title-fonts/` (the unlinked `/title-fonts/` page) is a specimen of
+every face the site has picked: each story's title face in contents
+order, then the backlog. Each shows the family name set in the face, the
+title it sets (or the book's title, for a backlog face) and its alphabet;
+its faces are one more `text=` subset per family, kept in the same
+`fonts/subsets/` cache.
+
 Hovering a title turns it, letter by letter, red (the accent of every
 hover) and into Major Mono Display (a build-time subset of just the
-letters the titles use). Every word changes at once, its letters
-strictly left to right, one at a time, each after a random wait (4-55
-ms times the number of words, mostly short), so each word of a longer
-title moves more slowly. Each
+letters the titles use). The whole title changes strictly left to right,
+one letter at a time, each after a random wait (4-55 ms, mostly short).
+A title longer than 20 letters speeds up letter by letter, so the sweep
+finishes in about the time a 20-letter title would. Each
 letter turns red as it changes; the rest keep the title's colour. The morph only plays
 forwards; leaving resets it. The title keeps its resting box, so nothing
 on the page moves. Major Mono is wider than every title face, so the
@@ -198,7 +217,9 @@ width and the size that matches its letters' height, set 0.08em tight:
 a hovered title grows a little wider and a little shorter, never much of
 either. It may run past the title (the meta beside it fades out) up to
 the end of the column, or in the newer/older row up to the other link,
-where it shrinks to fit. `node scripts/hover-check.mjs
+where it shrinks to fit. The mono glyphs overflow that box rather than
+resize it, so they are not hit-testable: the link's resting box is the
+whole hover target, and a hovered title cannot cover its neighbour. `node scripts/hover-check.mjs
 <chrome|firefox|webkit>` hovers every title in a real engine (the list
 and the newer/older links, at three desktop widths) and fails if a
 hovered title breaks that rule (width times height off by more than 3%,

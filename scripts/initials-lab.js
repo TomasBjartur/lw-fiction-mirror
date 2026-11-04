@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Initials lab: decorated initials (drop caps) for the story pages, set on
 // the book page so a face and a frequency can be chosen by eye. Reads built
-// stories out of dist/<slug>.html (run `node build.js` first) and writes
+// stories out of dist/<slug>/index.html (run `node build.js` first) and writes
 // dist/initials-lab/index.html. Fonts come from the manifest that
 // scripts/initials-lab-fonts.py writes into dist/initials-lab/fonts/; the
 // page loads only those files. Research and sources: the lab's notes and
@@ -46,7 +46,7 @@ const fontFaces = m => m.map(f =>
 // --- story text ------------------------------------------------------------
 
 function storyBody(slug) {
-  const html = fs.readFileSync(path.join(DIST, `${slug}.html`), 'utf8');
+  const html = fs.readFileSync(path.join(DIST, slug, 'index.html'), 'utf8');
   const title = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, '').trim();
   const body = html.match(/<div class="post-body">([\s\S]*?)<\/div>\s*<p class="end-mark"/)[1].trim();
   // Sections are runs of paragraphs between <hr>s.

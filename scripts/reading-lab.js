@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Reading lab: sets one story three ways so the reading treatment can be
-// chosen by eye. Reads the built story out of dist/<slug>.html (run
+// chosen by eye. Reads the built story out of dist/<slug>/index.html (run
 // `node build.js` first) and writes dist/reading-lab/: index.html, a.html,
 // b.html, c.html for the first slug, <slug>-a.html etc. for any others.
 // Fonts are fetched once from Google Fonts (latin subset, woff2) into
@@ -37,7 +37,7 @@ function fontFaces() {
 // --- story ----------------------------------------------------------------
 
 function readStory(slug) {
-  const html = fs.readFileSync(path.join(DIST, `${slug}.html`), 'utf8');
+  const html = fs.readFileSync(path.join(DIST, slug, 'index.html'), 'utf8');
   const title = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)[1].trim();
   const when = (html.match(/<span class="when">([\s\S]*?)<\/span>/) || [, ''])[1];
   const body = html.match(/<div class="post-body">([\s\S]*?)<\/div>\s*<footer class="post-footer">/)[1].trim();
@@ -210,7 +210,7 @@ function page(story, key, files, faces) {
   const v = VARIANTS[key];
   const nav = Object.keys(VARIANTS).map(k =>
     `<a href="${files[k]}"${k === key ? ' aria-current="page"' : ''}>${k.toUpperCase()}</a>`).join('') +
-    `<a href="../${story.slug}.html">current</a><a href="index.html">lab</a>`;
+    `<a href="../${story.slug}/">current</a><a href="index.html">lab</a>`;
   const by = story.when ? `Tomás Bjartur · <i>${story.when}</i>` : 'Tomás Bjartur';
   const head = key === 'c'
     ? `<header class="head"><h1>${story.title}</h1><p class="by"><span>Tomás Bjartur</span><span>${story.when}</span></p><div class="rule"></div></header>`
@@ -249,7 +249,7 @@ function indexPage(stories, faces) {
   const rows = Object.entries(VARIANTS).map(([k, v]) =>
     `<li><h2><a href="${k}.html">${k.toUpperCase()} · ${v.name}</a></h2><p class="face">${v.face}</p><p>${v.blurb}</p></li>`).join('\n');
   const others = stories.slice(1).map(s =>
-    `<li>${s.title}: ${Object.keys(VARIANTS).map(k => `<a href="${s.slug}-${k}.html">${k.toUpperCase()}</a>`).join(' · ')} · <a href="../${s.slug}.html">current</a></li>`).join('\n');
+    `<li>${s.title}: ${Object.keys(VARIANTS).map(k => `<a href="${s.slug}-${k}.html">${k.toUpperCase()}</a>`).join(' · ')} · <a href="../${s.slug}/">current</a></li>`).join('\n');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -277,7 +277,7 @@ ul li + li { margin-top: 0.3rem; }
 <body>
 <main>
 <h1>Reading lab</h1>
-<p class="intro"><i>${stories[0].title}</i>, set three ways. Compare against <a href="../${stories[0].slug}.html">the current page</a>. Every face is served from this folder.</p>
+<p class="intro"><i>${stories[0].title}</i>, set three ways. Compare against <a href="../${stories[0].slug}/">the current page</a>. Every face is served from this folder.</p>
 <ol>
 ${rows}
 </ol>
