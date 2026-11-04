@@ -505,7 +505,8 @@ main {
 .post-header .morph .mq, .post-header .morph .mm { text-transform: none; }
 /* Opened by clicking a title, a story's title starts turned (site.js), and until
    then stays hidden rather than flash its resting face: about 80 ms in Firefox
-   and Safari. It shows anyway if the script never gets there. */
+   and Safari. It shows anyway if the script or the fonts are slow, and site.js
+   then leaves it at rest. */
 .carry .post-header h1 { visibility: hidden; animation: carry-show 0s 0.6s forwards; }
 @keyframes carry-show { to { visibility: visible; } }
 .post-nav .morph { transition: opacity var(--dur) ease-out; }

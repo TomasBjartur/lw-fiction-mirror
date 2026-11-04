@@ -264,11 +264,12 @@ where it shrinks to fit. The mono glyphs overflow that box rather than
 resize it, so they are not hit-testable: the link's resting box is the
 whole hover target, and a hovered title cannot cover its neighbour. A
 story's own title, set in EB Garamond capitals, does the same, showing the
-letters as they are in the list. Opened by clicking a title, it starts already
-turned and lets go when the pointer moves off it or on the first scroll; a
-small script in the page's head decides this before first paint and keeps the
-title hidden until it has turned (at most 0.6 s), since Firefox and Safari
-would otherwise flash its resting face. `node scripts/hover-check.mjs
+letters as they are in the list. Opened by clicking a title with a mouse, it
+starts already turned and lets go when the pointer moves off it or on the first
+scroll. The click leaves a note in `sessionStorage`; a small script in the next
+page's head reads it before first paint and keeps the title hidden until it has
+turned, since Firefox and Safari would otherwise flash its resting face. After
+0.6 s it shows at rest and stays at rest. `node scripts/hover-check.mjs
 <chrome|firefox|webkit>` hovers every title in a real engine (the list, and
 each story's title and newer/older links, at three desktop widths) and fails if a
 hovered title breaks that rule (width times height off by more than 3%,

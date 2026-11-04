@@ -278,17 +278,22 @@
     // Leaving resets the title at once; the morph only plays forwards.
     function leave(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}}
     a.addEventListener('mouseleave',leave);
+    // A title clicked while it is hovered leaves a note for the next page's head.
+    if(a.href)a.addEventListener('click',function(e){if(dir>0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey)try{sessionStorage.setItem('carry',a.pathname)}catch(x){}});
     // A title clicked in the list or the newer/older row is still hovered when the
     // page changes, so a story's own title opens already turned, and lets go the
     // way a hover does: when the pointer moves off it, or on the first scroll. The
     // page's head decides this and keeps the title hidden until then (.carry). The
-    // title's own face must be in first, or its resting box is measured wrong.
+    // title's own face must be in first, or its resting box is measured wrong; if
+    // that outlasts the wait in style.css, the title has shown at rest and stays so.
     if(own&&h.classList.contains('carry')){
-      var rest=getComputedStyle(a);
+      var rest=getComputedStyle(a),late=false;
+      named.addEventListener('animationend',function(){late=true},{once:true});
       Promise.all([mono,document.fonts.load(rest.fontStyle+' '+rest.fontWeight+' '+rest.fontSize+' '+rest.fontFamily,a.textContent),document.fonts.ready]).then(function(){
+        h.classList.remove('carry');
+        if(late)return;
         split();dir=1;left=[];
         spans.forEach(function(s){s.className='mm'});
-        h.classList.remove('carry');
         // A browser may send one move with no movement after a page loads.
         var x=null,y=null;
         function end(e){

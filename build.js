@@ -804,10 +804,11 @@ function buildTitleFontsPage(posts, faces, files) {
   });
 }
 
-// A story opened by clicking a title takes over that title's hover (site.js): a
-// fresh navigation from this site, with a mouse, unless a saved reading place will
-// take the reader past the title anyway. Before first paint, so the title can wait.
-const CARRY_SCRIPT = "try{if(matchMedia('(hover:hover) and (prefers-reduced-motion:no-preference)').matches&&performance.getEntriesByType('navigation')[0].type==='navigate'&&document.referrer.indexOf(location.origin+'/')===0&&!location.hash&&!localStorage.getItem('read:'+location.pathname))document.documentElement.classList.add('carry')}catch(e){}";
+// A story opened by clicking a title with a mouse takes over that title's hover
+// (site.js leaves a note for this page), unless a saved reading place will take the
+// reader past the title anyway. A prerendered page runs this before the click, but
+// on a mouse only a hover starts one. Before first paint, so the title can wait.
+const CARRY_SCRIPT = "try{let c=sessionStorage.getItem('carry');sessionStorage.removeItem('carry');if((c===location.pathname||document.prerendering)&&performance.getEntriesByType('navigation')[0].type==='navigate'&&matchMedia('(hover:hover) and (prefers-reduced-motion:no-preference)').matches&&!localStorage.getItem('read:'+location.pathname))document.documentElement.classList.add('carry')}catch(e){}";
 
 // Where the email form lands after a successful signup.
 function buildSuccessPage(posts) {
