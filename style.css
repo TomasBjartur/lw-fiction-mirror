@@ -808,7 +808,7 @@ main {
 
 .end-mark { margin-top: 2em; font-family: var(--serif); text-align: center; letter-spacing: 0.5em; color: var(--muted); }
 
-.post-footer { margin-top: var(--s-6); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
+.post-footer { margin-top: var(--s-6); }
 /* Two titles that don't fit side by side take a line each (the older
    one still on the right) rather than breaking a title over two lines. */
 .post-nav {

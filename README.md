@@ -90,7 +90,9 @@ too (except on a phone's contents page, where it is already under the
 name). Story pages put "TB" (in the name's face) and the EPUB link in
 their nav. The tab icon is "TB" in the name's face, in the accent red on
 the paper colour (dark values in a dark system theme); `scripts/favicon.py`
-writes it to `favicon.svg` from the name's font subset. Every story's row is the
+writes it to `favicon.svg` from the name's font subset, which the build
+copies to `dist/` and also draws as a full-bleed `apple-touch-icon.png`.
+The build writes `404.html`, `robots.txt` and `sitemap.xml` too. Every story's row is the
 same height: a share of the window's height (on phones, with the
 browser's toolbars showing), at most 2.875rem and at most what the
 list's width lets a title be, with titles scaled to the row, so rows
@@ -104,8 +106,9 @@ sits at the bottom; the author's signature (Homemade Apple, subset) is
 at its right. The footer also carries the email signup, copied from
 markusstrasser.org's form; its Formspree endpoint is
 `NEWSLETTER_FORM_ACTION` in `build.js`, a placeholder until Tomás's form
-ID is supplied (the nav Subscribe button still goes to Substack), and a
-successful signup lands on `/subscribed/`. On
+ID is supplied. Until then a deploy (CI set) leaves the form out and logs
+`[DEGRADED]`; a local build keeps it for review. The nav Subscribe button
+still goes to Substack, and a successful signup lands on `/subscribed/`. On
 phones (640 px and under) the meta sits on its own line under each
 title and the largest faces come partway back to the others
 (`--ts-spread`), so San Silvestro's swash clears the date above it. Rows

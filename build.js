@@ -24,6 +24,9 @@ const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
 // Tomás's own Formspree form URL (or another provider's POST endpoint)
 // before the signup can work.
 const NEWSLETTER_FORM_ACTION = 'https://formspree.io/f/REPLACE_WITH_YOUR_FORM_ID';
+// A deploy leaves the form out until then, since every signup would fail; a
+// local build keeps it, so the footer can still be reviewed.
+const SHOW_SIGNUP = !NEWSLETTER_FORM_ACTION.includes('REPLACE_WITH') || !process.env.CI;
 const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
 const EPUB_FILENAME = 'The_Origami_Men_and_Other_Stories.epub';
 // Variant EPUB served to readers matched by GEO_HIDDEN: same cover and title,
@@ -795,6 +798,7 @@ function buildTitleFontsPage(posts, faces, files) {
     bodyClass: 'is-fonts',
     base: '../',
     skipLabel: 'title fonts',
+    robots: 'noindex',
     styles: ['title-fonts.css'],
     preload: ['fonts/eb-garamond-latin-normal-400-v1.woff2'],
   });
@@ -822,6 +826,33 @@ function buildSuccessPage(posts) {
   });
 }
 
+
+// GitHub Pages serves this for any missing path at any depth, so its links are
+// root-absolute.
+function buildNotFoundPage(posts) {
+  const content = `
+    <section class="success-page">
+      <h1>This page isn’t here</h1>
+      <p class="success-back"><a href="/">Back to the stories</a></p>
+    </section>`;
+
+  return pageShell(content, 'Not found', posts, null, {
+    description: 'This page isn’t here.',
+    canonicalUrl: `${SITE_URL}/`,
+    bodyClass: 'is-success',
+    base: '/',
+    nav: true,
+    skipLabel: 'message',
+    robots: 'noindex',
+    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
+  });
+}
+
+function buildSitemap(posts) {
+  const urls = [`  <url><loc>${SITE_URL}/</loc></url>`].concat(sortByDate(posts).map(p =>
+    `  <url><loc>${SITE_URL}/${p.slug}/</loc><lastmod>${new Date(p.postedAt).toISOString().slice(0, 10)}</lastmod></url>`));
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+}
 
 function sortByDate(posts) {
   return [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
@@ -884,12 +915,12 @@ function whenText(p) {
 // Reader counts from LessWrong and Substack, each group led by its source
 // icon (a link to the story there); a number's kind is the small icon after it.
 function stats(p) {
-  const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}</span>`;
+  const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}<span class="sr-only"> ${label}</span></span>`;
   const lw = p.lw
-    ? `<span class="m"><a class="src src-lw" href="${p.lw.url}" title="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}</span>`
+    ? `<span class="m"><a class="src src-lw" href="${p.lw.url}" title="On LessWrong" aria-label="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}</span>`
     : '';
   const ss = p.ss
-    ? `<span class="m"><a class="src src-ss" href="${p.ss.url}" title="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}</span>`
+    ? `<span class="m"><a class="src src-ss" href="${p.ss.url}" title="On Substack" aria-label="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}</span>`
     : '';
   return lw + ss;
 }
@@ -900,8 +931,23 @@ function stats(p) {
 // and for the phone toolbar tint.
 const PAPER = { light: '#fefcf7', dark: '#13110f' };
 
-// "TB" in the name's face, accent red on paper (scripts/favicon.py writes it).
-const FAVICON_SVG = 'data:image/svg+xml,' + encodeURIComponent(fs.readFileSync(path.join(__dirname, 'favicon.svg'), 'utf8').trim());
+// Set in main() once they exist: the cover's size for share cards, and whether
+// the touch icon could be drawn.
+let coverSize = null;
+let hasTouchIcon = false;
+
+// The home-screen icon: "TB" from favicon.svg (scripts/favicon.py writes it),
+// 180px. iOS ignores SVG icons and rounds the corners itself, so it fills the
+// square, in the light colours only.
+async function buildTouchIcon() {
+  const svg = fs.readFileSync(path.join(__dirname, 'favicon.svg'), 'utf8');
+  const [, accent] = svg.match(/path\{fill:(#[0-9a-f]+)/);
+  const [, transform, d] = svg.match(/<path transform='([^']+)' d='([^']+)'/);
+  const flat = `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 100 100'><rect width='100' height='100' fill='${PAPER.light}'/><path transform='${transform}' d='${d}' fill='${accent}' stroke='${accent}' stroke-width='45' stroke-linejoin='round'/></svg>`;
+  const canvas = createCanvas(180, 180);
+  canvas.getContext('2d').drawImage(await loadImage(Buffer.from(flat)), 0, 0, 180, 180);
+  return canvas.toBuffer('image/png');
+}
 
 // The bird from markusstrasser.org's Icon.svelte.
 const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
@@ -933,7 +979,7 @@ function siteFoot(base = '') {
   const sep = '<span class="sep" aria-hidden="true">·</span>';
   return `<div class="site-foot-wrap">
     <div class="site-foot-main">
-      <div class="site-signup" id="subscribe">
+      ${SHOW_SIGNUP ? `<div class="site-signup" id="subscribe">
         <form class="subscribe" action="${NEWSLETTER_FORM_ACTION}" method="POST" data-success="${base}subscribed/">
           <input type="hidden" name="_source" value="footer">
           <input type="hidden" name="_page" value="">
@@ -945,7 +991,7 @@ function siteFoot(base = '') {
           <button type="submit">Subscribe</button>
         </form>
         <p class="subscribe-message" role="status" aria-live="polite"></p>
-      </div>
+      </div>` : ''}
       <p class="site-foot"><span class="foot-copy">© ${new Date().getFullYear()} ${AUTHOR}</span>${sep}<a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item">${sep}${bookLink('foot-book', base)}</span></p>
     </div>${SIGNATURE_SVG}
   </div>`;
@@ -960,7 +1006,7 @@ function navItems(currentSlug, base = '') {
 }
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
-  const pageTitle = title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`;
+  const pageTitle = escapeHtml(title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`);
   const description = opts.description || SITE_DESCRIPTION;
   const canonicalUrl = opts.canonicalUrl || (currentSlug ? `${SITE_URL}/${currentSlug}/` : `${SITE_URL}/`);
   const ogType = currentSlug ? 'article' : 'website';
@@ -983,17 +1029,23 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="description" content="${escapeAttr(description)}">
   ${opts.robots ? `<meta name="robots" content="${opts.robots}">` : ''}
   <link rel="canonical" href="${canonicalUrl}">
-  <link rel="icon" href="${FAVICON_SVG}">
+  <link rel="icon" href="${base}${assetUrl('favicon.svg')}" type="image/svg+xml">
+  ${hasTouchIcon ? `<link rel="apple-touch-icon" href="${base}apple-touch-icon.png">` : ''}
   <meta property="og:type" content="${ogType}">
   <meta property="og:site_name" content="${escapeAttr(SITE_TITLE)}">
   <meta property="og:title" content="${escapeAttr(ogTitle)}">
   <meta property="og:description" content="${escapeAttr(description)}">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:image" content="${SITE_URL}/cover.png">
+  ${coverSize ? `<meta property="og:image:width" content="${coverSize.width}">
+  <meta property="og:image:height" content="${coverSize.height}">` : ''}
+  <meta property="og:image:alt" content="${escapeAttr(`Cover of ${SITE_TITLE}`)}">
+  ${opts.published ? `<meta property="article:published_time" content="${new Date(opts.published).toISOString()}">` : ''}
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
+  <meta name="twitter:image:alt" content="${escapeAttr(`Cover of ${SITE_TITLE}`)}">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="${PAPER.light}">
   <script>try{if(localStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name=color-scheme]').content='dark';document.querySelector('meta[name=theme-color]').content='${PAPER.dark}'}}catch(e){}</script>
@@ -1324,7 +1376,7 @@ function postNavLink(list, idx, step, base = '') {
     const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${base}${alt.slug}/` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${base}${target.slug}/" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
+  return `<a href="${base}${target.slug}/" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${escapeHtml(target.title)}</a>`;
 }
 
 // A story's images, as they appear on its page: post bodies hold site-relative
@@ -1351,7 +1403,7 @@ function buildPostPage(post, allPosts) {
   const content = `
     <article>
       <header class="post-header">
-        <h1>${post.title}</h1>
+        <h1>${escapeHtml(post.title)}</h1>
         <p class="post-byline"><span class="byline">${AUTHOR}</span><span class="when">${date}</span></p>
         ${metaLine ? `<p class="post-meta meta">${metaLine}</p>` : ''}
         <span class="orn" aria-hidden="true"></span>
@@ -1371,6 +1423,7 @@ function buildPostPage(post, allPosts) {
   return pageShell(content, post.title, allPosts, post.slug, {
     description: extractExcerpt(post.htmlBody),
     base: '../',
+    published: post.postedAt,
   });
 }
 
@@ -1398,7 +1451,7 @@ function buildPostRedirect(post) {
 function buildIndexPage(posts) {
   const rows = sortByDate(posts).map((p, i) => `
         <li class="story${EDITOR_PICKS.has(p.slug) ? ' pick' : ''}" data-slug="${p.slug}"${EDITOR_PICKS.has(p.slug) ? ' title="Editor\'s pick"' : ''}>
-          <span class="title-cell"><a class="story-title morph t-${p.slug}" href="${p.slug}/">${p.title}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
+          <span class="title-cell"><a class="story-title morph t-${p.slug}" href="${p.slug}/">${escapeHtml(p.title)}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
         </li>`).join('');
 
   const content = `
@@ -2616,6 +2669,21 @@ async function main() {
   }
   fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
   console.log('Wrote style.css');
+  fs.copyFileSync(path.join(__dirname, 'favicon.svg'), path.join(OUTPUT_DIR, 'favicon.svg'));
+  try {
+    fs.writeFileSync(path.join(OUTPUT_DIR, 'apple-touch-icon.png'), await buildTouchIcon());
+    hasTouchIcon = true;
+  } catch (err) {
+    console.warn(`[DEGRADED] no apple-touch-icon.png: ${err.message}`);
+  }
+  if (!SHOW_SIGNUP) console.warn('[DEGRADED] no Formspree form ID, so the footer signup is left out of this build');
+
+  // The cover (shared by the EPUB and og:image), before the pages that state its size
+  const collection = orderForCollection(fiction);
+  const coverPng = buildCoverPng(collection, BOOK_TITLE);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
+  coverSize = { width: coverPng.readUInt32BE(16), height: coverPng.readUInt32BE(20) };
+  console.log('Wrote cover.png');
 
   // Reader metrics and per-title fonts
   attachMetrics(fiction, await fetchSubstackMetrics());
@@ -2648,6 +2716,11 @@ async function main() {
   fs.writeFileSync(path.join(subscribedDir, 'index.html'), buildSuccessPage(fiction));
   console.log('Wrote subscribed/index.html');
 
+  fs.writeFileSync(path.join(OUTPUT_DIR, '404.html'), buildNotFoundPage(fiction));
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'sitemap.xml'), buildSitemap(fiction));
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'robots.txt'), `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+  console.log('Wrote 404.html, sitemap.xml, robots.txt');
+
   // Write individual post pages as clean directory URLs (/slug/) and keep
   // the old /slug.html paths as redirects, so existing links still resolve.
   for (const post of fiction) {
@@ -2657,12 +2730,6 @@ async function main() {
     fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(post));
     console.log(`Wrote ${post.slug}/index.html (+ ${post.slug}.html redirect)`);
   }
-
-  // Generate cover (shared by the EPUB and og:image)
-  const collection = orderForCollection(fiction);
-  const coverPng = buildCoverPng(collection, BOOK_TITLE);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
-  console.log('Wrote cover.png');
 
   // Generate EPUB
   const epub = await buildEpub(collection, 'collection', BOOK_TITLE, coverPng);
