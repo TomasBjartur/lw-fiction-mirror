@@ -122,8 +122,8 @@
      still too wide for its row with its meta shrinks alone, --fit); its
      line is --title-lh of the row; the meta scales with the row, clamped. */
   --row-min:   1.9rem;
-  --row-max:   3.6rem;
-  --title-k:   0.68;
+  --row-max:   3.2rem;
+  --title-k:   0.64;
   --title-cqw: 4.2cqw;
   --title-lh:  1;
   --meta-k:    0.27;
@@ -417,7 +417,7 @@ main {
 @media (min-width: 1040px) {
   .head-book { display: none; }
   .nav-bk-title, .site-head .nav-epub { display: inline-flex; }
-  .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); margin-right: var(--s-2); }
+  .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); }
 }
 
 .stories { list-style: none; padding-left: var(--indent); }
