@@ -289,6 +289,10 @@ main {
    rather than a story. The mark is the nav labels' size, or its line's
    if smaller (the footer). */
 .book { color: var(--ink-soft); }
+/* The book's title in EB Garamond italic, as a book title is set; in the
+   footer's sans line too, a step up to match Inter's height. */
+.bk-title { font-style: italic; }
+.foot-book .bk-title { font: italic 400 1.12em/1 var(--serif); }
 .bk-dl {
   font: var(--w-ui) min(var(--fs-s), 1em)/1 var(--sans);
   letter-spacing: var(--track-label);
@@ -412,7 +416,7 @@ main {
 .head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: 400 var(--fs-book)/1.2 var(--serif); }
 /* From 1040px the book joins the nav: its title just left of an EPUB nav
    item, centred on the row like RSS and X. */
-.nav-bk-title { display: none; font: 400 var(--fs-nav-text)/1 var(--serif); color: var(--ink-soft); white-space: nowrap; }
+.nav-bk-title { display: none; font: italic 400 var(--fs-nav-text)/1 var(--serif); color: var(--ink-soft); white-space: nowrap; }
 .site-head .nav-epub { display: none; text-underline-offset: 0.25em; }
 @media (min-width: 1040px) {
   .head-book { display: none; }

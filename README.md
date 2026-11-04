@@ -77,7 +77,7 @@ contents
 page opens with the author's name (Send Flowers), the book and the links
 (RSS, X, and a Substack-orange Subscribe button that goes to Substack)
 above a thin grey rule. The book is its title in the text face,
-plain, followed by "EPUB" and a download mark in the accent red, the one
+italic and plain (no link), followed by "EPUB" and a download mark in the accent red, the one
 link, underlined, that downloads the EPUB. From 1040 px up it sits in the
 nav, its EPUB link a nav item level with RSS and X; on narrower screens it goes below the
 rule, indented to the list, at story-title size. The footer carries it
