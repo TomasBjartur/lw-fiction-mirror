@@ -813,7 +813,7 @@ const CARRY_SCRIPT = "try{if(matchMedia('(hover:hover) and (prefers-reduced-moti
 function buildSuccessPage(posts) {
   const content = `
     <section class="success-page">
-      <h1>Thank you.<br>The next story will come by email.</h1>
+      <h1><span>Thank you.</span> <span>The next story will come by email.</span></h1>
       <p class="success-back"><a href="../">Back to the stories</a></p>
     </section>`;
 

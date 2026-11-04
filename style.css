@@ -680,6 +680,8 @@ main {
   letter-spacing: 0;
   text-wrap: balance;
 }
+/* Two blocks, since a forced line break stops Chrome balancing the lines. */
+.success-page h1 span { display: block; }
 .success-back {
   margin-top: var(--s-6);
   font: var(--w-light) var(--fs-xs)/1.4 var(--meta-sans);
