@@ -201,7 +201,10 @@ main {
 /* The site links: beside the name on the contents page, in a bar across
    the top of story pages. */
 
-.navbar { display: flex; align-items: center; gap: var(--s-1); }
+/* Every label stands on one baseline, whatever its face and size; the icons,
+   which have no text to stand on, centre on the row. */
+.navbar { display: flex; align-items: baseline; gap: var(--s-1); }
+.nav-x, .theme-toggle { align-self: center; }
 
 .nav-item {
   display: inline-flex;
@@ -225,12 +228,15 @@ main {
 .theme-toggle .ti-dark, :root[data-theme="dark"] .theme-toggle .ti-light { display: none; }
 :root[data-theme="dark"] .theme-toggle .ti-dark { display: block; }
 
-/* Substack's own button: 40px tall, 8px corners, semibold, its orange. */
+/* Substack's own button: 40px tall, 8px corners, semibold, its orange. Its
+   label's line fills the button, which centres the label and gives the button
+   the label's baseline for the row to align on. */
 .nav-sub {
+  --sub-h: 2.35rem;
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0.45em;
-  height: 2.35rem;
+  height: var(--sub-h);
   margin-left: auto;
   padding: 0 var(--s-4);
   font: var(--w-strong) var(--fs-s)/1 var(--sans);
@@ -239,7 +245,8 @@ main {
   border-radius: 8px;
 }
 @media (hover: hover) { .nav-sub:hover { color: var(--on-substack); background: var(--substack-hover); } }
-.nav-sub svg { width: auto; height: 0.85em; fill: currentColor; }
+.nav-sub span { line-height: var(--sub-h); }
+.nav-sub svg { align-self: center; width: auto; height: 0.85em; fill: currentColor; }
 
 /* Story pages: the bar slides up out of the way while reading down and
    returns on scroll up (script in build.js); a hairline across the top
@@ -256,7 +263,8 @@ main {
   transition: transform var(--dur-slide) var(--ease-out);
 }
 .nav.hidden { transform: translateY(-100%); }
-.nav .navbar { width: var(--page-w); min-height: var(--nav-h); border-bottom: 1px solid var(--rule-strong); }
+/* The Subscribe button is the row's tallest item, so this padding centres it. */
+.nav .navbar { width: var(--page-w); min-height: var(--nav-h); padding-block: 0.125rem; border-bottom: 1px solid var(--rule-strong); }
 
 /* Reading progress: a 4px bar across the top in the EPUB accent at 70%
    alpha, faded in over the first 100-140px of scroll, filling from the
@@ -476,8 +484,10 @@ main {
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
 .morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); -webkit-text-stroke: 0; }
 .morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
-.morph.pinned { display: inline-flex; white-space: nowrap; }
-.story .morph.pinned { align-items: baseline; }  /* on the strut, so the baseline stays put */
+/* Pinned, a title's parts become flex items: the strut in the list, the arrow
+   in the newer/older row. Baseline alignment keeps them on the line they were
+   on, so nothing beside or below the title moves. */
+.morph.pinned { display: inline-flex; align-items: baseline; white-space: nowrap; }
 /* The mono glyphs are free to run past the pinned box; they must not take
    the pointer with them, or a hovered row covers its neighbour's title
    (moving up from a script face made the title above slow to react). */
@@ -805,9 +815,9 @@ main {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  /* Centre, not baseline: the two links are in different faces, and a
-     hovered (pinned) link's baseline must not nudge the other one. */
-  align-items: center;
+  /* One baseline, though the links are in different faces; a hovered link
+     keeps its baseline, so the other one doesn't move. */
+  align-items: baseline;
   gap: var(--s-4);
 }
 .post-nav-next { margin-left: auto; text-align: right; }
@@ -847,7 +857,8 @@ main {
   .nav-rss { display: none; }
   .foot-copy, .foot-copy + .sep { display: none; }
   .nav-item { padding-inline: var(--s-1); }
-  .nav-sub { height: 2rem; padding-inline: var(--s-3); font-size: var(--fs-xs); }
+  .nav-sub { --sub-h: 2rem; padding-inline: var(--s-3); font-size: var(--fs-xs); }
+  .nav .navbar { padding-block: 0.3rem; }
   .site-head { column-gap: var(--s-2); margin-bottom: 0.625rem; }
   .head-book { margin: 0.875rem 0 0 var(--indent); }
   .is-index .foot-book-item { display: none; }
