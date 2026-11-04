@@ -102,30 +102,40 @@
   // offset means nothing once the width or text size changes. Back, forward and
   // reload stay the browser's own, and a link to a place in the story wins. The
   // first screen of text doesn't count, and reaching the last line clears it, so
-  // a finished story opens at its title again.
+  // a finished story opens at its title again. Only the reader moving counts: a
+  // page the browser or this code put somewhere, or one left idle in another tab,
+  // says nothing about where they stopped.
   if(storyBody){
-    var readKey='read:'+location.pathname,blocks=storyBody.children,readTimer=0,place=null,placeW=innerWidth;
+    var readKey='read:'+location.pathname,blocks=storyBody.children,readTimer=0,place=null,placeW=innerWidth,finished=false;
     var goTo=function(p){var b=blocks[p.i].getBoundingClientRect();scrollTo(0,scrollY+b.top+b.height*p.f)};
     var saveRead=function(){
       readTimer=0;
       var r=storyBody.getBoundingClientRect(),lo=0,hi=blocks.length-1;
       while(lo<hi){var mid=(lo+hi)>>1;if(blocks[mid].getBoundingClientRect().bottom>0)hi=mid;else lo=mid+1}
       var b=blocks[lo].getBoundingClientRect();
-      place=r.top>-innerHeight||r.bottom<innerHeight?null:{i:lo,f:+(-b.top/b.height).toFixed(3),n:blocks.length};
-      try{if(place)localStorage.setItem(readKey,JSON.stringify(place));else localStorage.removeItem(readKey)}catch(e){}
+      // Above the text there is no paragraph to hold on to.
+      place=!lo&&b.top>0?null:{i:lo,f:+(-b.top/b.height).toFixed(3),n:blocks.length};
+      if(!moved)return;
+      // A nudge back up after the last line, to reach the nav, doesn't undo finishing.
+      if(r.bottom<innerHeight)finished=true;else if(r.bottom>2*innerHeight)finished=false;
+      try{if(finished||r.top>-innerHeight)localStorage.removeItem(readKey);else localStorage.setItem(readKey,JSON.stringify(place))}catch(e){}
     };
     var kept=null;try{kept=JSON.parse(localStorage.getItem(readKey))}catch(e){}
+    // A fresh visit starts at the top, where any scroll is the reader's. The entry's
+    // name is the whole link: a text fragment (#:~:text=) is hidden from location.
     var entry=performance.getEntriesByType('navigation')[0];
-    if(kept&&kept.n===blocks.length&&entry&&entry.type==='navigate'&&!location.hash){
-      place=kept;goTo(place);
+    var moved=entry&&entry.type==='navigate'&&entry.name.indexOf('#')<0;
+    if(moved&&kept&&kept.n===blocks.length){
+      moved=false;place=kept;goTo(kept);
       // The text face can arrive after this and move the text.
-      var touched=false,touch=function(){touched=true};
-      ['wheel','touchstart','keydown'].forEach(function(t){addEventListener(t,touch,{passive:true,once:true})});
-      document.fonts.ready.then(function(){if(!touched)goTo(place)});
+      document.fonts.ready.then(function(){if(!moved)goTo(kept)});
     }
+    if(!moved)['wheel','touchstart','keydown','pointerdown'].forEach(function(t){addEventListener(t,function(){moved=true},{passive:true,once:true})});
     addEventListener('scroll',function(){if(!readTimer)readTimer=setTimeout(saveRead,300)},{passive:true});
-    addEventListener('pagehide',saveRead);
-    document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')saveRead()});
+    // Leaving saves only a scroll still waiting: another tab may have read further.
+    var flush=function(){if(readTimer){clearTimeout(readTimer);saveRead()}};
+    addEventListener('pagehide',flush);
+    document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flush()});
     // A rotated phone or a resized window reflows the text under the same scroll
     // offset. A phone's toolbars change only the height, and move no text.
     addEventListener('resize',function(){if(innerWidth===placeW)return;placeW=innerWidth;if(place)goTo(place)});

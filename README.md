@@ -186,7 +186,9 @@ nothing once the width or text size changes. A later visit opens there, and
 rotating a phone or resizing the window keeps the place. Back, forward and
 reload stay the browser's own, and a link to a place in the story wins. The
 first screen of text doesn't count, and reaching the last line clears it, so
-a finished story opens at its title again.
+a finished story opens at its title again. Only the reader moving saves
+anything, so a page left idle in another tab, or an old history entry, can't
+erase a later place.
 
 The story fonts' latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
