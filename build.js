@@ -896,6 +896,10 @@ function stats(p) {
 
 // --- Pages -------------------------------------------------------------------
 
+// style.css's --paper as hex, for the browser's own chrome before CSS loads
+// and for the phone toolbar tint.
+const PAPER = { light: '#fefcf7', dark: '#13110f' };
+
 // "TB" in the name's face, accent red on paper (scripts/favicon.py writes it).
 const FAVICON_SVG = 'data:image/svg+xml,' + encodeURIComponent(fs.readFileSync(path.join(__dirname, 'favicon.svg'), 'utf8').trim());
 
@@ -936,7 +940,7 @@ function siteFoot(base = '') {
           <input type="hidden" name="_next" value="${SITE_URL}/subscribed/">
           <div class="subscribe-field">
             <span class="subscribe-mark" aria-hidden="true">${ICON_SS_OFF}</span>
-            <input type="email" name="email" aria-label="Email address" placeholder="Direct Email" required>
+            <input type="email" name="email" aria-label="Email address" placeholder="Direct Email" required autocomplete="email" autocapitalize="off" spellcheck="false">
           </div>
           <button type="submit">Subscribe</button>
         </form>
@@ -990,8 +994,9 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
-  <meta name="color-scheme" content="light dark">
-  <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="${PAPER.light}">
+  <script>try{if(localStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name=color-scheme]').content='dark';document.querySelector('meta[name=theme-color]').content='${PAPER.dark}'}}catch(e){}</script>
   <link rel="stylesheet" href="${base}${assetUrl('style.css')}">
   <link rel="stylesheet" href="${base}${assetUrl('titles.css')}">
   ${styles.map(s => `<link rel="stylesheet" href="${base}${assetUrl(s)}">`).join('\n  ')}
@@ -1068,7 +1073,11 @@ ${(currentSlug || opts.nav) ? `  <header class="nav">
     if(tb){
       var NAME={light:'Light theme',dark:'Dark theme'};
       var cur=function(){return h.getAttribute('data-theme')==='dark'?'dark':'light'};
-      var show=function(){var c=cur();tb.title=NAME[c]+' (click to change)';tb.setAttribute('aria-label',NAME[c]+'. Change theme')};
+      var show=function(){
+        var c=cur();tb.title=NAME[c]+' (click to change)';tb.setAttribute('aria-label',NAME[c]+'. Change theme');
+        document.querySelector('meta[name=color-scheme]').content=c;
+        document.querySelector('meta[name=theme-color]').content=c==='dark'?${JSON.stringify(PAPER.dark)}:${JSON.stringify(PAPER.light)};
+      };
       tb.addEventListener('click',function(){
         var n=cur()==='dark'?'light':'dark';
         if(n==='dark')h.setAttribute('data-theme','dark');else h.removeAttribute('data-theme');
