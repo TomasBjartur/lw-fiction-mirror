@@ -1,6 +1,6 @@
 // The site's behaviour on every page: theme toggle, story nav, reading progress,
-// arrow keys, title fitting, email signup and the title hover morph. Copied to
-// dist/ by build.js and stamped with a hash of its bytes. The geo curtain stays
+// title fitting, reading position, email signup and the title hover morph. Copied
+// to dist/ by build.js and stamped with a hash of its bytes. The geo curtain stays
 // inline in the page (build.js), where it can act before first paint.
 (function(){
   var h=document.documentElement;
@@ -104,6 +104,40 @@
     var fitFrame=0;
     (document.fonts?document.fonts.ready:Promise.resolve()).then(fit);
     addEventListener('resize',function(){cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(fit)},{passive:true});
+  }
+
+  // Where the reader stopped in a story, so a later visit opens there. It is kept
+  // as a paragraph and how far into it the window's top was, because a scroll
+  // offset means nothing once the width or text size changes. Back, forward and
+  // reload stay the browser's own, and a link to a place in the story wins. The
+  // first screen of text doesn't count, and reaching the last line clears it, so
+  // a finished story opens at its title again.
+  if(storyBody){
+    var readKey='read:'+location.pathname,blocks=storyBody.children,readTimer=0,place=null,placeW=innerWidth;
+    var goTo=function(p){var b=blocks[p.i].getBoundingClientRect();scrollTo(0,scrollY+b.top+b.height*p.f)};
+    var saveRead=function(){
+      readTimer=0;
+      var r=storyBody.getBoundingClientRect(),lo=0,hi=blocks.length-1;
+      while(lo<hi){var mid=(lo+hi)>>1;if(blocks[mid].getBoundingClientRect().bottom>0)hi=mid;else lo=mid+1}
+      var b=blocks[lo].getBoundingClientRect();
+      place=r.top>-innerHeight||r.bottom<innerHeight?null:{i:lo,f:+(-b.top/b.height).toFixed(3),n:blocks.length};
+      try{if(place)localStorage.setItem(readKey,JSON.stringify(place));else localStorage.removeItem(readKey)}catch(e){}
+    };
+    var kept=null;try{kept=JSON.parse(localStorage.getItem(readKey))}catch(e){}
+    var entry=performance.getEntriesByType('navigation')[0];
+    if(kept&&kept.n===blocks.length&&entry&&entry.type==='navigate'&&!location.hash){
+      place=kept;goTo(place);
+      // The text face can arrive after this and move the text.
+      var touched=false,touch=function(){touched=true};
+      ['wheel','touchstart','keydown'].forEach(function(t){addEventListener(t,touch,{passive:true,once:true})});
+      document.fonts.ready.then(function(){if(!touched)goTo(place)});
+    }
+    addEventListener('scroll',function(){if(!readTimer)readTimer=setTimeout(saveRead,300)},{passive:true});
+    addEventListener('pagehide',saveRead);
+    document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')saveRead()});
+    // A rotated phone or a resized window reflows the text under the same scroll
+    // offset. A phone's toolbars change only the height, and move no text.
+    addEventListener('resize',function(){if(innerWidth===placeW)return;placeW=innerWidth;if(place)goTo(place)});
   }
 
   // Footer email signup, the form from markusstrasser.org: submit by

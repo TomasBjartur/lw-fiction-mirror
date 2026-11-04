@@ -178,7 +178,17 @@ scroll up, near the top, or on keyboard focus; a hairline across the top
 fills with progress through the story text, reaching the end at its last
 line rather than the footer. The nav slide and progress bar are small
 scripts copied from markusstrasser.org (`Nav.svelte`,
-`ReadingProgress.svelte`). Their latin subsets live in `fonts/web/`
+`ReadingProgress.svelte`).
+
+A story remembers where the reader stopped, in `localStorage`, as a paragraph
+and how far into it the window's top was, because a scroll offset means
+nothing once the width or text size changes. A later visit opens there, and
+rotating a phone or resizing the window keeps the place. Back, forward and
+reload stay the browser's own, and a link to a place in the story wins. The
+first screen of text doesn't count, and reaching the last line clears it, so
+a finished story opens at its title again.
+
+The story fonts' latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
 subsets (the nav marks, arrows, and any such character in a story, like
 the █ redactions) go into a small Noto Sans JP subset the build fetches.
