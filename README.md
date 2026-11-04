@@ -150,7 +150,8 @@ tool, not part of the site.
 While reading, the nav slides away on scrolling down and returns on any
 scroll up, near the top, or on keyboard focus; a hairline across the top
 fills with progress through the story text, reaching the end at its last
-line rather than the footer. Both copy markusstrasser.org (`Nav.svelte`,
+line rather than the footer (CSS scroll-driven animations; the nav's
+slide is the only script). Both copy markusstrasser.org (`Nav.svelte`,
 `ReadingProgress.svelte`). Their latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
 subsets (the nav marks, arrows, and any such character in a story, like

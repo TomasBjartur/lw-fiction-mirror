@@ -825,26 +825,19 @@ ${currentSlug ? `  <header class="nav">
       show();
     }
 
-    // Story pages, as on markusstrasser.org (Nav.svelte, ReadingProgress
-    // .svelte): the nav slides away while reading down and returns on any
-    // scroll up, at the top, or when it holds keyboard focus; a hairline
-    // across the top shows how far through the story text the reader is
-    // (100% at its last line, not at the footer).
-    var nav=document.querySelector('.nav'),bar=document.querySelector('.reading-progress'),body=document.querySelector('.post-body');
-    if(nav&&bar&&body){
-      var lastY=scrollY,frame=0,fill=bar.firstChild;
+    // Story pages, as on markusstrasser.org (Nav.svelte): the nav slides
+    // away while reading down and returns on any scroll up, at the top, or
+    // when it holds keyboard focus. (The reading-progress hairline is CSS.)
+    var nav=document.querySelector('.is-post .nav');
+    if(nav){
+      var lastY=scrollY,frame=0;
       var update=function(){
         frame=0;var y=scrollY,d=y-lastY;
         if(y<50)nav.classList.remove('hidden');
         else if(Math.abs(d)>5&&!nav.contains(document.activeElement))nav.classList.toggle('hidden',d>0);
         if(Math.abs(d)>5||y<50)lastY=y;
-        var r=body.getBoundingClientRect(),start=r.top+y,span=r.bottom+y-innerHeight-start;
-        var p=span>0?Math.min(1,Math.max(0,(y-start)/span)):1;
-        fill.style.transform='scaleX('+p.toFixed(4)+')';
-        bar.classList.toggle('visible',y>140);
       };
       addEventListener('scroll',function(){if(!frame)frame=requestAnimationFrame(update)},{passive:true});
-      addEventListener('resize',function(){if(!frame)frame=requestAnimationFrame(update)},{passive:true});
       nav.addEventListener('focusin',function(){nav.classList.remove('hidden')});
       update();
     }

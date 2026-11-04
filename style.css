@@ -250,6 +250,12 @@ main {
 .nav.hidden { transform: translateY(-100%); }
 .nav .navbar { width: var(--page-w); min-height: var(--nav-h); border-bottom: 1px solid var(--rule-strong); }
 
+/* Reading progress, all CSS (scroll-driven animations): the hairline
+   fades in over the first 100-140px of scroll and fills with the story
+   text's view timeline, from the text's top at the window's top to its
+   last line at the window's bottom ("contain"), not to the footer. A
+   browser without scroll timelines (Firefox before 159) shows no bar,
+   rather than a full one. */
 .reading-progress {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -257,10 +263,24 @@ main {
   height: 2px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity var(--dur-slide) ease;
 }
-.reading-progress.visible { opacity: 1; }
-.progress-bar { height: 100%; transform: scaleX(0); transform-origin: left; background: var(--progress); }
+.progress-bar { height: 100%; transform-origin: left; background: var(--progress); }
+@supports (animation-timeline: scroll()) {
+  .is-post { timeline-scope: --story; }
+  .post-body { view-timeline: --story block; }
+  .reading-progress {
+    animation: progress-show linear both;
+    animation-timeline: scroll(root);
+    animation-range: 100px 140px;
+  }
+  .progress-bar {
+    animation: progress-fill linear both;
+    animation-timeline: --story;
+    animation-range: contain 0% contain 100%;
+  }
+}
+@keyframes progress-show { from { opacity: 0; } to { opacity: 1; } }
+@keyframes progress-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 /* --- The book --------------------------------------------------------- */
 /* The collection as a download: its title in the text face, underlined,
