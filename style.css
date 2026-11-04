@@ -174,13 +174,13 @@ a:hover { color: var(--accent); }
 
 /* One underline for every underlined link: story text and the book's
    EPUB mark (the book's title is not a link). */
-.post-body a, .bk-dl, .site-head .nav-epub {
+.post-body a, .bk-dl {
   text-decoration-line: underline;
   text-decoration-thickness: 1px;
   text-decoration-color: var(--underline);
   text-underline-offset: 0.2em;
 }
-.post-body a:hover, .bk-dl:hover, .site-head .nav-epub:hover { text-decoration-color: currentColor; }
+.post-body a:hover, .bk-dl:hover { text-decoration-color: currentColor; }
 
 /* --- Layout ----------------------------------------------------------- */
 /* One centred column under the story nav; the contents page has no bar
@@ -417,7 +417,9 @@ main {
 /* From 1040px the book joins the nav: its title just left of an EPUB nav
    item, centred on the row like RSS and X. */
 .nav-bk-title { display: none; font: italic 400 var(--fs-nav-text)/1 var(--serif); color: var(--ink-soft); white-space: nowrap; }
-.site-head .nav-epub { display: none; text-underline-offset: 0.25em; }
+/* No underline there: it hung below the row and made EPUB read lower than
+   RSS though their letters share one line; the red marks it as the link. */
+.site-head .nav-epub { display: none; }
 @media (min-width: 1040px) {
   .head-book { display: none; }
   .nav-bk-title, .site-head .nav-epub { display: inline-flex; }
