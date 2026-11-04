@@ -42,7 +42,7 @@
     var update=function(){
       frame=0;var y=scrollY,d=y-lastY;
       if(y<50)nav.classList.remove('hidden');
-      else if(Math.abs(d)>5&&!nav.contains(document.activeElement))nav.classList.toggle('hidden',d>0);
+      else if(Math.abs(d)>5&&!nav.querySelector(':focus-visible'))nav.classList.toggle('hidden',d>0);
       if(Math.abs(d)>5||y<50)lastY=y;
     };
     addEventListener('scroll',function(){if(!frame)frame=requestAnimationFrame(update)},{passive:true});
