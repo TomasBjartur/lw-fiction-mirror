@@ -441,6 +441,13 @@ const SUBSET_FONTS = [
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
   { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
     text: () => AUTHOR },
+  { family: 'Homemade Apple', as: 'Signature', file: 'fonts/signature-homemade-apple.woff2', display: 'block',
+    text: () => 'Tomás B.' },
+  // Dates and reading times in the contents list and on story pages. Its
+  // Light weight is the face; the subset holds every month, digit and word
+  // those lines use.
+  { family: 'Urbanist:wght@300', as: 'Urbanist Meta', file: 'fonts/urbanist-meta.woff2', display: 'swap', weight: 300,
+    text: posts => '· 0123456789 You Successfully Subscribed. Thank you ' + posts.map(p => `${formatDate(p.postedAt)} ${formatMonthYear(p.postedAt)} ${readingMinutes(p.wordCount)}m ${estimateReadingTime(p.wordCount)}`).join('') },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
     text: posts => '△←→↗' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
@@ -661,7 +668,7 @@ function titleColor(rank, n) {
 function buildTitlesCss(posts, subsetFonts, titleFonts) {
   const byDate = sortByDate(posts);
   const face = subsetFonts
-    .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2');font-display:${f.display}}\n`)
+    .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2')${f.weight ? `;font-weight:${f.weight}` : ''};font-display:${f.display}}\n`)
     .join('');
   const titleFaces = [...titleFonts].map(([slug, f]) =>
     `@font-face{font-family:'tf-${slug}';src:url('${assetUrl(f.file)}') format('woff2');font-weight:${f.weight};font-display:block}\n`).join('');
@@ -1049,10 +1056,10 @@ ${currentSlug ? `  <header class="nav">
       return m>0?h/m:fontPx;
     }
     document.querySelectorAll('.morph').forEach(function(a){
-      var spans=null,words=null,text=null,timers=[],left=null,dir=0;
+      var spans=null,words=null,text=null,timers=[],left=null,dir=0,running=false;
       function split(){
         var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
-        var inline=getComputedStyle(a).display==='inline';
+        var inline=/^inline/.test(getComputedStyle(a).display);
         // Lines are counted on the text, one rect per line however tall the
         // face's glyphs (a block-level link, the newer/older row's, has one
         // box however many lines it wraps to), and before splitting, since
@@ -1112,25 +1119,25 @@ ${currentSlug ? `  <header class="nav">
           boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
         }
       }
-      // Every word changes at once, each on its own clock, its letters
-      // strictly left to right, one at a time; each waits a random time
-      // before the next, mostly short with rare pauses (cubed random;
-      // browsers clamp chained timers to 4 ms). The wait is 4-55 ms times
-      // the number of words, so each word of an n-word title moves n times
-      // slower.
-      function stop(){timers.forEach(clearTimeout);timers=[]}
+      // The whole title changes left to right, one letter at a time; each
+      // waits a random time before the next, mostly short with rare pauses
+      // (cubed random; browsers clamp chained timers to 4 ms). A layout
+      // change under the pointer can fire mouseenter again; 'running' keeps
+      // a second chain from starting on the same letter queue.
+      function stop(){timers.forEach(clearTimeout);timers=[];running=false}
       function run(){
-        stop();
-        var m=left.length;
-        left.forEach(function(l){
-          (function step(){
-            if(!l.length)return;
-            spans[l.shift()].className='mm';
-            var r=Math.random();timers.push(setTimeout(step,m*(2.7+51.4*r*r*r)));
-          })();
-        });
+        if(running)return;
+        running=true;
+        // A title longer than 20 letters speeds up letter by letter, so the
+        // sweep finishes in about the time a 20-letter title would.
+        var pace=Math.min(1,20/spans.length);
+        (function step(){
+          if(!left.length){running=false;return}
+          spans[left.shift()].className='mm';
+          var r=Math.random();timers.push(setTimeout(step,pace*(2.7+51.4*r*r*r)));
+        })();
       }
-      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left)left=words.map(function(g){return g.slice()});run()})});
+      a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
       // A resize rescales the titles, so pins measured at the old size are
       // dropped; the next hover measures afresh.
       addEventListener('resize',function(){if(!spans)return;stop();a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null});
@@ -1149,7 +1156,7 @@ ${currentSlug ? `  <header class="nav">
 // swaps in.
 // The list wraps: the newest story's "newer" link is the oldest story and
 // the oldest's "older" link is the newest, so both links always lead on.
-function postNavLink(list, idx, step) {
+function postNavLink(list, idx, step, base = '') {
   const cls = step < 0 ? 'post-nav-prev' : 'post-nav-next';
   const at = i => list[((i % list.length) + list.length) % list.length];
   const target = list.length > 1 ? at(idx + step) : null;
@@ -1159,14 +1166,16 @@ function postNavLink(list, idx, step) {
     let i = idx + step, guard = list.length;
     while (guard-- > 0 && GEO_HIDDEN.some(r => r.slug === at(i).slug)) i += step;
     const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
-    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
+    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${base}${alt.slug}/` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
+  return `<a href="${base}${target.slug}/" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
 function buildPostPage(post, allPosts) {
+  const date = formatDate(post.postedAt, true);
   const readTime = estimateReadingTime(post.wordCount);
-  const meta = [formatDate(post.postedAt, true), readTime].filter(Boolean).join(' · ');
+  const social = stats(post);
+  const metaLine = [readTime ? `<span class="when">${readTime}</span>` : '', social].filter(Boolean).join('');
   const byDate = sortByDate(allPosts);
   const idx = byDate.findIndex(p => p.slug === post.slug);
 
@@ -1174,8 +1183,8 @@ function buildPostPage(post, allPosts) {
     <article>
       <header class="post-header">
         <h1>${post.title}</h1>
-        <p class="byline">${AUTHOR}</p>
-        <p class="post-meta meta"><span class="when">${meta}</span>${stats(post)}</p>
+        <p class="post-byline"><span class="byline">${AUTHOR}</span><span class="when">${date}</span></p>
+        ${metaLine ? `<p class="post-meta meta">${metaLine}</p>` : ''}
         <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">

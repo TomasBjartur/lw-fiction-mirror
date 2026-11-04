@@ -18,11 +18,12 @@
 /* Every face is served from fonts/, so all devices render the same; no
    stack relies on an installed font. Latin subsets from
    scripts/fetch-webfonts.py. Inter stands in for the system UI font,
-   EB Garamond sets the stories, the reader counts and the book, Fira Mono
-   any code, Zallman Caps (Dieter Steffmann's vine-framed capitals, built
-   by scripts/initials-lab-fonts.py --site) the initials. build.js adds
-   subset faces (the name, the hover face, the marks) and each story's
-   title face in titles.css. */
+   Urbanist Light sets the dates and reading times, EB Garamond sets the
+   stories, the reader counts and the book, Fira Mono any code, Zallman
+   Caps (Dieter Steffmann's vine-framed capitals, built by
+   scripts/initials-lab-fonts.py --site) the initials. build.js adds
+   subset faces (the name, the hover face, the marks, the date line, the
+   signature) and each story's title face in titles.css. */
 @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-normal-300-700-v1.woff2') format('woff2'); font-weight: 300 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-normal-400-v1.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-italic-400-v1.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
@@ -47,18 +48,18 @@
   --muted:         light-dark(oklch(0.55 0.01 264),  oklch(0.75 0.01 264));
   --rule:          light-dark(oklch(0.88 0.006 264), oklch(0.32 0.006 264));
   --rule-strong:   light-dark(oklch(0.70 0.006 264), oklch(0.48 0.006 264));  /* the header rule */
-  /* The one accent: every hover, the EPUB mark, the editor's-pick rule,
+  /* The one accent: every hover, the EPUB mark, the editor's-pick ring,
      the focus ring. */
   --accent:        light-dark(oklch(0.52 0.22 24),   oklch(0.80 0.11 24));
-  --accent-deep:   light-dark(oklch(0.38 0.16 24),   oklch(0.68 0.14 24));
   --accent-tint:   color-mix(in oklch, var(--accent) 10%, transparent);
-  --pick:          linear-gradient(var(--accent-deep), color-mix(in oklch, var(--accent) 50%, transparent));
+  --pick:          color-mix(in oklch, var(--accent) 70%, transparent);
   /* Links inside story text, the only underlined blue. */
   --link:          light-dark(oklch(0.47 0.15 264),  oklch(0.84 0.075 264));
   --link-visited:  light-dark(oklch(0.42 0.14 294),  oklch(0.82 0.07 294));
+  --signature:     light-dark(oklch(0.32 0.14 275),  oklch(0.84 0.07 275));
   --underline:     color-mix(in oklch, currentColor 40%, transparent);
   --selection:     light-dark(oklch(0.88 0.1 24 / 0.5), oklch(0.40 0.09 24));
-  --progress:      light-dark(oklch(0.4 0.02 285 / 0.4), oklch(0.8 0.02 285 / 0.45));
+  --progress:      color-mix(in oklch, var(--accent) 70%, transparent);
   /* Substack's own button colours, both themes. */
   --substack:       #ff6719;
   --substack-hover: color-mix(in oklch, var(--substack) 88%, black);
@@ -67,21 +68,21 @@
   /* Faces. 'Site Marks' (Noto Sans JP, subset) carries the marks and any
      character outside latin, right after each text face. */
   --sans:  'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
+  --meta-sans: 'Urbanist Meta', 'Site Marks', -apple-system, system-ui, sans-serif;  /* dates and reading times */
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --mono:  'Fira Mono', ui-monospace, monospace;
   --name:  'Author Name', var(--serif);  /* Send Flowers, subset to the name */
   --initial: 'Initials', var(--serif);   /* story and section initials */
 
   /* Type scale. */
-  --fs-2xs:  0.7rem;    /* reader counts */
+  --fs-2xs:  0.75rem;   /* reader counts */
   --fs-xs:   0.8rem;    /* footer, captions, the story's meta line, arrows */
   --fs-s:    1rem;      /* nav labels */
-  --fs-nav-text: calc(var(--fs-s) * 1.12);  /* EB Garamond at the nav labels' cap height (0.65 vs Inter's 0.73) */
   --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
   --fs-name: 2.9rem;    /* the name on the contents page */
   --fs-book: clamp(1.2rem, 3vw, 1.65rem);  /* the book under the rule: a title's size */
   --icon-k:  1.2;       /* an icon is 1.2x its label */
-  --title-size: 1.1rem; /* titles outside the filling list (newer/older, short windows) */
+  --title-size: 0.99rem; /* titles outside the filling list (newer/older, short windows) */
   --title-line: 1.85rem;
   --story-size: clamp(19px, 14.4px + 0.45vw, 21.5px);  /* story text; Rello et al. 2016 */
 
@@ -123,12 +124,12 @@
      line is --title-lh of the row; the meta scales with the row, clamped. */
   --row-min:   1.9rem;
   --row-max:   3.2rem;
-  --title-k:   0.64;
-  --title-cqw: 4.2cqw;
+  --title-k:   0.576;
+  --title-cqw: 3.78cqw;
   --title-lh:  1;
-  --meta-k:    0.27;
+  --meta-k:    0.30;
   --meta-min:  0.7rem;
-  --meta-max:  0.95rem;
+  --meta-max:  1rem;
 }
 
 /* --- Base ------------------------------------------------------------- */
@@ -214,7 +215,7 @@ main {
 }
 .nav-item:hover { color: var(--accent); background: var(--accent-tint); }
 .nav-home { font: 400 var(--fs-mark)/1 var(--name); letter-spacing: 0; color: var(--ink); }
-.nav-epub { color: var(--accent); }
+.nav-epub { color: var(--accent); font-family: var(--meta-sans); font-weight: var(--w-light); }
 .nav-x svg, .x-link svg { width: calc(1em * var(--icon-k)); height: calc(1em * var(--icon-k)); fill: currentColor; }
 .theme-toggle .ti { width: calc(1em * var(--icon-k)); height: calc(1em * var(--icon-k)); fill: currentColor; }
 /* The mark of the current mode: a sun in light, a crescent in dark. */
@@ -292,12 +293,12 @@ main {
    rather than a story. The mark is the nav labels' size, or its line's
    if smaller (the footer). */
 .book { color: var(--ink-soft); }
-/* The book's title in EB Garamond italic, as a book title is set; in the
-   footer's sans line too, a step up to match Inter's height. */
-.bk-title { font-style: italic; }
-.foot-book .bk-title { font: italic 400 1.12em/1 var(--serif); }
+/* The book's title in the date face, upright; the footer keeps a step up
+   to match its line. */
+.bk-title { font-style: normal; }
+.foot-book .bk-title { font: var(--w-light) 1.12em/1 var(--meta-sans); }
 .bk-dl {
-  font: var(--w-ui) min(var(--fs-s), 1em)/1 var(--sans);
+  font: var(--w-light) min(var(--fs-s), 1em)/1 var(--meta-sans);
   letter-spacing: var(--track-label);
   white-space: nowrap;
   color: var(--accent);
@@ -350,10 +351,29 @@ main {
    reflows, and sets --mono-size (the geometric mean of the sizes that
    match the title's width and its letter height) and --mfit (the most
    that fits its room). line-height: 0 keeps the mono glyphs from growing the line. */
+/* A display face can have a taller inline box than its row (Ballet's
+   ascent and descent overflow the line-height), which would let one title
+   cover the row above. Pin the link's box to the title line, on the
+   title's baseline (so the date, reading time and counts sit on it), and
+   make its text pointer-transparent; a pseudo-element over that resting
+   box is the hit target, so the visible spill stays inside the title's
+   own row. */
+.story .story-title {
+  display: inline-block;
+  height: var(--title-line);
+  vertical-align: baseline;
+  position: relative;
+  pointer-events: none;
+}
+.story .story-title::after { content: ""; position: absolute; inset: 0; pointer-events: auto; }
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
 .morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); -webkit-text-stroke: 0; }
 .morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
+/* The mono glyphs are free to run past the pinned box; they must not take
+   the pointer with them, or a hovered row covers its neighbour's title
+   (moving up from a script face made the title above slow to react). */
+.morph .mi, .morph .mi * { pointer-events: none; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
 .post-nav .morph { transition: opacity var(--dur) ease-out; }
 /* Where the morph runs (the script's own condition), a hovered title
@@ -365,10 +385,10 @@ main {
 .post-nav:has(.spread .mm) .morph:not(.spread) { opacity: 0; }
 
 /* --- Meta: dates, reading times and reader counts --------------------- */
-/* Date and reading time in Inter Light (the served stand-in for
-   Helvetica Light), the month a weight up and a step larger than the
-   counts; the counts in EB Garamond's old-style figures, each followed by
-   a small icon of its kind and each source led by its mark (a link). */
+/* Date and reading time in Urbanist Light, the month a weight up and a
+   step larger than the counts; the counts in EB Garamond's old-style
+   figures, each followed by a small icon of its kind and each source led
+   by its mark (a link). */
 
 .meta {
   font: 400 var(--fs-2xs)/1 var(--serif);
@@ -376,16 +396,18 @@ main {
   letter-spacing: 0.01em;
   color: var(--muted);
 }
-.meta .when { font: var(--w-light) 1.08em/1 var(--sans); color: var(--ink-soft); }
+.meta .when { font: var(--w-light) 1.08em/1 var(--meta-sans); color: var(--ink-soft); }
 .meta .mo { font-weight: var(--w-ui); }
-.meta .m { display: inline-flex; align-items: baseline; gap: 0.3em; margin-left: 0.8em; }
+.meta .m { display: inline-flex; align-items: center; gap: 0.3em; margin-left: 0.8em; font-family: var(--meta-sans); font-weight: var(--w-light); vertical-align: middle; }
+.meta .n { position: relative; padding-right: 1.07em; }
 .meta .n::after {
   content: "";
-  display: inline-block;
-  width: 0.62em;
-  height: 0.62em;
-  margin-left: 0.12em;
-  vertical-align: -0.02em;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0.95em;
+  height: 0.95em;
+  transform: translateY(-50%);
   background: currentColor;
   opacity: 0.7;
   -webkit-mask: var(--ico) center / contain no-repeat;
@@ -395,8 +417,13 @@ main {
 .k-cmts     { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'><path d='M4 5h16v10.5H10.5L6 19.5v-4H4z'/></svg>"); }
 .k-likes    { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 20.5s-8-4.9-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.7-8 10.6-8 10.6z'/></svg>"); }
 .k-restacks { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 11V9a3 3 0 0 1 3-3H19M16 3l3 3-3 3M19.5 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3'/></svg>"); }
+/* The glyphs sit differently inside their 24px boxes: nudge each so its
+   ink, not its box, is centred on the number. */
+.meta .k-karma::after    { transform: translateY(calc(-50% + 0.03em)); }
+.meta .k-likes::after    { transform: translateY(calc(-50% - 0.075em)); }
+.meta .k-cmts::after     { transform: translateY(calc(-50% - 0.01em)); }
 
-.src { display: inline-flex; align-self: center; width: 1em; height: 1em; }
+.src { display: inline-flex; align-self: center; width: 1.15em; height: 1.15em; }
 .src svg { width: 100%; height: 100%; fill: currentColor; }
 .src-lw { color: var(--ink-soft); }
 .src-ss { color: var(--substack); }
@@ -417,10 +444,13 @@ main {
 .site-h1 { grid-area: name; font: 400 var(--fs-name)/1.15 var(--name); white-space: nowrap; color: var(--ink); }
 .site-head .navbar { grid-area: nav; }
 .head-rule { grid-area: rule; margin-top: var(--s-1); border: 0; border-top: 1px solid var(--rule-strong); }
-.head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: 400 var(--fs-book)/1.2 var(--serif); }
-/* From 1040px the book joins the nav: its title just left of an EPUB nav
-   item, centred on the row like RSS and X. */
-.nav-bk-title { display: none; font: italic 400 var(--fs-nav-text)/1 var(--serif); color: var(--ink-soft); white-space: nowrap; }
+.head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: var(--w-light) var(--fs-book)/1.2 var(--meta-sans); }
+/* From 1040px the book joins the nav: its title set like the RSS label,
+   just left of an EPUB nav item, centred on the row like RSS and X. */
+.nav-bk-title { display: none; font: var(--w-light) var(--fs-s)/1 var(--meta-sans); color: var(--ink-soft); white-space: nowrap; }
+/* The homepage's book title follows the nav's sans; the footer keeps the
+   serif italic book title. */
+.head-book .bk-title { font-style: normal; }
 /* No underline there: it hung below the row and made EPUB read lower than
    RSS though their letters share one line; the red marks it as the link. */
 .site-head .nav-epub { display: none; }
@@ -430,21 +460,24 @@ main {
   .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); }
 }
 
-.stories { list-style: none; padding-left: var(--indent); }
-.story { position: relative; padding: var(--s-1) 0; }
+.stories { list-style: none; padding-left: var(--indent); margin-top: var(--s-2); }
+.story { position: relative; padding: calc(var(--s-1) * 0.6) 0; }
 .story .meta { margin-left: 0.6em; white-space: nowrap; }
 .title-cell .meta { transition: opacity var(--dur) ease-out; }
 .title-cell:has(.mm) .meta { opacity: 0; }
-/* Editor's picks: an accent rule in the margin, left of the title. */
-.story.pick::before {
+/* Editor's picks: a hollow accent ring in the margin, centred on the
+   title line; the inside is the page, so only the border shows. */
+.story.pick .story-title::before {
   content: "";
   position: absolute;
-  left: calc(-1 * min(var(--s-3), var(--indent) / 2));
-  top: 18%;
-  bottom: 18%;
-  width: 4px;
-  border-radius: 2px;
-  background: var(--pick);
+  left: calc(-1 * min(var(--s-3), var(--indent) / 2) - 0.13rem);
+  top: calc(50% + 0.12rem);
+  width: 0.5rem;
+  height: 0.5rem;
+  transform: translateY(-50%);
+  border: 1.5px solid var(--pick);
+  border-radius: 50%;
+  background: var(--paper);
 }
 
 /* Tall enough: the list shrinks to fit the window. It takes the height
@@ -482,7 +515,7 @@ main {
   /* cq units resolve against the list only inside it, so the row
      measures are defined on the rows. */
   .story {
-    --row: clamp(var(--row-min), 100cqh / var(--n), var(--row-max));
+    --row: clamp(var(--row-min), 100cqh / var(--n) - 0.15rem, var(--row-max));
     height: var(--row);
     --title-size: min(var(--row) * var(--title-k), var(--title-cqw));
     --title-line: calc(var(--row) * var(--title-lh));
@@ -512,8 +545,29 @@ main {
   margin-right: calc(-1 * var(--track-caps));
   text-wrap: balance;
 }
-.byline { margin-top: 0.4em; font: 400 1.5em/1.2 var(--name); }
+.post-byline {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0.7em;
+  row-gap: 0.15em;
+  margin-top: 0.4em;
+}
+.byline { font: 400 1.5em/1.2 var(--name); }
+.post-byline .when {
+  font-family: var(--meta-sans);
+  font-weight: var(--w-light);
+  font-size: calc(var(--fs-xs) * 1.08);
+  line-height: 1;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.post-byline .mo { font-weight: var(--w-ui); }
 .post-meta { margin-top: 0.5em; font-size: var(--fs-xs); }
+.post-meta .m { margin-left: 0; }
+.post-meta .when + .m,
+.post-meta .m + .m { margin-left: 0.8em; }
 .orn { display: block; width: 2.4em; margin: 1em auto 0; border-top: 1px solid var(--muted); }
 
 .post-body {
@@ -644,8 +698,8 @@ main {
     --fs-name: clamp(1.5rem, 7vw, 2.3rem);
     /* The meta goes under each title: a row splits about 60/40 between
        title and meta. */
-    --title-k:   0.46;
-    --title-cqw: 6.5cqw;
+    --title-k:   0.414;
+    --title-cqw: 5.85cqw;
     --title-lh:  0.58;
     --meta-k:    0.2;
     --meta-min:  0.62rem;
