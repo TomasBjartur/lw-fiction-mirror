@@ -80,6 +80,7 @@ const failures = [];
 let checked = 0;
 for (const [w, h] of [[1280, 800], [393, 659]]) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
   const page = await ctx.newPage();
   for (const file of new Set(PAGES.map(p => p[0]))) {
     await page.goto(new URL(file, base).href, { waitUntil: 'load' });

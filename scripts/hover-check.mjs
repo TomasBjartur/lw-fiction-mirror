@@ -12,7 +12,7 @@
 //   text had to shrink to fit its room, which is listed instead), and
 //   neither more than 40% off;
 // - a wrapped title's words may not grow;
-// - the title's row must not move.
+// - the title's row must not move, nor a list title's baseline.
 // Exits 1 on any failure.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -41,8 +41,10 @@ if (!stories.length) { console.error('no story pages in dist/: run node build.js
 const sizes = [[1440, 900], [1024, 768], [700, 900]];
 const TOL = 0.03, FAR = 0.4;
 
-// "chrome" is the installed Google Chrome, driven by Playwright.
-const browser = engine === 'chrome' ? await pw.chromium.launch({ channel: 'chrome' }) : await pw[engine].launch();
+// "chrome" is the installed Google Chrome, driven by Playwright. One browser per
+// width: Chrome closes the third context's page partway through, whichever width
+// that is and with no crash event, and a fresh browser avoids it.
+const launch = () => engine === 'chrome' ? pw.chromium.launch({ channel: 'chrome' }) : pw[engine].launch();
 
 // Hovers each title matching sel in turn; returns hovered/resting ratios.
 const HOVER = async sel => {
@@ -52,11 +54,19 @@ const HOVER = async sel => {
   const up = (f, s) => { cx.font = f; return cx.measureText(s).actualBoundingBoxAscent; };
   const height = (f, t) => { const xs = (t.match(/[acemnorsuvwxz]/g) || []).join('') || t; return (up(f, xs) + up(f, t)) / 2; };
   const width = e => { const r = document.createRange(); r.selectNodeContents(e); return r.getBoundingClientRect().width; };
+  const baseline = e => {
+    const s = document.createElement('span');
+    s.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+    e.appendChild(s);
+    const y = s.getBoundingClientRect().bottom;
+    s.remove();
+    return y;
+  };
   const out = [];
   for (const a of document.querySelectorAll(sel)) {
     const t = a.textContent, cs = getComputedStyle(a), row = a.closest('.story, .post-nav');
     const w0 = width(a), h0 = height(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, t);
-    const r0 = row.getBoundingClientRect();
+    const r0 = row.getBoundingClientRect(), b0 = a.closest('.story') ? baseline(a) : null;
     a.dispatchEvent(new MouseEvent('mouseenter'));
     const done = () => a.querySelector('.mi') && !a.querySelector('.mi .w > span:not(.mm)');
     for (const t0 = performance.now(); !done() && performance.now() - t0 < 3000;) await new Promise(r => setTimeout(r, 16));
@@ -68,7 +78,8 @@ const HOVER = async sel => {
     const fit = parseFloat(a.style.getPropertyValue('--mfit')) < parseFloat(a.style.getPropertyValue('--mono-size'));
     out.push({ t, wrapped: !!words, fit, w: words ? Math.max(...words) : width(a.querySelector('.mi')) / w0,
       h: height(`${mm.fontWeight} ${mm.fontSize} ${mm.fontFamily}`, t) / h0,
-      moved: Math.max(Math.abs(r1.top - r0.top), Math.abs(r1.height - r0.height)) });
+      moved: Math.max(Math.abs(r1.top - r0.top), Math.abs(r1.height - r0.height)),
+      dropped: b0 === null ? 0 : Math.abs(baseline(a.querySelector('.mi')) - b0) });
     a.dispatchEvent(new MouseEvent('mouseleave'));
   }
   return out;
@@ -77,7 +88,9 @@ const HOVER = async sel => {
 let checked = 0; const worstW = [0, 0], worstH = [0, 0];
 const failures = [], shrunk = [];
 for (const [w, h] of sizes) {
+  const browser = await launch();
   const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+  await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
   const page = await ctx.newPage();
   page.on('crash', () => { console.error(`${engine} ${w}px: the page crashed`); process.exit(2); });
   if (engine === 'chrome') await (await ctx.newCDPSession(page)).send('Emulation.setEmulatedMedia', { features: [{ name: 'hover', value: 'hover' }] });
@@ -94,14 +107,14 @@ for (const [w, h] of sizes) {
           : !r.fit && Math.abs(r.w * r.h - 1) > TOL && `width x height ${(r.w * r.h).toFixed(3)}`,
         Math.abs(r.w - 1) > FAR && `width ${r.w.toFixed(3)}x`,
         !r.fit && Math.abs(r.h - 1) > FAR && `letter height ${r.h.toFixed(3)}x`,
-        r.moved > 0.5 && `row moved ${r.moved.toFixed(1)}px`].filter(Boolean);
+        r.moved > 0.5 && `row moved ${r.moved.toFixed(1)}px`,
+        r.dropped > 1 && `baseline moved ${r.dropped.toFixed(1)}px`].filter(Boolean);
       if (r.fit) shrunk.push(`${w}px ${file} "${r.t}": shrunk to its room, letter height ${r.h.toFixed(2)}x`);
       if (why.length) failures.push(`${w}px ${file} "${r.t}": ${why.join('; ')}`);
     }
   }
-  await ctx.close();
+  await browser.close();
 }
-await browser.close();
 
 console.log(`${engine}: ${checked} hovers (list and newer/older on ${stories.length} stories) at ${sizes.map(s => s[0]).join(', ')}px;` +
   ` width ${(1 - worstW[0]).toFixed(2)}-${(1 + worstW[1]).toFixed(2)}x, height ${(1 - worstH[0]).toFixed(2)}-${(1 + worstH[1]).toFixed(2)}x`);

@@ -86,6 +86,7 @@ let checked = 0;
 const failures = [];
 for (const [w, h] of sizes) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
   const page = await ctx.newPage();
   const load = async s => { await page.goto(new URL(s, base).href, { waitUntil: 'load' }); await page.evaluate(() => document.fonts.ready.then(() => 1)); };
   for (const s of stories) {

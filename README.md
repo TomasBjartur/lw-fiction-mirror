@@ -90,11 +90,15 @@ too (except on a phone's contents page, where it is already under the
 name). Story pages put "TB" (in the name's face) and the EPUB link in
 their nav. The tab icon is "TB" in the name's face, in the accent red on
 the paper colour (dark values in a dark system theme); `scripts/favicon.py`
-writes it to `favicon.svg` from the name's font subset. On screens at least 520 px tall each story's row is 3.2rem,
-or less where that would not fit, titles scaled to the row, so every
-story shows without scrolling (on phones, with the browser's toolbars
-showing); spare height stays under the list and the footer sits at the
-bottom of the window. The footer is the last row of a one-column grid
+writes it to `favicon.svg` from the name's font subset. Every story's row is the
+same height: a share of the window's height (on phones, with the
+browser's toolbars showing), at most 2.875rem and at most what the
+list's width lets a title be, with titles scaled to the row, so rows
+never sit looser than their titles. Spare height stays under the list
+and the footer sits at the bottom of the window. Each row's baseline
+falls in the same place whatever its title's face (`--title-base` in
+`style.css`), and the date and counts share it, so the rows read as
+evenly spaced at every width. The footer is the last row of a one-column grid
 that fills the window on every page, so a short story's footer still
 sits at the bottom; the author's signature (Homemade Apple, subset) is
 at its right. The footer also carries the email signup, copied from
@@ -103,11 +107,14 @@ markusstrasser.org's form; its Formspree endpoint is
 ID is supplied (the nav Subscribe button still goes to Substack), and a
 successful signup lands on `/subscribed/`. On
 phones (640 px and under) the meta sits on its own line under each
-title. Rows never go below 1.9rem, so a long list scrolls. A title too
+title and the largest faces come partway back to the others
+(`--ts-spread`), so San Silvestro's swash clears the date above it. Rows
+stop shrinking at 1.9rem, or 2.3rem on phones to keep titles readable,
+and past that the page scrolls. A title too
 wide for its space (a long title in a wide face in a list row, or a long
 word in a story's title, on a phone) is shrunk to fit by a small script.
-Each title is followed by its month and reading time in Inter Light,
-upright, the month a weight up (reading time at 260 words a minute, Brysbaert's 2019 mean for
+Each title is followed by its month and reading time in Urbanist Light,
+upright (reading time at 260 words a minute, Brysbaert's 2019 mean for
 fiction, rounded to the minute under 10 and to 5 minutes above), then its
 LessWrong karma and comments and Substack likes, restacks and comments,
 small, in Urbanist Light (LessWrong from the GraphQL

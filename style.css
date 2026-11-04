@@ -9,7 +9,6 @@
      max-width 640px   phones: smaller type, the meta under each title
      max-width 520px   story text goes ragged (justified lines gap there)
      min-width 1040px  the book joins the name's row on the contents page
-     min-height 520px  the contents list shrinks to fit the window
    Colours are OKLCH, each written once for light and dark with
    light-dark(); browsers older than that (Safari 17.5, May 2024) are not
    supported. */
@@ -80,10 +79,11 @@
   --fs-s:    1rem;      /* nav labels */
   --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
   --fs-name: 2.9rem;    /* the name on the contents page */
-  --fs-book: clamp(1.2rem, 3vw, 1.65rem);  /* the book under the rule: a title's size */
+  --fs-book: clamp(0.9rem, 4.3vw, 1.65rem);  /* the book under the rule: a title's size, on one line */
   --icon-k:  1.2;       /* an icon is 1.2x its label */
   --title-size: 0.99rem; /* titles outside the filling list (newer/older, short windows) */
   --title-line: 1.85rem;
+  --ts-spread: 1;       /* how much of a face's size factor (--ts) applies */
   --story-size: clamp(19px, 14.4px + 0.45vw, 21.5px);  /* story text; Rello et al. 2016 */
 
   /* Weights. Light text on dark reads heavier, so dark takes the
@@ -117,17 +117,17 @@
   --page-w: min(100% - 2 * var(--gutter), var(--col));
   --indent: clamp(1.25rem, 4vw, 3.5rem);  /* the list sits one indent in from the name */
 
-  /* The contents list (Contents, below): one row per story, --row-max
-     tall, shrinking to fit the window, never below --row-min; the title
-     is --title-k of the row, capped at --title-cqw of the list's width (a looser cap: a title
-     still too wide for its row with its meta shrinks alone, --fit); its
-     line is --title-lh of the row; the meta scales with the row, clamped. */
+  /* The contents list (Contents, below): one row per story, all the same
+     height, at most --row-max and at least --row-min. The title is
+     --title-k of the row, at most --title-cqw of the list's width (a title
+     still too wide for its row with its meta shrinks alone, --fit), and its
+     line is --title-lh of the row. The meta scales with the row, clamped. */
   --row-min:   1.9rem;
-  --row-max:   3.2rem;
-  --title-k:   0.576;
+  --row-max:   2.875rem;
+  --title-k:   0.6;
   --title-cqw: 3.78cqw;
   --title-lh:  1;
-  --meta-k:    0.30;
+  --meta-k:    0.31;
   --meta-min:  0.7rem;
   --meta-max:  1rem;
 }
@@ -188,15 +188,13 @@ a:hover { color: var(--accent); }
 
 /* --- Layout ----------------------------------------------------------- */
 /* One centred column under the story nav; the contents page has no bar
-   (and fills the window when tall enough: Contents, below). */
+   and fills the window (Contents, below). */
 
 main {
-  flex: 1 0 auto;
   width: var(--page-w);
   margin: 0 auto;
   padding: calc(var(--nav-h) + var(--s-5)) 0 0;
 }
-.is-index main { padding-top: var(--s-6); }
 
 /* --- Nav -------------------------------------------------------------- */
 /* The site links: beside the name on the contents page, in a bar across
@@ -302,7 +300,6 @@ main {
 .site-foot-wrap {
   --sig-w: clamp(4.25rem, 7.5vw, 5.5rem);
   position: relative;
-  flex: none;
   width: var(--page-w);
   margin: var(--s-3) auto var(--s-4);
   padding: var(--s-2) calc(var(--sig-w) + var(--s-3)) 0 0;
@@ -442,7 +439,7 @@ main {
 .story-title, .post-nav-link {
   font-family: var(--tf, var(--sans)), var(--sans);
   font-weight: var(--tw, var(--w-light));
-  font-size: calc(var(--title-size) * var(--ts, 1) * var(--fit, 1));
+  font-size: calc(var(--title-size) * (1 + (var(--ts, 1) - 1) * var(--ts-spread)) * var(--fit, 1));
   line-height: var(--title-line);
   color: var(--tc, var(--ink));
   -webkit-text-stroke: var(--tk, 0) currentColor;
@@ -454,25 +451,30 @@ main {
    reflows, and sets --mono-size (the geometric mean of the sizes that
    match the title's width and its letter height) and --mfit (the most
    that fits its room). line-height: 0 keeps the mono glyphs from growing the line. */
-/* A display face can have a taller inline box than its row (Ballet's
-   ascent and descent overflow the line-height), which would let one title
-   cover the row above. Pin the link's box to the title line, on the
-   title's baseline (so the date, reading time and counts sit on it), and
-   make its text pointer-transparent; a pseudo-element over that resting
-   box is the hit target, so the visible spill stays inside the title's
-   own row. */
+/* Every row keeps its baseline in the same place, whatever its title's face.
+   A display face's ascent and descent would otherwise move the baseline and
+   stretch the line (Ballet's overflow the row), so rows that are the same
+   height look unevenly spaced. line-height: 0 takes the face's metrics out of
+   the line; an empty strut, --title-base tall and sitting on the baseline,
+   sets where that baseline falls in a box --title-line tall. The date and
+   counts share it. The text is pointer-transparent and a pseudo-element over
+   the box is the hit target, so a glyph spilling out of its row can't take
+   clicks from the next. */
 .story .story-title {
   display: inline-block;
   height: var(--title-line);
+  line-height: 0;
   vertical-align: baseline;
   position: relative;
   pointer-events: none;
 }
+.story .story-title::before { content: ""; display: inline-block; width: 0; height: var(--title-base); vertical-align: baseline; }
 .story .story-title::after { content: ""; position: absolute; inset: 0; pointer-events: auto; }
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
 .morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); -webkit-text-stroke: 0; }
 .morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
+.story .morph.pinned { align-items: baseline; }  /* on the strut, so the baseline stays put */
 /* The mono glyphs are free to run past the pinned box; they must not take
    the pointer with them, or a hovered row covers its neighbour's title
    (moving up from a script face made the title above slow to react). */
@@ -498,16 +500,19 @@ main {
   color: var(--muted);
 }
 .meta .when { font-size: 1.08em; color: var(--ink-soft); }
-.meta .m { display: inline-flex; align-items: center; gap: 0.3em; margin-left: 0.8em; vertical-align: middle; }
-.meta .n { position: relative; padding-right: 1.07em; }
+.meta .m { margin-left: 0.8em; white-space: nowrap; }
+/* All on one baseline. Urbanist's figures are 0.7em tall, so a mark is centred
+   on them when its middle is 0.35em up: vertical-align is -(height / 2 - 0.35em).
+   A count's own icon sits closer than the next count. */
+.meta .n { margin-left: 0.5em; }
+.meta .src + .n { margin-left: 0.3em; }
 .meta .n::after {
   content: "";
-  position: absolute;
-  right: 0;
-  top: 50%;
+  display: inline-block;
   width: 0.95em;
   height: 0.95em;
-  transform: translateY(-50%);
+  margin-left: 0.12em;
+  vertical-align: -0.125em;
   background: currentColor;
   opacity: 0.7;
   -webkit-mask: var(--ico) center / contain no-repeat;
@@ -519,12 +524,12 @@ main {
 .k-restacks { --ico: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 11V9a3 3 0 0 1 3-3H19M16 3l3 3-3 3M19.5 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3'/></svg>"); }
 /* The glyphs sit differently inside their 24px boxes: nudge each so its
    ink, not its box, is centred on the number. */
-.meta .k-karma::after    { transform: translateY(calc(-50% + 0.03em)); }
-.meta .k-likes::after    { transform: translateY(calc(-50% - 0.075em)); }
-.meta .k-cmts::after     { transform: translateY(calc(-50% - 0.01em)); }
+.meta .k-karma::after    { transform: translateY(0.03em); }
+.meta .k-likes::after    { transform: translateY(-0.075em); }
+.meta .k-cmts::after     { transform: translateY(-0.01em); }
 
-.src { display: inline-flex; align-self: center; width: 1.15em; height: 1.15em; }
-.src svg { width: 100%; height: 100%; fill: currentColor; }
+.src { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.225em; }
+.src svg { display: block; width: 100%; height: 100%; fill: currentColor; }
 .src-lw { color: var(--ink-soft); }
 .src-ss { color: var(--substack); }
 
@@ -539,12 +544,12 @@ main {
   grid-template-areas: "name . nav" "rule rule rule" "book book book";
   align-items: baseline;
   column-gap: var(--s-4);
-  margin-bottom: var(--s-4);
+  margin-bottom: var(--s-5);
 }
 .site-h1 { grid-area: name; font: 400 var(--fs-name)/1.15 var(--name); white-space: nowrap; color: var(--ink); }
 .site-head .navbar { grid-area: nav; }
 .head-rule { grid-area: rule; margin-top: var(--s-1); border: 0; border-top: 1px solid var(--rule-strong); }
-.head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: var(--w-light) var(--fs-book)/1.2 var(--meta-sans); }
+.head-book { grid-area: book; justify-self: start; margin: 1.25rem 0 0 var(--indent); font: var(--w-light) var(--fs-book)/1.2 var(--meta-sans); }
 /* From 1040px the book joins the nav: its title set like the RSS label,
    just left of an EPUB nav item, centred on the row like RSS and X. */
 .nav-bk-title { display: none; font: var(--w-light) var(--fs-s)/1 var(--meta-sans); color: var(--ink-soft); white-space: nowrap; }
@@ -560,74 +565,72 @@ main {
   .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); }
 }
 
-.stories { list-style: none; padding-left: var(--indent); margin-top: var(--s-2); }
-.story { position: relative; padding: calc(var(--s-1) * 0.6) 0; }
-.story .meta { margin-left: 0.6em; white-space: nowrap; }
+/* The page fills the window, and the list takes the height left under the
+   header. Rows are all one height (one per story, --n, set by the build): an
+   equal share of that height, at most what the list's width lets a title be
+   and at most --row-max, so rows never sit looser than their titles. Spare
+   height stays under the list, and the footer sits at the window's bottom.
+   Rows stop shrinking at --row-min; past that the list's min-height pushes
+   the footer down and the page scrolls. svh (body), so the list fits with a
+   phone browser's toolbars showing. The height must be fixed, not a
+   min-height: cq units need a definite container height (with min-height
+   Chrome resolves 100cqh to 0 and every row falls to --row-min). */
+.is-index main {
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  min-height: 0;
+  margin: 0 var(--gutter);
+  padding: var(--s-4) 0 0;
+}
+.is-index .site-head { flex: none; }
+.stories {
+  flex: 1;
+  display: grid;
+  /* One column, the list's width: an auto column would grow to the widest
+     unwrapped row and push the page sideways. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(var(--n), auto);
+  align-content: start;
+  min-height: calc(var(--n) * var(--row-min));
+  margin-top: var(--s-2);
+  padding-left: var(--indent);
+  list-style: none;
+  container-type: size;
+}
+/* cq units resolve against the list only inside it, so the row measures are
+   defined on the rows. --title-base is the baseline's drop from the top of
+   the title's line: 0.33em below the line's middle, which centres a face's
+   x-height and capitals on the line. */
+.story {
+  --row: clamp(var(--row-min), min(100cqh / var(--n), var(--title-cqw) / var(--title-k)), var(--row-max));
+  --title-size: min(var(--row) * var(--title-k), var(--title-cqw));
+  --title-line: calc(var(--row) * var(--title-lh));
+  --title-base: calc(var(--title-line) / 2 + var(--title-size) * 0.33);
+  position: relative;
+  height: var(--row);
+}
+.title-cell { display: block; line-height: 0; white-space: nowrap; }
+.story .meta {
+  margin-left: 0.6em;
+  font-size: clamp(var(--meta-min), var(--row) * var(--meta-k), var(--meta-max));
+  white-space: nowrap;
+}
 .title-cell .meta { transition: opacity var(--dur) ease-out; }
 .title-cell:has(.mm) .meta { opacity: 0; }
 /* Editor's picks: a hollow accent ring in the margin, centred on the
-   title line; the inside is the page, so only the border shows. */
-.story.pick .story-title::before {
+   title's x-height; the inside is the page, so only the border shows. */
+.story.pick::before {
   content: "";
   position: absolute;
   left: calc(-1 * min(var(--s-3), var(--indent) / 2) - 0.13rem);
-  top: calc(50% + 0.12rem);
+  top: calc(var(--title-base) - var(--title-size) * 0.3);
   width: 0.5rem;
   height: 0.5rem;
   transform: translateY(-50%);
   border: 1.5px solid var(--pick);
   border-radius: 50%;
   background: var(--paper);
-}
-
-/* Tall enough: the list shrinks to fit the window. It takes the height
-   left under the header, and each row (one per story, --n, set by the
-   build) is --row-max tall or, if all of them would not fit, an equal
-   share of that height; titles scale with the row (cq units of the list),
-   capped by its width, so every story shows without scrolling. Spare
-   height stays under the list, and the footer sits at the window's
-   bottom. Rows stop shrinking at --row-min; past that the list's
-   min-height pushes the footer down and the page scrolls. svh, so the list fits with a phone
-   browser's toolbars showing. The height must be fixed, not a min-height:
-   cq units need a definite container height (with min-height Chrome
-   resolves 100cqh to 0 and every row falls to --row-min). */
-@media (min-height: 520px) {
-  .is-index main {
-    display: flex;
-    flex-direction: column;
-    width: auto;
-    height: auto;
-    flex: 1;
-    min-height: 0;
-    margin: 0 var(--gutter);
-    padding: var(--s-4) 0 0;
-  }
-  .is-index .site-head, .is-index .site-foot-wrap { flex: none; }
-  .stories {
-    flex: 1;
-    display: grid;
-    grid-template-rows: repeat(var(--n), auto);
-    align-content: start;
-    /* One column, the list's width: an auto column would grow to the
-       widest unwrapped row and push the page sideways. */
-    grid-template-columns: minmax(0, 1fr);
-    min-height: calc(var(--n) * var(--row-min));
-    container-type: size;
-  }
-  /* cq units resolve against the list only inside it, so the row
-     measures are defined on the rows. */
-  .story {
-    --row: clamp(var(--row-min), 100cqh / var(--n) - 0.15rem, var(--row-max));
-    height: var(--row);
-    --title-size: min(var(--row) * var(--title-k), var(--title-cqw));
-    --title-line: calc(var(--row) * var(--title-lh));
-    display: flex;
-    align-items: center;
-    min-height: 0;
-    padding: 0;
-  }
-  .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
-  .story .meta { font-size: clamp(var(--meta-min), var(--row) * var(--meta-k), var(--meta-max)); }
 }
 
 /* --- Success ---------------------------------------------------------- */
@@ -822,22 +825,29 @@ main {
   :root {
     --fs-name: clamp(1.5rem, 7vw, 2.3rem);
     /* The meta goes under each title: a row splits about 60/40 between
-       title and meta. */
+       title and meta. The floor keeps titles readable, so a short phone
+       scrolls a little rather than shrinking them. */
+    --row-min:   2.3rem;
+    --row-max:   2.75rem;
     --title-k:   0.414;
     --title-cqw: 5.85cqw;
-    --title-lh:  0.58;
+    --title-lh:  0.52;
     --meta-k:    0.2;
-    --meta-min:  0.62rem;
+    --meta-min:  0.66rem;
     --meta-max:  0.8rem;
+    /* Rows are tight here, with a date right above each title, so the largest
+       faces come partway back to the others: San Silvestro's swash would
+       otherwise cross the date above it. */
+    --ts-spread: 0.55;
   }
   .nav-rss { display: none; }
   .foot-copy, .foot-copy + .sep { display: none; }
   .nav-item { padding-inline: var(--s-1); }
   .nav-sub { height: 2rem; padding-inline: var(--s-3); font-size: var(--fs-xs); }
-  .site-head { column-gap: var(--s-2); margin-bottom: var(--s-2); }
-  .head-book { margin: var(--s-2) 0 0 var(--indent); }
+  .site-head { column-gap: var(--s-2); margin-bottom: 0.625rem; }
+  .head-book { margin: 0.875rem 0 0 var(--indent); }
   .is-index .foot-book-item { display: none; }
-  .story .meta { display: block; margin: 0; line-height: 1.15; white-space: normal; }
+  .story .meta { display: block; margin: 0; line-height: 1.3; }
   .post-nav { flex-direction: column; gap: var(--s-2); }
   .post-nav-next { margin-left: 0; text-align: left; }
 }
