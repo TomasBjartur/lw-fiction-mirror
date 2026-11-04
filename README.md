@@ -188,7 +188,8 @@ reload stay the browser's own, and a link to a place in the story wins. The
 first screen of text doesn't count, and reaching the last line clears it, so
 a finished story opens at its title again. Only the reader moving saves
 anything, so a page left idle in another tab, or an old history entry, can't
-erase a later place.
+erase a later place. `node scripts/reading-check.mjs <chrome|firefox|webkit>`
+tries all of this with a real wheel, mouse and keyboard.
 
 The story fonts' latin subsets live in `fonts/web/`
 (`scripts/fetch-webfonts.py` refreshes them). Characters outside those
