@@ -155,6 +155,8 @@
   // Display; leaving resets it at once. The title (or, if it wraps, each
   // word) keeps its resting box, so nothing around it moves; the mono
   // letters keep the title's size, never distorted (see .morph in style.css).
+  // A story's own title does the same, and takes over from the title that was
+  // clicked to open it (below).
   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
   var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
   // The mono text keeps the title's width and height about equally: its
@@ -167,13 +169,17 @@
   function up(font,t){cx.font=font;return cx.measureText(t).actualBoundingBoxAscent}
   function heightSize(a,t,fontPx){
     var cs=getComputedStyle(a);
-    var xs=(t.match(/[acemnorsuvwxz]/g)||[]).join('')||t;
+    var shown=cs.textTransform==='uppercase'?t.toUpperCase():t;
+    var xs=function(s){return (s.match(/[acemnorsuvwxz]/g)||[]).join('')||s};
     var f=cs.fontStyle+' '+cs.fontWeight+' '+fontPx+'px '+cs.fontFamily,mf='400 100px "Major Mono Display"';
-    var h=(up(f,xs)+up(f,t))/2,m=(up(mf,xs)+up(mf,t))/200;
+    var h=(up(f,xs(shown))+up(f,shown))/2,m=(up(mf,xs(t))+up(mf,t))/200;
     return m>0?h/m:fontPx;
   }
   document.querySelectorAll('.morph').forEach(function(a){
     var spans=null,words=null,text=null,timers=[],left=null,dir=0,running=false;
+    // The letters are hidden from screen readers, so the name goes on the link,
+    // or on the heading for a story's own title, whose span cannot carry one.
+    var named=a.closest('h1')||a,own=a.closest('.post-header');
     function split(){
       var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
       var inline=/^inline/.test(getComputedStyle(a).display);
@@ -183,7 +189,7 @@
       // the letter spans add fragments.
       var lr=document.createRange();lr.selectNodeContents(a);
       var oneLine=lr.getClientRects().length===1,textW=lr.getBoundingClientRect().width;
-      text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];words=[];
+      text=a.textContent;named.setAttribute('aria-label',text);a.textContent='';spans=[];words=[];
       var mi=document.createElement('span');mi.className='mi';
       text.split(/(\s+)/).forEach(function(part){
         if(!part)return;
@@ -216,7 +222,7 @@
         // row, up to the other link; if it needs more, the other link fades
         // too (.spread) and it has the whole row. Only past that does it
         // shrink further.
-        var nav=a.closest('.post-nav'),room=cr.right-ar.left-4;
+        var nav=a.closest('.post-nav'),room=own?cr.width:cr.right-ar.left-4;
         if(nav){
           var o=Array.from(nav.querySelectorAll('.morph')).filter(function(x){return x!==a})[0],or=o&&o.getBoundingClientRect();
           room=cr.width-(ar.width-textW);
@@ -266,10 +272,37 @@
     // dropped; the next hover measures afresh. A click leaves the page with
     // the title morphed and no mouseleave, so a page restored from the
     // back/forward cache starts over too.
-    function reset(){if(!spans)return;stop();dir=0;a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null}
+    function reset(){if(!spans)return;stop();dir=0;a.textContent=text;a.removeAttribute('style');named.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null}
     addEventListener('resize',reset);
     addEventListener('pageshow',function(e){if(e.persisted)reset()});
     // Leaving resets the title at once; the morph only plays forwards.
-    a.addEventListener('mouseleave',function(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}});
+    function leave(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}}
+    a.addEventListener('mouseleave',leave);
+    // A title clicked in the list or the newer/older row is still hovered when the
+    // page changes, so a story's own title opens already turned, and lets go the
+    // way a hover does: when the pointer moves off it, or on the first scroll. The
+    // page's head decides this and keeps the title hidden until then (.carry). The
+    // title's own face must be in first, or its resting box is measured wrong.
+    if(own&&h.classList.contains('carry')){
+      var rest=getComputedStyle(a);
+      Promise.all([mono,document.fonts.load(rest.fontStyle+' '+rest.fontWeight+' '+rest.fontSize+' '+rest.fontFamily,a.textContent),document.fonts.ready]).then(function(){
+        split();dir=1;left=[];
+        spans.forEach(function(s){s.className='mm'});
+        h.classList.remove('carry');
+        // A browser may send one move with no movement after a page loads.
+        var x=null,y=null;
+        function end(e){
+          if(e.type==='mousemove'){
+            if(a.contains(e.target))return;
+            if(x===null){x=e.clientX;y=e.clientY;return}
+            if(e.clientX===x&&e.clientY===y)return;
+          }
+          removeEventListener('mousemove',end);removeEventListener('scroll',end);
+          leave();
+        }
+        addEventListener('mousemove',end,{passive:true});
+        addEventListener('scroll',end,{passive:true});
+      });
+    }
   });
 })();

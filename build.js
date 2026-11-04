@@ -804,6 +804,11 @@ function buildTitleFontsPage(posts, faces, files) {
   });
 }
 
+// A story opened by clicking a title takes over that title's hover (site.js): a
+// fresh navigation from this site, with a mouse, unless a saved reading place will
+// take the reader past the title anyway. Before first paint, so the title can wait.
+const CARRY_SCRIPT = "try{if(matchMedia('(hover:hover) and (prefers-reduced-motion:no-preference)').matches&&performance.getEntriesByType('navigation')[0].type==='navigate'&&document.referrer.indexOf(location.origin+'/')===0&&!location.hash&&!localStorage.getItem('read:'+location.pathname))document.documentElement.classList.add('carry')}catch(e){}";
+
 // Where the email form lands after a successful signup.
 function buildSuccessPage(posts) {
   const content = `
@@ -1049,6 +1054,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="${PAPER.light}">
   <script>try{if(localStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name=color-scheme]').content='dark';document.querySelector('meta[name=theme-color]').content='${PAPER.dark}'}}catch(e){}</script>
+  ${currentSlug ? `<script>${CARRY_SCRIPT}</script>` : ''}
   <script src="${base}${assetUrl('site.js')}" defer></script>
   <link rel="stylesheet" href="${base}${assetUrl('style.css')}">
   <link rel="stylesheet" href="${base}${assetUrl('titles.css')}">
@@ -1165,7 +1171,7 @@ function buildPostPage(post, allPosts) {
   const content = `
     <article>
       <header class="post-header">
-        <h1>${escapeHtml(post.title)}</h1>
+        <h1><span class="morph">${escapeHtml(post.title)}</span></h1>
         <p class="post-byline"><span class="byline">${AUTHOR}</span><span class="when">${date}</span></p>
         ${metaLine ? `<p class="post-meta meta">${metaLine}</p>` : ''}
         <span class="orn" aria-hidden="true"></span>

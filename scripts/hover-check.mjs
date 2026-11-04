@@ -4,8 +4,8 @@
 //
 // Serve dist/ first and install the engines as for initials-check.mjs (its
 // header says how). At three desktop widths it hovers every title in the
-// contents list and the newer/older links on every story page, waits for
-// the morph to finish, and compares the mono text with the resting title.
+// contents list, and the title and newer/older links on every story page, waits
+// for the morph to finish, and compares the mono text with the resting title.
 // The morph takes the geometric mean of the sizes that match the title's
 // width and its letter height (x-height and capitals averaged), so:
 // - width times letter height must be within 3% of the title's (unless the
@@ -65,9 +65,9 @@ const HOVER = async sel => {
   };
   const out = [];
   for (const a of document.querySelectorAll(sel)) {
-    const t = a.textContent, cs = getComputedStyle(a), row = a.closest('.story, .post-nav');
-    const w0 = width(a), h0 = height(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, t);
-    const r0 = row.getBoundingClientRect(), b0 = a.closest('.story') ? baseline(a) : null;
+    const t = a.textContent, cs = getComputedStyle(a), row = a.closest('.story, .post-nav, .post-header');
+    const w0 = width(a), h0 = height(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, cs.textTransform === 'uppercase' ? t.toUpperCase() : t);
+    const r0 = row.getBoundingClientRect(), b0 = a.closest('.story, .post-header') ? baseline(a) : null;
     a.dispatchEvent(new MouseEvent('mouseenter'));
     const done = () => a.querySelector('.mi') && !a.querySelector('.mi .w > span:not(.mm)');
     for (const t0 = performance.now(); !done() && performance.now() - t0 < 3000;) await new Promise(r => setTimeout(r, 16));
@@ -90,7 +90,7 @@ let checked = 0; const worstW = [0, 0], worstH = [0, 0];
 const failures = [], shrunk = [];
 for (const [w, h] of sizes) {
   let browser = null, page = null, born = 0;
-  for (const [file, sel] of [['index.html', '.stories .morph'], ...stories.map(s => [s, '.post-nav .morph'])]) {
+  for (const [file, sel] of [['index.html', '.stories .morph'], ...stories.map(s => [s, '.post-header .morph, .post-nav .morph'])]) {
     if (Date.now() - born > LIFE_MS) {
       await browser?.close();
       browser = await launch();
@@ -122,7 +122,7 @@ for (const [w, h] of sizes) {
   await browser.close();
 }
 
-console.log(`${engine}: ${checked} hovers (list and newer/older on ${stories.length} stories) at ${sizes.map(s => s[0]).join(', ')}px;` +
+console.log(`${engine}: ${checked} hovers (list, and title and newer/older on ${stories.length} stories) at ${sizes.map(s => s[0]).join(', ')}px;` +
   ` width ${(1 - worstW[0]).toFixed(2)}-${(1 + worstW[1]).toFixed(2)}x, height ${(1 - worstH[0]).toFixed(2)}-${(1 + worstH[1]).toFixed(2)}x`);
 for (const f of shrunk) console.log(`  · ${f}`);
 for (const f of failures) console.log(`  ✗ ${f}`);

@@ -497,6 +497,16 @@ main {
    (moving up from a script face made the title above slow to react). */
 .morph .mi, .morph .mi * { pointer-events: none; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
+/* A story's own title is centred, so its mono text runs past its box evenly
+   either way, and shows the same letters as in the list: Major Mono's capitals
+   are different drawings, and this title is set in capitals. */
+.post-header .morph.pinned { justify-content: center; }
+.post-header .morph .mq, .post-header .morph .mm { text-transform: none; }
+/* Opened by clicking a title, a story's title starts turned (site.js), and until
+   then stays hidden rather than flash its resting face: about 80 ms in Firefox
+   and Safari. It shows anyway if the script never gets there. */
+.carry .post-header h1 { visibility: hidden; animation: carry-show 0s 0.6s forwards; }
+@keyframes carry-show { to { visibility: visible; } }
 .post-nav .morph { transition: opacity var(--dur) ease-out; }
 /* Where the morph runs (the script's own condition), a hovered title
    keeps its colour and each letter turns red as it changes. */
