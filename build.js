@@ -252,20 +252,16 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
-// With html, the month is wrapped (.mo) so it can sit a weight above the
-// numbers; without, plain text for title attributes and the feed.
-const markMonth = (m, html) => html ? `<span class="mo">${m}</span>` : m;
-
 // "17 September 2025"
-function formatDate(dateStr, html = false) {
+function formatDate(dateStr) {
   const d = new Date(dateStr);
-  return `${d.getUTCDate()} ${markMonth(MONTHS[d.getUTCMonth()], html)} ${d.getUTCFullYear()}`;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 // "Sep 2025"
-function formatMonthYear(dateStr, html = false) {
+function formatMonthYear(dateStr) {
   const d = new Date(dateStr);
-  return `${markMonth(MONTHS[d.getUTCMonth()].slice(0, 3), html)} ${d.getUTCFullYear()}`;
+  return `${MONTHS[d.getUTCMonth()].slice(0, 3)} ${d.getUTCFullYear()}`;
 }
 
 // Minutes to read: 260 words a minute, the mean silent reading rate for
@@ -447,11 +443,11 @@ const SUBSET_FONTS = [
     text: () => AUTHOR },
   { family: 'Homemade Apple', as: 'Signature', file: 'fonts/signature-homemade-apple.woff2', display: 'block',
     text: () => 'Tomás B.' },
-  // Dates and reading times in the contents list and on story pages. Its
-  // Light weight is the face; the subset holds every month, digit and word
-  // those lines use.
+  // Dates, reading times and counts, the book's title, EPUB and the small
+  // labels. Its Light weight is the face. The whole alphabet, so a wording
+  // change can't quietly drop a letter to the reader's device font.
   { family: 'Urbanist:wght@300', as: 'Urbanist Meta', file: 'fonts/urbanist-meta.woff2', display: 'swap', weight: 300,
-    text: posts => '· 0123456789 You Successfully Subscribed. Thank you ' + posts.map(p => `${formatDate(p.postedAt)} ${formatMonthYear(p.postedAt)} ${readingMinutes(p.wordCount)}m ${estimateReadingTime(p.wordCount)}`).join('') },
+    text: () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;·—–-&?!\'’()/' },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
     text: posts => '△←→↗' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
@@ -820,7 +816,9 @@ function buildSuccessPage(posts) {
     nav: true,
     skipLabel: 'confirmation',
     robots: 'noindex',
-    preload: ['fonts/urbanist-meta.woff2'],
+    // The name's face first: while it loads, Chrome reaches for the next face in
+    // its stack, which would fetch EB Garamond for a page that sets no story.
+    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
   });
 }
 
@@ -880,7 +878,7 @@ const ICON_SS_OFF = `<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h1
 function whenText(p) {
   const mins = readingMinutes(p.wordCount);
   const read = mins ? ` · <span title="${mins} min read">${mins}m</span>` : '';
-  return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt, true)}</span>${read}</span>`;
+  return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span>${read}</span>`;
 }
 
 // Reader counts from LessWrong and Substack, each group led by its source
@@ -1322,7 +1320,7 @@ function storyImages(html) {
 }
 
 function buildPostPage(post, allPosts) {
-  const date = formatDate(post.postedAt, true);
+  const date = formatDate(post.postedAt);
   const readTime = estimateReadingTime(post.wordCount);
   const social = stats(post);
   const metaLine = [readTime ? `<span class="when">${readTime}</span>` : '', social].filter(Boolean).join('');

@@ -18,8 +18,8 @@
 /* Every face is served from fonts/, so all devices render the same; no
    stack relies on an installed font. Latin subsets from
    scripts/fetch-webfonts.py. Inter stands in for the system UI font,
-   Urbanist Light sets the dates and reading times, EB Garamond sets the
-   stories, the reader counts and the book, Fira Mono any code, Zallman
+   Urbanist Light sets the dates, reading times, reader counts and the
+   book, EB Garamond the stories, Fira Mono any code, Zallman
    Caps (Dieter Steffmann's vine-framed capitals, built by
    scripts/initials-lab-fonts.py --site) the initials. build.js adds
    subset faces (the name, the hover face, the marks, the date line, the
@@ -68,7 +68,7 @@
   /* Faces. 'Site Marks' (Noto Sans JP, subset) carries the marks and any
      character outside latin, right after each text face. */
   --sans:  'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;
-  --meta-sans: 'Urbanist Meta', 'Site Marks', -apple-system, system-ui, sans-serif;  /* dates and reading times */
+  --meta-sans: 'Urbanist Meta', 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;  /* dates, counts and small labels */
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --mono:  'Fira Mono', ui-monospace, monospace;
   --name:  'Author Name', var(--serif);  /* Send Flowers, subset to the name */
@@ -488,20 +488,17 @@ main {
 .post-nav:has(.spread .mm) .morph:not(.spread) { opacity: 0; }
 
 /* --- Meta: dates, reading times and reader counts --------------------- */
-/* Date and reading time in Urbanist Light, the month a weight up and a
-   step larger than the counts; the counts in EB Garamond's old-style
-   figures, each followed by a small icon of its kind and each source led
-   by its mark (a link). */
+/* Everything in Urbanist Light: date and reading time a step larger than
+   the counts, each count followed by a small icon of its kind and each
+   source led by its mark (a link). */
 
 .meta {
-  font: 400 var(--fs-2xs)/1 var(--serif);
-  font-variant-numeric: oldstyle-nums proportional-nums;
+  font: var(--w-light) var(--fs-2xs)/1 var(--meta-sans);
   letter-spacing: 0.01em;
   color: var(--muted);
 }
-.meta .when { font: var(--w-light) 1.08em/1 var(--meta-sans); color: var(--ink-soft); }
-.meta .mo { font-weight: var(--w-ui); }
-.meta .m { display: inline-flex; align-items: center; gap: 0.3em; margin-left: 0.8em; font-family: var(--meta-sans); font-weight: var(--w-light); vertical-align: middle; }
+.meta .when { font-size: 1.08em; color: var(--ink-soft); }
+.meta .m { display: inline-flex; align-items: center; gap: 0.3em; margin-left: 0.8em; vertical-align: middle; }
 .meta .n { position: relative; padding-right: 1.07em; }
 .meta .n::after {
   content: "";
@@ -692,7 +689,6 @@ main {
   color: var(--ink-soft);
   white-space: nowrap;
 }
-.post-byline .mo { font-weight: var(--w-ui); }
 .post-meta { margin-top: 0.5em; font-size: var(--fs-xs); }
 .post-meta .m { margin-left: 0; }
 .post-meta .when + .m,
