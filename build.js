@@ -442,7 +442,7 @@ const SUBSET_FONTS = [
   { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
     text: () => AUTHOR },
   { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
-    text: posts => '△◐←→↗' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
+    text: posts => '△←→↗' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
 ];
 
 // The unicode-range of Google Fonts' "latin" subset, which is what the
@@ -693,6 +693,12 @@ const FAVICON_SVG = 'data:image/svg+xml,' + encodeURIComponent(fs.readFileSync(p
 
 // The bird from markusstrasser.org's Icon.svelte.
 const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
+// Theme toggle marks, one per mode; CSS shows the current one. System: a
+// yin-yang, light and dark in one; light: a sun with long and short rays;
+// dark: a crescent with two sparks.
+const ICON_THEME = '<svg class="ti ti-system" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17a4.25 4.25 0 0 0 0-8.5a4.25 4.25 0 0 1 0-8.5z"/></svg>'
+  + '<svg class="ti ti-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19 12L22 12M16.95 16.95L18.08 18.08M12 19L12 22M7.05 16.95L5.92 18.08M5 12L2 12M7.05 7.05L5.92 5.92M12 5L12 2M16.95 7.05L18.08 5.92" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+  + '<svg class="ti ti-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 15.2A8 8 0 1 1 9.8 3.6a6.6 6.6 0 0 0 9.7 11.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 3.2l.55 1.45 1.45.55-1.45.55L17 7.2l-.55-1.45L15 5.2l1.45-.55zM20.6 8.6l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z"/></svg>';
 // Download mark: an arrow into a tray, so an EPUB link reads as a file.
 const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // The book as a download: its title (plain text) and, as the one link,
@@ -713,7 +719,7 @@ function siteFoot() {
 // contents page. Subscribe looks like Substack's own button, so readers
 // know where it goes.
 function navItems(currentSlug) {
-  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>TB</a><a href="${EPUB_FILENAME}" class="nav-item nav-epub epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">◐</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
+  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>TB</a><a href="${EPUB_FILENAME}" class="nav-item nav-epub epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">${ICON_THEME}</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
 }
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
@@ -811,7 +817,7 @@ ${currentSlug ? `  <header class="nav">
   (function(){
     var h=document.documentElement;
 
-    // Theme: follows the system until the reader picks; ◐ cycles
+    // Theme: follows the system until the reader picks; the toggle cycles
     // System -> Light -> Dark and remembers the choice.
     var tb=document.getElementById('theme-btn');
     if(tb){

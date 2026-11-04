@@ -59,7 +59,8 @@ cached in `localStorage` for 24h to stay under the free tier's rate limit.
 ## Architecture
 
 Reading requires no JavaScript. Light and dark themes follow the
-reader's system setting; the ◐ button cycles System → Light → Dark and
+reader's system setting; the theme button (a yin-yang, a sun, a crescent:
+its mark shows the mode) cycles System → Light → Dark and
 remembers the choice (a blocking script in `<head>` applies it before
 first paint). Each colour token is written once with `light-dark()` in
 `style.css`; the dark values (warm near-black page, off-white text at
