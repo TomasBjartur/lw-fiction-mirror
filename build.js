@@ -694,8 +694,9 @@ const FAVICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
 // Download mark: an arrow into a tray, so an EPUB link reads as a file.
 const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-// The book as a download: its title, underlined, with the EPUB mark.
-const bookLink = cls => `<a href="${EPUB_FILENAME}" class="book ${cls} epub-link" title="The whole collection as a free EPUB" download><span class="bk-title">${SITE_TITLE}</span> <span class="bk-dl">EPUB${ICON_DL}</span></a>`;
+// The book as a download: its title (plain text) and, as the one link,
+// the underlined EPUB mark.
+const bookLink = cls => `<span class="book ${cls}"><span class="bk-title">${SITE_TITLE}</span> <a href="${EPUB_FILENAME}" class="bk-dl epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a></span>`;
 const X_HANDLE = 'BjarturTomas';
 const X_URL = `https://x.com/${X_HANDLE}`;
 
@@ -1056,7 +1057,7 @@ function buildIndexPage(posts) {
     <header class="site-head">
       <h1 class="site-h1">${AUTHOR}</h1>
       ${bookLink('head-book')}
-      <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>TB<\/a>/, '').replace(/<a[^>]*nav-epub[^>]*>EPUB.*?<\/a>/, '')}</nav>
+      <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>TB<\/a>/, '').replace(/<a[^>]*nav-epub[^>]*>EPUB.*?<\/a>/, m => `<span class="nav-bk-title">${SITE_TITLE}</span>${m}`)}</nav>
       <hr class="head-rule">
     </header>
     <ol class="stories" style="--n:${posts.length}">${rows}

@@ -122,8 +122,8 @@
      still too wide for its row with its meta shrinks alone, --fit); its
      line is --title-lh of the row; the meta scales with the row, clamped. */
   --row-min:   1.9rem;
-  --row-max:   3.4rem;
-  --title-k:   0.62;
+  --row-max:   3.6rem;
+  --title-k:   0.68;
   --title-cqw: 4.2cqw;
   --title-lh:  1;
   --meta-k:    0.27;
@@ -172,14 +172,15 @@ a:hover { color: var(--accent); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* One underline for every underlined link: story text and the book. */
-.post-body a, .book {
+/* One underline for every underlined link: story text and the book's
+   EPUB mark (the book's title is not a link). */
+.post-body a, .bk-dl, .site-head .nav-epub {
   text-decoration-line: underline;
   text-decoration-thickness: 1px;
   text-decoration-color: var(--underline);
   text-underline-offset: 0.2em;
 }
-.post-body a:hover, .book:hover { text-decoration-color: currentColor; }
+.post-body a:hover, .bk-dl:hover, .site-head .nav-epub:hover { text-decoration-color: currentColor; }
 
 /* --- Layout ----------------------------------------------------------- */
 /* One centred column under the story nav; the contents page has no bar
@@ -409,9 +410,14 @@ main {
 .site-head .navbar { grid-area: nav; }
 .head-rule { grid-area: rule; margin-top: var(--s-1); border: 0; border-top: 1px solid var(--rule-strong); }
 .head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: 400 var(--fs-book)/1.2 var(--serif); }
+/* From 1040px the book joins the nav: its title just left of an EPUB nav
+   item, centred on the row like RSS and X. */
+.nav-bk-title { display: none; font: 400 var(--fs-nav-text)/1 var(--serif); color: var(--ink-soft); white-space: nowrap; }
+.site-head .nav-epub { display: none; text-underline-offset: 0.25em; }
 @media (min-width: 1040px) {
-  .site-head { grid-template-columns: auto 1fr auto auto; grid-template-areas: "name . book nav" "rule rule rule rule"; }
-  .head-book { margin: 0 var(--s-2) 0 0; font-size: var(--fs-nav-text); }
+  .head-book { display: none; }
+  .nav-bk-title, .site-head .nav-epub { display: inline-flex; }
+  .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); margin-right: var(--s-2); }
 }
 
 .stories { list-style: none; padding-left: var(--indent); }

@@ -77,13 +77,13 @@ contents
 page opens with the author's name (Send Flowers), the book and the links
 (RSS, X, and a Substack-orange Subscribe button that goes to Substack)
 above a thin grey rule. The book is its title in the text face,
-underlined, followed by "EPUB" and a download mark in the accent red: one
-link that downloads the EPUB. From 1040 px up it sits on the name's row
-at the size of the nav labels; on narrower screens it goes below the
+plain, followed by "EPUB" and a download mark in the accent red, the one
+link, underlined, that downloads the EPUB. From 1040 px up it sits in the
+nav, its EPUB link a nav item level with RSS and X; on narrower screens it goes below the
 rule, indented to the list, at story-title size. The footer carries it
 too (except on a phone's contents page, where it is already under the
 name). Story pages put "TB" (in the name's face) and the EPUB link in
-their nav. On screens at least 520 px tall each story's row is 3.4rem,
+their nav. On screens at least 520 px tall each story's row is 3.6rem,
 or less where that would not fit, titles scaled to the row, so every
 story shows without scrolling (on phones, with the browser's toolbars
 showing); spare height stays under the list and the footer sits at the
