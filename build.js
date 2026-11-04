@@ -808,12 +808,12 @@ function buildTitleFontsPage(posts, faces, files) {
 function buildSuccessPage(posts) {
   const content = `
     <section class="success-page">
-      <h1>You Successfully Subscribed. Thank you</h1>
+      <h1>Thank you.<br>The next story will come by email.</h1>
       <p class="success-back"><a href="../">Back to the stories</a></p>
     </section>`;
 
   return pageShell(content, 'Subscribed', posts, null, {
-    description: 'You are on the list.',
+    description: 'Thank you for subscribing.',
     canonicalUrl: `${SITE_URL}/subscribed/`,
     bodyClass: 'is-success',
     base: '../',
