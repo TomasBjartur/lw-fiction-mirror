@@ -261,9 +261,11 @@ it can be pinned.
 ## Open questions for Tomás
 
 - **What should stop a deploy?** The site rebuilds every 6 hours. Right
-  now three things stop a build (the last good version stays live):
+  now four things stop a build (the last good version stays live):
   a story font that can't be fetched from Google, a `GEO_HIDDEN` slug
-  that matches no story, and the usual API failures. Stale slugs in
+  that matches no story, a page whose `src` or `href` points at no file
+  in `dist/` (a relative link inside story text only warns), and the
+  usual API failures. Stale slugs in
   `TITLE_FONTS`, `EDITOR_PICKS`, `COLLECTION_ORDER` or
   `FORCE_INCLUDE_SLUGS` (e.g. a story renamed on LessWrong) only log
   `[DEGRADED]`. Is that the split you want, or should every stale slug

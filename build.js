@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { createCanvas, registerFont } = require('canvas');
+const { createCanvas, registerFont, loadImage } = require('canvas');
 
 // Cover typeface, bundled so the CI runner (which has no Georgia) renders the
 // same cover as a local Mac build. EB Garamond, SIL OFL — see fonts/OFL.txt.
@@ -1308,6 +1308,19 @@ function postNavLink(list, idx, step, base = '') {
   return `<a href="${base}${target.slug}/" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${target.title}</a>`;
 }
 
+// A story's images, as they appear on its page: post bodies hold site-relative
+// paths (the EPUB and the feed read those), and a story's page is one directory
+// down, so they need the step up, plus their size and lazy loading.
+function storyImages(html) {
+  return html.replace(/<img\b[^>]*>/gi, tag => {
+    const src = tag.match(/\ssrc="(images\/[^"]+)"/i);
+    if (!src) return tag;
+    const { width, height } = LOCAL_IMAGES.get(src[1]) || {};
+    const size = width && height ? ` width="${width}" height="${height}"` : '';
+    return tag.replace(src[0], ` src="../${src[1]}"`).replace(/^<img/i, `<img${size} loading="lazy" decoding="async"`);
+  });
+}
+
 function buildPostPage(post, allPosts) {
   const date = formatDate(post.postedAt, true);
   const readTime = estimateReadingTime(post.wordCount);
@@ -1325,7 +1338,7 @@ function buildPostPage(post, allPosts) {
         <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">
-        ${typeset(cleanHtml(post.htmlBody).trim())}
+        ${storyImages(typeset(cleanHtml(post.htmlBody).trim()))}
       </div>
       <p class="end-mark" aria-hidden="true">· · ·</p>
       <footer class="post-footer">
@@ -2252,6 +2265,18 @@ async function downloadImage(url) {
 // Filled by localizeImages(); used for dist/, the EPUB, and RSS absolutization.
 const LOCAL_IMAGES = new Map();
 
+// Pixel size, for the width and height attributes that keep a page from
+// shifting as its images arrive. A format canvas cannot read just goes without.
+async function imageSize(data, name) {
+  try {
+    const { width, height } = await loadImage(data);
+    return { width, height };
+  } catch (err) {
+    console.warn(`  [DEGRADED] no size for ${name}: ${err.message}`);
+    return {};
+  }
+}
+
 // Download every remote image referenced in post bodies and rewrite the srcs
 // to site-relative paths, so the site doesn't hotlink LessWrong's CDN.
 async function localizeImages(posts) {
@@ -2273,7 +2298,7 @@ async function localizeImages(posts) {
         const img = await downloadImage(url);
         if (!img) continue;
         const name = `images/img-${hashStr(url).toString(36)}.${img.ext}`;
-        LOCAL_IMAGES.set(name, { data: img.data, mediaType: img.mediaType });
+        LOCAL_IMAGES.set(name, { data: img.data, mediaType: img.mediaType, ...await imageSize(img.data, name) });
         urlToPath.set(url, name);
       }
       post.htmlBody = post.htmlBody.split(url).join(urlToPath.get(url));
@@ -2654,7 +2679,42 @@ async function main() {
     `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${SUBSTACK_URL}"/></head><body></body></html>`);
   console.log('Wrote subscribe/index.html (redirect to Substack)');
 
+  checkLocalReferences();
+
   console.log(`\nDone! ${fiction.length} pages + EPUB + RSS generated in ${OUTPUT_DIR}/`);
+}
+
+// Every src and href on every page must resolve to a file in dist/, the way a
+// browser would resolve it from that page. A broken one stops the build, so
+// the last good deploy stays live: story images once 404ed for a day because
+// nothing looked. Links inside story text are the author's, so a relative one
+// there only warns.
+function checkLocalReferences() {
+  const pages = [];
+  const walk = dir => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith('.html')) pages.push(full);
+    }
+  };
+  walk(OUTPUT_DIR);
+  const broken = [], soft = [];
+  for (const page of pages) {
+    const html = fs.readFileSync(page, 'utf8');
+    const start = html.indexOf('<div class="post-body">'), end = html.indexOf('<p class="end-mark"');
+    for (const m of html.matchAll(/\s(src|href)="([^"]+)"/g)) {
+      const url = m[2].replace(/&amp;/g, '&').split(/[?#]/)[0];
+      if (!url || /^[a-z][a-z0-9+.-]*:|^\/\//i.test(m[2])) continue;
+      const target = url.startsWith('/') ? path.join(OUTPUT_DIR, url) : path.resolve(path.dirname(page), url);
+      if (fs.existsSync(target) && (!fs.statSync(target).isDirectory() || fs.existsSync(path.join(target, 'index.html')))) continue;
+      const where = `${path.relative(OUTPUT_DIR, page)}: ${m[2]}`;
+      (m[1] === 'href' && m.index > start && start >= 0 && m.index < end ? soft : broken).push(where);
+    }
+  }
+  for (const w of soft) console.warn(`[DEGRADED] relative link in story text goes nowhere: ${w}`);
+  if (broken.length) throw new Error(`broken references:\n  ${broken.join('\n  ')}`);
+  console.log(`Checked local references on ${pages.length} pages`);
 }
 
 // Export for testing, run if called directly
