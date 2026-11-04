@@ -693,11 +693,9 @@ const FAVICON_SVG = 'data:image/svg+xml,' + encodeURIComponent(fs.readFileSync(p
 
 // The bird from markusstrasser.org's Icon.svelte.
 const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
-// Theme toggle marks, one per mode; CSS shows the current one. System: a
-// yin-yang, light and dark in one; light: a sun with long and short rays;
-// dark: a crescent with two sparks.
-const ICON_THEME = '<svg class="ti ti-system" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17a4.25 4.25 0 0 0 0-8.5a4.25 4.25 0 0 1 0-8.5z"/></svg>'
-  + '<svg class="ti ti-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19 12L22 12M16.95 16.95L18.08 18.08M12 19L12 22M7.05 16.95L5.92 18.08M5 12L2 12M7.05 7.05L5.92 5.92M12 5L12 2M16.95 7.05L18.08 5.92" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+// Theme toggle marks, one per mode; CSS shows the current one. Light: a
+// sun with long and short rays; dark: a crescent with two sparks.
+const ICON_THEME = '<svg class="ti ti-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19 12L22 12M16.95 16.95L18.08 18.08M12 19L12 22M7.05 16.95L5.92 18.08M5 12L2 12M7.05 7.05L5.92 5.92M12 5L12 2M16.95 7.05L18.08 5.92" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
   + '<svg class="ti ti-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 15.2A8 8 0 1 1 9.8 3.6a6.6 6.6 0 0 0 9.7 11.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 3.2l.55 1.45 1.45.55-1.45.55L17 7.2l-.55-1.45L15 5.2l1.45-.55zM20.6 8.6l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z"/></svg>';
 // Download mark: an arrow into a tray, so an EPUB link reads as a file.
 const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -749,7 +747,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <meta name="color-scheme" content="light dark">
-  <script>try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
   <link rel="stylesheet" href="${assetUrl('style.css')}">
   <link rel="stylesheet" href="${assetUrl('titles.css')}">
   <link rel="preload" href="${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
@@ -817,17 +815,17 @@ ${currentSlug ? `  <header class="nav">
   (function(){
     var h=document.documentElement;
 
-    // Theme: follows the system until the reader picks; the toggle cycles
-    // System -> Light -> Dark and remembers the choice.
+    // Theme: light until the reader picks dark; the toggle switches between
+    // the two and remembers the choice.
     var tb=document.getElementById('theme-btn');
     if(tb){
-      var ORDER=['system','light','dark'],NAME={system:'Theme: follows your system',light:'Theme: light',dark:'Theme: dark'};
-      var cur=function(){return h.getAttribute('data-theme')||'system'};
+      var NAME={light:'Light theme',dark:'Dark theme'};
+      var cur=function(){return h.getAttribute('data-theme')==='dark'?'dark':'light'};
       var show=function(){var c=cur();tb.title=NAME[c]+' (click to change)';tb.setAttribute('aria-label',NAME[c]+'. Change theme')};
       tb.addEventListener('click',function(){
-        var n=ORDER[(ORDER.indexOf(cur())+1)%3];
-        if(n==='system')h.removeAttribute('data-theme');else h.setAttribute('data-theme',n);
-        try{if(n==='system')localStorage.removeItem('theme');else localStorage.setItem('theme',n)}catch(e){}
+        var n=cur()==='dark'?'light':'dark';
+        if(n==='dark')h.setAttribute('data-theme','dark');else h.removeAttribute('data-theme');
+        try{localStorage.setItem('theme',n)}catch(e){}
         show();
       });
       show();

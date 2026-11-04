@@ -58,11 +58,10 @@ cached in `localStorage` for 24h to stay under the free tier's rate limit.
 
 ## Architecture
 
-Reading requires no JavaScript. Light and dark themes follow the
-reader's system setting; the theme button (a yin-yang, a sun, a crescent:
-its mark shows the mode) cycles System → Light → Dark and
-remembers the choice (a blocking script in `<head>` applies it before
-first paint). Each colour token is written once with `light-dark()` in
+Reading requires no JavaScript. The page is light until the reader
+picks dark: the theme button (a sun in light, a crescent in dark)
+switches between the two and remembers the choice (a blocking
+script in `<head>` applies it before first paint). Each colour token is written once with `light-dark()` in
 `style.css`; the dark values (warm near-black page, off-white text at
 APCA Lc 88 rather than pure white, accents lifted and desaturated, story
 images dimmed to 85%, interface weight 360 instead of 400) come from a

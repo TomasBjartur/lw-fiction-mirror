@@ -33,13 +33,13 @@
 /* --- Tokens ----------------------------------------------------------- */
 
 :root {
-  /* Colour. Light and dark, each written once. The page follows the
-     reader's system setting; the theme button (System → Light → Dark,
-     remembered) forces one via data-theme. Dark values are from the
+  /* Colour. Light and dark, each written once. The page is light until
+     the reader picks dark with the theme button (remembered), which sets
+     data-theme="dark". Dark values are from the
      dark-mode research memo: a warm near-black page at Material's #121212
      lightness, off-white text at APCA Lc 88 (not pure white), accents
      lifted in lightness and halved in chroma. */
-  color-scheme: light dark;
+  color-scheme: light;
   --paper:         light-dark(oklch(0.99 0.006 85),  oklch(0.18 0.006 85));
   --paper-2:       light-dark(oklch(0.965 0.008 82), oklch(0.215 0.007 82));
   --ink:           light-dark(oklch(0.24 0.01 264),  oklch(0.91 0.008 85));
@@ -217,10 +217,8 @@ main {
 .nav-epub { color: var(--accent); }
 .nav-x svg, .x-link svg { width: calc(1em * var(--icon-k)); height: calc(1em * var(--icon-k)); fill: currentColor; }
 .theme-toggle .ti { width: calc(1em * var(--icon-k)); height: calc(1em * var(--icon-k)); fill: currentColor; }
-/* The mark of the current mode: system (no data-theme), light or dark. */
-.theme-toggle .ti-light, .theme-toggle .ti-dark,
-:root[data-theme] .theme-toggle .ti-system { display: none; }
-:root[data-theme="light"] .theme-toggle .ti-light,
+/* The mark of the current mode: a sun in light, a crescent in dark. */
+.theme-toggle .ti-dark, :root[data-theme="dark"] .theme-toggle .ti-light { display: none; }
 :root[data-theme="dark"] .theme-toggle .ti-dark { display: block; }
 
 /* Substack's own button: 40px tall, 8px corners, semibold, its orange. */
@@ -668,11 +666,7 @@ main {
    interface weight and dimmed story images (Apple HIG: darken
    white-ground images; Readium: never invert). */
 
-:root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --w-ui: 360; --img-filter: brightness(0.85); }
-}
 :root[data-theme="dark"] { --w-ui: 360; --img-filter: brightness(0.85); }
 
 /* --- Print: the story alone ------------------------------------------- */
