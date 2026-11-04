@@ -347,6 +347,12 @@ main {
 .morph.pinned { display: inline-flex; white-space: nowrap; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
 .post-nav .morph { transition: opacity var(--dur) ease-out; }
+/* Where the morph runs (the script's own condition), a hovered title
+   keeps its colour and each letter turns red as it changes. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .morph:hover { color: var(--tc, var(--ink)); }
+  .morph .mm { color: var(--accent); }
+}
 .post-nav:has(.spread .mm) .morph:not(.spread) { opacity: 0; }
 
 /* --- Meta: dates, reading times and reader counts --------------------- */
