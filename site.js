@@ -118,10 +118,12 @@
       if(!window.fetch)return;
       e.preventDefault();
       signupBtn.disabled=true;
-      fetch(signup.action,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({email:signup.email.value,_source:'footer',_page:location.pathname})})
+      fetch(signup.action,{method:'POST',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({email:signup.email.value,_source:'footer',_page:location.pathname})})
         .then(function(r){if(!r.ok)throw new Error();location.href=signup.getAttribute('data-success')||'/subscribed/';})
         .catch(function(){signupMsg.textContent='Something went wrong. Please try again.';signupMsg.className='subscribe-message error';signupMsg.setAttribute('role','alert');signupBtn.disabled=false;});
     });
+    // Back from the success page restores this page with its button still disabled.
+    addEventListener('pageshow',function(e){if(e.persisted)signupBtn.disabled=false});
   }
 
   // Hovering a title turns it, letter by letter at uneven speed, into Major Mono
