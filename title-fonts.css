@@ -16,7 +16,7 @@
   text-transform: uppercase;
   color: var(--muted);
 }
-.tf-back:hover { color: var(--accent); }
+@media (hover: hover) { .tf-back:hover { color: var(--accent); } }
 
 .tf-head { padding-bottom: var(--s-5); border-bottom: 1px solid var(--rule-strong); }
 .tf-eyebrow {
@@ -43,7 +43,7 @@
   text-decoration-color: var(--underline);
   text-underline-offset: 0.18em;
 }
-.tf-intro a:hover { text-decoration-color: currentColor; }
+@media (hover: hover) { .tf-intro a:hover { text-decoration-color: currentColor; } }
 .tf-counts {
   margin-top: var(--s-4);
   font: var(--w-ui) var(--fs-2xs)/1 var(--sans);
@@ -100,7 +100,7 @@
   text-decoration-color: var(--underline);
   text-underline-offset: 0.18em;
 }
-.tf-use a:hover { color: var(--accent); text-decoration-color: currentColor; }
+@media (hover: hover) { .tf-use a:hover { color: var(--accent); text-decoration-color: currentColor; } }
 .tf-sep { color: var(--muted); }
 .tf-specs {
   margin-top: var(--s-2);
