@@ -961,13 +961,12 @@ ${currentSlug ? `  <header class="nav">
           boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
         }
       }
-      // Every word changes at once, each on its own clock, sweeping left to
-      // right but not in strict order: each step turns one of the word's
-      // next three unchanged letters (two at once a quarter of the time),
-      // then waits, mostly short with rare pauses (cubed random; browsers
-      // clamp chained timers to 4 ms). The wait is 4-68 ms times the number
-      // of words, so each word of an n-word title moves n times slower
-      // (Goldfish takes ~100 ms, The Liar and the Scold ~0.5 s).
+      // Every word changes at once, each on its own clock, its letters
+      // strictly left to right, one at a time; each waits a random time
+      // before the next, mostly short with rare pauses (cubed random;
+      // browsers clamp chained timers to 4 ms). The wait is 4-55 ms times
+      // the number of words, so each word of an n-word title moves n times
+      // slower.
       function stop(){timers.forEach(clearTimeout);timers=[]}
       function run(){
         stop();
@@ -975,9 +974,8 @@ ${currentSlug ? `  <header class="nav">
         left.forEach(function(l){
           (function step(){
             if(!l.length)return;
-            for(var k=Math.random()<0.25?2:1;k>0&&l.length;k--)
-              spans[l.splice(Math.floor(Math.random()*Math.min(3,l.length)),1)[0]].className='mm';
-            var r=Math.random();timers.push(setTimeout(step,m*(3.4+64.2*r*r*r)));
+            spans[l.shift()].className='mm';
+            var r=Math.random();timers.push(setTimeout(step,m*(2.7+51.4*r*r*r)));
           })();
         });
       }
