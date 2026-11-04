@@ -73,15 +73,6 @@
     updateProgress();
   }
 
-  // Arrow keys step to the newer/older story
-  document.addEventListener('keydown',function(e){
-    if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;
-    if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
-    var el=document.activeElement;if(el&&(el.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;
-    var as=document.querySelectorAll(e.key==='ArrowLeft'?'a.post-nav-prev[href]':'a.post-nav-next[href]');
-    for(var i=0;i<as.length;i++)if(as[i].offsetParent){location.href=as[i].href;return}
-  });
-
   // A title too wide for its space shrinks just enough to fit: --fit
   // scales its CSS size. That is a long title in a wide face in a list
   // row (with its meta, when the meta shares the line), or a long word in

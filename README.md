@@ -271,9 +271,7 @@ Story pages sign the story in the name's face (Send Flowers), as in the
 header. Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.
 
-A small inline script adds the optional extras: arrow keys for
-newer/older and the hover morph (book order, `COLLECTION_ORDER`, now only
-shapes the EPUB). The only
+Book order (`COLLECTION_ORDER`) now only shapes the EPUB. The only
 external request on the reader's end is the `GEO_HIDDEN` lookup to
 ipapi.co, which runs on every page view (cached 24h) while any rule is
 configured.
