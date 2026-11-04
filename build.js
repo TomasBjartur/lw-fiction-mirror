@@ -20,6 +20,10 @@ const SITE_SUBTITLE = `by ${AUTHOR}`;
 const SITE_DESCRIPTION = 'Fiction by Tomás Bjartur.';
 const SITE_URL = 'https://tomasbjartur.com';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
+// The footer email signup's form action. Placeholder: replace this with
+// Tomás's own Formspree form URL (or another provider's POST endpoint)
+// before the signup can work.
+const NEWSLETTER_FORM_ACTION = 'https://formspree.io/f/REPLACE_WITH_YOUR_FORM_ID';
 const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
 const EPUB_FILENAME = 'The_Origami_Men_and_Other_Stories.epub';
 // Variant EPUB served to readers matched by GEO_HIDDEN: same cover and title,
@@ -818,6 +822,8 @@ function attachMetrics(posts, substack) {
 
 const ICON_LW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-4.6 6L18 18l-6-4.6L6 18l4.6-6L6 6l6 4.6z" opacity=".55"/><path d="M12 0l2.2 9.8L24 12l-9.8 2.2L12 24l-2.2-9.8L0 12l9.8-2.2z"/></svg>';
 const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.4H0zM0 2.7h11v1.4H0zM0 5.4h11V12L5.5 9 0 12z"/></svg>';
+// Substack's mark, struck through: the form's "email, not Substack" field.
+const ICON_SS_OFF = `<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.4H0zM0 2.7h11v1.4H0zM0 5.4h11V12L5.5 9 0 12z"/><path class="slash-bg" d="M1.2 11.1L9.8 0.9" fill="none" stroke-width="2.4" stroke-linecap="round"/><path class="slash" d="M1.2 11.1L9.8 0.9" fill="none" stroke-width="1.2" stroke-linecap="round"/></svg>`;
 
 // Month and reading time, set inline after a title in the contents list.
 function whenText(p) {
@@ -852,25 +858,52 @@ const ICON_THEME = '<svg class="ti ti-light" viewBox="0 0 24 24" aria-hidden="tr
   + '<svg class="ti ti-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 15.2A8 8 0 1 1 9.8 3.6a6.6 6.6 0 0 0 9.7 11.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 3.2l.55 1.45 1.45.55-1.45.55L17 7.2l-.55-1.45L15 5.2l1.45-.55zM20.6 8.6l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z"/></svg>';
 // Download mark: an arrow into a tray, so an EPUB link reads as a file.
 const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// The author's signature, from the supplied SVG; set in Homemade Apple and
+// inlined so it can use the site's self-hosted subset and follow the theme.
+const SIGNATURE_SVG = `<svg class="signature-mark" viewBox="0 0 420 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <g transform="rotate(0.11 210.0 85.0)">
+    <text x="34.9" y="95.8" font-family="Signature, serif" font-size="67.2" fill="currentColor" stroke="currentColor" stroke-width="0.78" transform="skewX(-12.1) translate(20.5 0)">Tomás B.</text>
+    <path d="M 44.9 117.8 c 10.3 -20.1, 20.7 -20.1, 10.3 0 c -10.3 14.1, 103.5 4.3, 194.1 2.6 c 38.8 -1.3, 51.8 -4.3, 64.7 -9.5" fill="none" stroke="currentColor" stroke-width="2.18" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  </g>
+</svg>`;
 // The book as a download: its title (plain text) and, as the one link,
-// the underlined EPUB mark.
-const bookLink = cls => `<span class="book ${cls}"><span class="bk-title">${SITE_TITLE}</span> <a href="${EPUB_FILENAME}" class="bk-dl epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a></span>`;
+// the underlined EPUB mark. `base` lets a page in a subdirectory link back
+// up to the root (the title-fonts specimen).
+const bookLink = (cls, base = '') => `<span class="book ${cls}"><span class="bk-title">${SITE_TITLE}</span> <a href="${base}${EPUB_FILENAME}" class="bk-dl epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a></span>`;
 const X_HANDLE = 'BjarturTomas';
 const X_URL = `https://x.com/${X_HANDLE}`;
 
-// One line at the foot of every page.
-function siteFoot() {
+// One line at the foot of every page, with the email signup above it.
+function siteFoot(base = '') {
   // The book with its separator, so a phone's contents page (where the
   // book sits under the name) can drop it and keep the footer to a line.
   const sep = '<span class="sep" aria-hidden="true">·</span>';
-  return `<p class="site-foot"><span>© ${new Date().getFullYear()} ${AUTHOR}</span>${sep}<a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item">${sep}${bookLink('foot-book')}</span></p>`;
+  return `<div class="site-foot-wrap">
+    <div class="site-foot-main">
+      <div class="site-signup" id="subscribe">
+        <form class="subscribe" action="${NEWSLETTER_FORM_ACTION}" method="POST" data-success="${base}subscribed/">
+          <input type="hidden" name="_source" value="footer">
+          <input type="hidden" name="_page" value="">
+          <input type="hidden" name="_next" value="${SITE_URL}/subscribed/">
+          <div class="subscribe-field">
+            <span class="subscribe-mark" aria-hidden="true">${ICON_SS_OFF}</span>
+            <input type="email" name="email" aria-label="Email address" placeholder="Direct Email" required>
+          </div>
+          <button type="submit">Subscribe</button>
+        </form>
+        <p class="subscribe-message" role="status" aria-live="polite"></p>
+      </div>
+      <p class="site-foot"><span class="foot-copy">© ${new Date().getFullYear()} ${AUTHOR}</span>${sep}<a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item">${sep}${bookLink('foot-book', base)}</span></p>
+    </div>${SIGNATURE_SVG}
+  </div>`;
 }
 
 // Site links: in the fixed bar on story pages, beside the title on the
 // contents page. Subscribe looks like Substack's own button, so readers
-// know where it goes.
-function navItems(currentSlug) {
-  return `<a href="index.html" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>TB</a><a href="${EPUB_FILENAME}" class="nav-item nav-epub epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a><a href="feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">${ICON_THEME}</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
+// know where it goes. `base` is '../' on story pages, whose clean URLs are
+// one directory down; the contents page is at the site root.
+function navItems(currentSlug, base = '') {
+  return `<a href="${base || 'index.html'}" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>TB</a><a href="${base}${EPUB_FILENAME}" class="nav-item nav-epub epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a><a href="${base}feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">${ICON_THEME}</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
 }
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
@@ -986,7 +1019,7 @@ ${currentSlug ? `  <header class="nav">
 
     // Story pages, as on markusstrasser.org (Nav.svelte): the nav slides
     // away while reading down and returns on any scroll up, at the top, or
-    // when it holds keyboard focus. (The reading-progress hairline is CSS.)
+    // when it holds keyboard focus.
     var nav=document.querySelector('.is-post .nav');
     if(nav){
       var lastY=scrollY,frame=0;
@@ -999,6 +1032,29 @@ ${currentSlug ? `  <header class="nav">
       addEventListener('scroll',function(){if(!frame)frame=requestAnimationFrame(update)},{passive:true});
       nav.addEventListener('focusin',function(){nav.classList.remove('hidden')});
       update();
+    }
+
+    // Reading progress: the hairline fades in after 100px and fills from
+    // the story text's top at the window's top to its last line at the
+    // window's bottom, so it reaches the end at the text, not the footer.
+    var storyBody=document.querySelector('.is-post .post-body');
+    var progressWrap=document.querySelector('.reading-progress');
+    var progressBar=progressWrap&&progressWrap.querySelector('.progress-bar');
+    if(storyBody&&progressWrap&&progressBar){
+      var progressFrame=0;
+      var updateProgress=function(){
+        progressFrame=0;
+        var r=storyBody.getBoundingClientRect();
+        var start=r.top+scrollY,end=r.bottom+scrollY,denom=end-innerHeight-start;
+        var p=denom>0?Math.min(1,Math.max(0,(scrollY-start)/denom)):1;
+        progressBar.style.transform='scaleX('+p.toFixed(4)+')';
+        progressWrap.style.opacity=Math.min(1,Math.max(0,(scrollY-100)/40)).toFixed(2);
+      };
+      var scheduleProgress=function(){if(!progressFrame)progressFrame=requestAnimationFrame(updateProgress)};
+      addEventListener('scroll',scheduleProgress,{passive:true});
+      addEventListener('resize',scheduleProgress,{passive:true});
+      if(document.fonts)document.fonts.ready.then(scheduleProgress);
+      updateProgress();
     }
 
     // Arrow keys step to the newer/older story
@@ -1144,6 +1200,24 @@ ${currentSlug ? `  <header class="nav">
       // Leaving resets the title at once; the morph only plays forwards.
       a.addEventListener('mouseleave',function(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}});
     });
+
+    // Footer email signup, the form from markusstrasser.org: submit by
+    // fetch and show the message in place; without JS the form still POSTs.
+    var signup=document.querySelector('.site-signup .subscribe');
+    if(signup){
+      var signupMsg=signup.parentElement.querySelector('.subscribe-message');
+      var signupBtn=signup.querySelector('button');
+      var signupPage=signup.querySelector('input[name="_page"]');
+      if(signupPage)signupPage.value=location.pathname;
+      signup.addEventListener('submit',function(e){
+        if(!window.fetch)return;
+        e.preventDefault();
+        signupBtn.disabled=true;
+        fetch(signup.action,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({email:signup.email.value,_source:'footer',_page:location.pathname})})
+          .then(function(r){if(!r.ok)throw new Error();location.href=signup.getAttribute('data-success')||'/subscribed/';})
+          .catch(function(){signupMsg.textContent='Something went wrong. Please try again.';signupMsg.className='subscribe-message error';signupMsg.setAttribute('role','alert');signupBtn.disabled=false;});
+      });
+    }
   })();
   </script>
 </body>

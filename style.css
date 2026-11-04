@@ -146,6 +146,9 @@ html {
 }
 
 body {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 100svh;
   font-family: var(--sans);
   line-height: 1.5;
   font-kerning: normal;
@@ -188,9 +191,10 @@ a:hover { color: var(--accent); }
    (and fills the window when tall enough: Contents, below). */
 
 main {
+  flex: 1 0 auto;
   width: var(--page-w);
   margin: 0 auto;
-  padding: calc(var(--nav-h) + var(--s-5)) 0 var(--s-7);
+  padding: calc(var(--nav-h) + var(--s-5)) 0 0;
 }
 .is-index main { padding-top: var(--s-6); }
 
@@ -255,37 +259,21 @@ main {
 .nav.hidden { transform: translateY(-100%); }
 .nav .navbar { width: var(--page-w); min-height: var(--nav-h); border-bottom: 1px solid var(--rule-strong); }
 
-/* Reading progress, all CSS (scroll-driven animations): the hairline
-   fades in over the first 100-140px of scroll and fills with the story
-   text's view timeline, from the text's top at the window's top to its
-   last line at the window's bottom ("contain"), not to the footer. A
-   browser without scroll timelines (Firefox before 159) shows no bar,
-   rather than a full one. */
+/* Reading progress: a 4px bar across the top in the EPUB accent at 70%
+   alpha, faded in over the first 100-140px of scroll, filling from the
+   story text's top at the window's top to its last line at the window's
+   bottom. A small script (build.js) measures it, so every browser gets the
+   same bar. */
 .reading-progress {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 30;
-  height: 2px;
+  height: 4px;
   pointer-events: none;
   opacity: 0;
+  transition: opacity var(--dur) ease-out;
 }
-.progress-bar { height: 100%; transform-origin: left; background: var(--progress); }
-@supports (animation-timeline: scroll()) {
-  .is-post { timeline-scope: --story; }
-  .post-body { view-timeline: --story block; }
-  .reading-progress {
-    animation: progress-show linear both;
-    animation-timeline: scroll(root);
-    animation-range: 100px 140px;
-  }
-  .progress-bar {
-    animation: progress-fill linear both;
-    animation-timeline: --story;
-    animation-range: contain 0% contain 100%;
-  }
-}
-@keyframes progress-show { from { opacity: 0; } to { opacity: 1; } }
-@keyframes progress-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.progress-bar { height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: var(--progress); }
 
 /* --- The book --------------------------------------------------------- */
 /* The collection as a download: its title in the text face, underlined,
@@ -311,25 +299,140 @@ main {
    (a story's column, phones) the book takes its own centred line, without
    a separator left dangling at the end of the first. */
 
+.site-foot-wrap {
+  --sig-w: clamp(4.25rem, 7.5vw, 5.5rem);
+  position: relative;
+  flex: none;
+  width: var(--page-w);
+  margin: var(--s-3) auto var(--s-4);
+  padding: var(--s-2) calc(var(--sig-w) + var(--s-3)) 0 0;
+  border-top: 1px solid var(--rule);
+}
+.is-index .site-foot-wrap { width: auto; margin: var(--s-3) var(--gutter) var(--s-4); }
+.is-fonts .site-foot-wrap { width: min(100% - 2 * var(--gutter), 68rem); }
+.site-foot-main {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+}
+.site-signup {
+  width: 100%;
+  max-width: 280px;
+  flex: 0 1 280px;
+  margin: 0;
+}
+.site-signup .subscribe {
+  display: flex;
+  width: 100%;
+  margin: 0;
+  gap: 0;
+}
+.subscribe-field {
+  flex: 1;
+  min-width: 0;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0 0.55em;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+}
+.subscribe-field:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.subscribe-mark {
+  display: inline-flex;
+  flex: none;
+  width: 0.9em;
+  height: 1em;
+  color: color-mix(in srgb, var(--substack) 60%, var(--muted));
+}
+.subscribe-mark svg { width: 100%; height: 100%; fill: currentColor; }
+.subscribe-mark .slash-bg { stroke: var(--paper-2); }
+.subscribe-mark .slash { stroke: currentColor; }
+.subscribe-field input[type="email"] {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: var(--w-ui) 0.85rem/1 var(--sans);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.subscribe-field input[type="email"]::placeholder { color: var(--muted); }
+.subscribe-field input[type="email"]:focus-visible { outline: none; }
+.subscribe-field input[type="email"]:disabled { opacity: 0.6; cursor: not-allowed; }
+.site-signup button {
+  flex: none;
+  height: 2rem;
+  padding: 0 0.8em;
+  font: var(--w-ui) 0.85rem/1 var(--sans);
+  color: var(--paper);
+  background: var(--ink);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.site-signup button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--paper);
+  border-color: var(--ink);
+}
+.site-signup button:disabled { opacity: 0.6; cursor: not-allowed; }
+.subscribe-message {
+  margin-top: var(--s-1);
+  font: 400 var(--fs-2xs)/1.4 var(--sans);
+  text-align: center;
+  color: var(--ink-soft);
+}
+.subscribe-message.error { color: var(--accent); }
+.subscribe-message:empty { display: none; }
 .site-foot {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
   column-gap: 0.5em;
-  margin-top: var(--s-3);
-  padding-top: var(--s-2);
-  border-top: 1px solid var(--rule);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
   font: var(--w-ui) var(--fs-xs)/1.4 var(--sans);
   color: var(--muted);
 }
 .foot-book-item { display: contents; }
 .site-foot { container: foot / inline-size; }
 @container foot (width < 44em) {
+  .foot-copy, .foot-copy + .sep { display: none; }
   .foot-book-item { display: flex; flex-basis: 100%; justify-content: center; }
   .foot-book-item > .sep { display: none; }
 }
 .x-link { display: inline-flex; align-items: center; gap: 0.3em; }
+.signature-mark {
+  position: absolute;
+  right: 0;
+  top: calc(50% + var(--s-2) / 2);
+  width: var(--sig-w);
+  height: auto;
+  margin: 0;
+  transform: translateY(-50%);
+  color: var(--signature);
+  pointer-events: none;
+}
+@media (max-width: 640px) {
+  .site-foot-wrap { padding-right: 0; }
+  .site-foot-main { flex-direction: column; }
+  .site-signup { flex: 0 1 auto; }
+  .site-foot { flex: 0 1 auto; width: 100%; }
+  .signature-mark { display: none; }
+}
 
 /* --- Story titles ----------------------------------------------------- */
 /* In the contents list and the newer/older links: each story's own face,
@@ -496,11 +599,13 @@ main {
     display: flex;
     flex-direction: column;
     width: auto;
-    height: 100svh;
+    height: auto;
+    flex: 1;
+    min-height: 0;
     margin: 0 var(--gutter);
-    padding: var(--s-4) 0 var(--s-3);
+    padding: var(--s-4) 0 0;
   }
-  .is-index .site-head, .is-index .site-foot { flex: none; }
+  .is-index .site-head, .is-index .site-foot-wrap { flex: none; }
   .stories {
     flex: 1;
     display: grid;
@@ -527,6 +632,30 @@ main {
   .title-cell { flex: 1; min-width: 0; white-space: nowrap; }
   .story .meta { font-size: clamp(var(--meta-min), var(--row) * var(--meta-k), var(--meta-max)); }
 }
+
+/* --- Success ---------------------------------------------------------- */
+/* The page after an email signup: the confirmation, then the footer. */
+.is-success main {
+  width: min(100% - 2 * var(--gutter), 56rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--nav-h) + var(--s-5)) 0 var(--s-6);
+}
+.success-page { max-width: 48rem; text-align: center; }
+.success-page h1 {
+  font: var(--w-light) clamp(1.8rem, 4vw, 2.8rem)/1.25 var(--meta-sans);
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+.success-back {
+  margin-top: var(--s-6);
+  font: var(--w-light) var(--fs-xs)/1.4 var(--meta-sans);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.success-back a { color: var(--accent); }
+.success-back a:hover { text-decoration: underline; }
 
 /* --- Story: a printed book page ---------------------------------------- */
 /* Treatment A from the reading lab (scripts/reading-lab.js): EB Garamond
@@ -706,6 +835,7 @@ main {
     --meta-max:  0.8rem;
   }
   .nav-rss { display: none; }
+  .foot-copy, .foot-copy + .sep { display: none; }
   .nav-item { padding-inline: var(--s-1); }
   .nav-sub { height: 2rem; padding-inline: var(--s-3); font-size: var(--fs-xs); }
   .site-head { column-gap: var(--s-2); margin-bottom: var(--s-2); }
@@ -728,7 +858,8 @@ main {
 
 @media print {
   html { font-size: 11pt; }
-  .nav, .reading-progress, .skip-link, .post-footer { display: none !important; }
+  body { display: block; }
+  .nav, .reading-progress, .skip-link, .post-footer, .site-foot-wrap { display: none !important; }
   main { width: auto; padding: 0; }
   .post-body p { orphans: 3; widows: 3; }
   .post-body a { color: inherit; text-decoration: none; }
