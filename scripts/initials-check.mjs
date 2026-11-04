@@ -12,6 +12,9 @@
 //   PLAYWRIGHT_DIR=~/.cache/pw node scripts/initials-check.mjs webkit
 //
 // "chrome" drives the installed Google Chrome (Playwright channel "chrome").
+// macOS quits a Chrome that has never shown a window 30 s after it starts, whatever
+// it is doing (loginwindow logs "is not allowed to run non-foreground and has never
+// been user-visible"), so a check must replace its browser well before that.
 //
 // At a desktop and a phone width, for each .first/.sect paragraph:
 // - the next paragraph must start at its own indent, not pushed right by

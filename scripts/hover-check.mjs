@@ -41,10 +41,11 @@ if (!stories.length) { console.error('no story pages in dist/: run node build.js
 const sizes = [[1440, 900], [1024, 768], [700, 900]];
 const TOL = 0.03, FAR = 0.4;
 
-// "chrome" is the installed Google Chrome, driven by Playwright. One browser per
-// width: Chrome closes the third context's page partway through, whichever width
-// that is and with no crash event, and a fresh browser avoids it.
+// "chrome" is the installed Google Chrome, driven by Playwright. macOS quits it
+// 30 s after it starts (see initials-check.mjs), so a browser older than LIFE_MS
+// is replaced before the next page; the slowest page takes about 10 s.
 const launch = () => engine === 'chrome' ? pw.chromium.launch({ channel: 'chrome' }) : pw[engine].launch();
+const LIFE_MS = 15000;
 
 // Hovers each title matching sel in turn; returns hovered/resting ratios.
 const HOVER = async sel => {
@@ -88,13 +89,18 @@ const HOVER = async sel => {
 let checked = 0; const worstW = [0, 0], worstH = [0, 0];
 const failures = [], shrunk = [];
 for (const [w, h] of sizes) {
-  const browser = await launch();
-  const ctx = await browser.newContext({ viewport: { width: w, height: h } });
-  await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
-  const page = await ctx.newPage();
-  page.on('crash', () => { console.error(`${engine} ${w}px: the page crashed`); process.exit(2); });
-  if (engine === 'chrome') await (await ctx.newCDPSession(page)).send('Emulation.setEmulatedMedia', { features: [{ name: 'hover', value: 'hover' }] });
+  let browser = null, page = null, born = 0;
   for (const [file, sel] of [['index.html', '.stories .morph'], ...stories.map(s => [s, '.post-nav .morph'])]) {
+    if (Date.now() - born > LIFE_MS) {
+      await browser?.close();
+      browser = await launch();
+      born = Date.now();
+      const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+      await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
+      page = await ctx.newPage();
+      page.on('crash', () => { console.error(`${engine} ${w}px: the page crashed`); process.exit(2); });
+      if (engine === 'chrome') await (await ctx.newCDPSession(page)).send('Emulation.setEmulatedMedia', { features: [{ name: 'hover', value: 'hover' }] });
+    }
     await page.goto(new URL(file, base).href, { waitUntil: 'load' });
     const res = await page.evaluate(HOVER, sel);
     if (typeof res === 'string') { console.error(`${engine} ${w}px ${file}: ${res}`); process.exit(2); }
