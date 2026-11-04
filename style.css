@@ -901,7 +901,8 @@ main {
 @media (pointer: coarse) {
   .story .story-title { position: static; }
   .meta .src { position: relative; z-index: 1; }
-  .meta .src::after { content: ""; position: absolute; inset: -0.75em -0.5em; }
+  /* Less above than below: the row's title sits right above the mark. */
+  .meta .src::after { content: ""; position: absolute; inset: -0.4em -0.5em -0.75em; }
   .nav-item, .nav-sub, .x-link, .bk-dl { position: relative; }
   .nav-item::after, .nav-sub::after, .x-link::after, .bk-dl::after { content: ""; position: absolute; }
   .nav-item::after { inset: -0.55rem -0.125rem; }
