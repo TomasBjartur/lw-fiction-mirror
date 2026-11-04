@@ -76,18 +76,20 @@ the layout tokens can't express (its header lists the breakpoints). The
 contents
 page opens with the author's name (Send Flowers), the book and the links
 (RSS, X, and a Substack-orange Subscribe button that goes to Substack)
-above a thin black rule. The book is its title in the text face,
+above a thin grey rule. The book is its title in the text face,
 underlined, followed by "EPUB" and a download mark in the accent red: one
-link that downloads the EPUB. From 1200 px up it sits on the name's row
+link that downloads the EPUB. From 1040 px up it sits on the name's row
 at the size of the nav labels; on narrower screens it goes below the
 rule, indented to the list, at story-title size. The footer carries it
 too (except on a phone's contents page, where it is already under the
 name). Story pages put "TB" (in the name's face) and the EPUB link in
-their nav. On screens at least 520 px tall the list fills the window:
-one equal row per story, titles scaled to the row, so every story shows
-without scrolling (on phones, with the browser's toolbars showing). On
+their nav. On screens at least 520 px tall each story's row is 3.4rem,
+or less where that would not fit, titles scaled to the row, so every
+story shows without scrolling (on phones, with the browser's toolbars
+showing); spare height stays under the list and the footer sits at the
+bottom of the window. On
 phones (640 px and under) the meta sits on its own line under each
-title. Rows never go below 2.1rem, so a long list scrolls. A title too
+title. Rows never go below 1.9rem, so a long list scrolls. A title too
 wide for its space (a long title in a wide face in a list row, or a long
 word in a story's title, on a phone) is shrunk to fit by a small script.
 Each title is followed by its month and reading time in Inter Light,

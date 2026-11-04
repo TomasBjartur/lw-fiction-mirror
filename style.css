@@ -8,8 +8,8 @@
    layout that tokens can't express:
      max-width 640px   phones: smaller type, the meta under each title
      max-width 520px   story text goes ragged (justified lines gap there)
-     min-width 1200px  the book joins the name's row on the contents page
-     min-height 520px  the contents list fills the window
+     min-width 1040px  the book joins the name's row on the contents page
+     min-height 520px  the contents list shrinks to fit the window
    Colours are OKLCH, each written once for light and dark with
    light-dark(); browsers older than that (Safari 17.5, May 2024) are not
    supported. */
@@ -46,7 +46,7 @@
   --ink-soft:      light-dark(oklch(0.38 0.01 264),  oklch(0.81 0.008 85));
   --muted:         light-dark(oklch(0.55 0.01 264),  oklch(0.75 0.01 264));
   --rule:          light-dark(oklch(0.88 0.006 264), oklch(0.32 0.006 264));
-  --rule-strong:   var(--ink);
+  --rule-strong:   light-dark(oklch(0.70 0.006 264), oklch(0.48 0.006 264));  /* the header rule */
   /* The one accent: every hover, the EPUB mark, the editor's-pick rule,
      the focus ring. */
   --accent:        light-dark(oklch(0.52 0.22 24),   oklch(0.80 0.11 24));
@@ -116,13 +116,14 @@
   --page-w: min(100% - 2 * var(--gutter), var(--col));
   --indent: clamp(1.25rem, 4vw, 3.5rem);  /* the list sits one indent in from the name */
 
-  /* The contents list filling the window (Contents, below): one row per
-     story, never shorter than --row-min; the title is --title-k of the
-     row, capped at --title-cqw of the list's width (a looser cap: a title
+  /* The contents list (Contents, below): one row per story, --row-max
+     tall, shrinking to fit the window, never below --row-min; the title
+     is --title-k of the row, capped at --title-cqw of the list's width (a looser cap: a title
      still too wide for its row with its meta shrinks alone, --fit); its
      line is --title-lh of the row; the meta scales with the row, clamped. */
-  --row-min:   2.1rem;
-  --title-k:   0.56;
+  --row-min:   1.9rem;
+  --row-max:   3.4rem;
+  --title-k:   0.62;
   --title-cqw: 4.2cqw;
   --title-lh:  1;
   --meta-k:    0.27;
@@ -382,7 +383,7 @@ main {
 .site-head .navbar { grid-area: nav; }
 .head-rule { grid-area: rule; margin-top: var(--s-1); border: 0; border-top: 1px solid var(--rule-strong); }
 .head-book { grid-area: book; justify-self: start; margin: var(--s-3) 0 var(--s-1) var(--indent); font: 400 var(--fs-book)/1.2 var(--serif); }
-@media (min-width: 1200px) {
+@media (min-width: 1040px) {
   .site-head { grid-template-columns: auto 1fr auto auto; grid-template-areas: "name . book nav" "rule rule rule rule"; }
   .head-book { margin: 0 var(--s-2) 0 0; font-size: var(--fs-nav-text); }
 }
@@ -404,12 +405,14 @@ main {
   background: var(--pick);
 }
 
-/* Tall enough: the list fills the window. It takes the height left under
-   the header, one equal row per story (--n, set by the build), and titles
-   scale with the row (cq units of the list), capped by its width, so
-   every story shows without scrolling and no height is left over. Rows
-   stop shrinking at --row-min; past that the list's min-height pushes the
-   footer down and the page scrolls. svh, so the list fits with a phone
+/* Tall enough: the list shrinks to fit the window. It takes the height
+   left under the header, and each row (one per story, --n, set by the
+   build) is --row-max tall or, if all of them would not fit, an equal
+   share of that height; titles scale with the row (cq units of the list),
+   capped by its width, so every story shows without scrolling. Spare
+   height stays under the list, and the footer sits at the window's
+   bottom. Rows stop shrinking at --row-min; past that the list's
+   min-height pushes the footer down and the page scrolls. svh, so the list fits with a phone
    browser's toolbars showing. The height must be fixed, not a min-height:
    cq units need a definite container height (with min-height Chrome
    resolves 100cqh to 0 and every row falls to --row-min). */
@@ -426,7 +429,8 @@ main {
   .stories {
     flex: 1;
     display: grid;
-    grid-template-rows: repeat(var(--n), minmax(var(--row-min), 1fr));
+    grid-template-rows: repeat(var(--n), auto);
+    align-content: start;
     /* One column, the list's width: an auto column would grow to the
        widest unwrapped row and push the page sideways. */
     grid-template-columns: minmax(0, 1fr);
@@ -436,7 +440,8 @@ main {
   /* cq units resolve against the list only inside it, so the row
      measures are defined on the rows. */
   .story {
-    --row: max(var(--row-min), 100cqh / var(--n));
+    --row: clamp(var(--row-min), 100cqh / var(--n), var(--row-max));
+    height: var(--row);
     --title-size: min(var(--row) * var(--title-k), var(--title-cqw));
     --title-line: calc(var(--row) * var(--title-lh));
     display: flex;
