@@ -5,10 +5,12 @@
 
    How it is organised: every colour, size, space and duration is a token
    in :root, and components only use tokens. Breakpoints change tokens, or
-   layout that tokens can't express:
-     max-width 640px   phones: smaller type, the meta under each title
-     max-width 520px   story text goes ragged (justified lines gap there)
-     min-width 1040px  the book joins the name's row on the contents page
+   layout that tokens can't express. Widths are in em, so a reader's larger
+   text setting gets the layout that has room for it (px at the default size):
+     max-width 40em    640px, phones: smaller type, the meta under each title
+     max-width 32.5em  520px, story text goes ragged (justified lines gap there)
+     min-width 65em    1040px, the book joins the name's row on the contents page
+     max-width 19.5em  312px, zoomed phones: the marks go under the name
      pointer: coarse   larger hit areas and form controls
    Colours are OKLCH, each written once for light and dark with
    light-dark(); browsers older than that (Safari 17.5, May 2024) are not
@@ -148,6 +150,7 @@ html {
 
 body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 1fr auto;
   min-height: 100svh;
   font-family: var(--sans);
@@ -434,7 +437,7 @@ main {
   color: var(--signature);
   pointer-events: none;
 }
-@media (max-width: 640px) {
+@media (max-width: 40em) {
   .site-foot-wrap { padding-right: 0; }
   .site-foot-main { flex-direction: column; }
   .site-signup { flex: 0 1 auto; }
@@ -563,7 +566,7 @@ main {
 .site-head .navbar { grid-area: nav; }
 .head-rule { grid-area: rule; margin-top: var(--s-1); border: 0; border-top: 1px solid var(--rule-strong); }
 .head-book { grid-area: book; justify-self: start; margin: 1.25rem 0 0 var(--indent); font: var(--w-light) var(--fs-book)/1.2 var(--meta-sans); }
-/* From 1040px the book joins the nav: its title set like the RSS label,
+/* From 65em the book joins the nav: its title set like the RSS label,
    just left of an EPUB nav item, centred on the row like RSS and X. */
 .nav-bk-title { display: none; font: var(--w-light) var(--fs-s)/1 var(--meta-sans); color: var(--ink-soft); white-space: nowrap; }
 /* The homepage's book title follows the nav's sans; the footer keeps the
@@ -572,7 +575,7 @@ main {
 /* No underline there: it hung below the row and made EPUB read lower than
    RSS though their letters share one line; the red marks it as the link. */
 .site-head .nav-epub { display: none; }
-@media (min-width: 1040px) {
+@media (min-width: 65em) {
   .head-book { display: none; }
   .nav-bk-title, .site-head .nav-epub { display: inline-flex; }
   .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); }
@@ -706,7 +709,9 @@ main {
   white-space: nowrap;
 }
 .post-meta { margin-top: 0.5em; font-size: var(--fs-xs); }
-.post-meta .m { margin-left: 0; }
+/* Inline blocks so a narrow window can wrap between the groups: Firefox will not
+   break between two nowrap spans, and the whole page then scrolls sideways. */
+.post-meta .m { display: inline-block; margin-left: 0; }
 .post-meta .when + .m,
 .post-meta .m + .m { margin-left: 0.8em; }
 .orn { display: block; width: 2.4em; margin: 1em auto 0; border-top: 1px solid var(--muted); }
@@ -829,11 +834,11 @@ main {
 
 /* Browsers justify greedily, line by line; at ~43 characters that opens
    visible gaps, so narrow screens go ragged and keep the hyphenation. */
-@media (max-width: 520px) {
+@media (max-width: 32.5em) {
   .post-body { text-align: left; hyphenate-limit-chars: 7 3 3; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 40em) {
   html { font-size: 100%; }
   :root {
     --fs-name: clamp(1.5rem, 7vw, 2.3rem);
@@ -862,13 +867,29 @@ main {
   .site-head { column-gap: var(--s-2); margin-bottom: 0.625rem; }
   .head-book { margin: 0.875rem 0 0 var(--indent); }
   .is-index .foot-book-item { display: none; }
-  .story .meta { display: block; margin: 0; line-height: 1.3; }
+  /* The longest line is about 25em, so the cap keeps it inside the column where
+     the rem size would not fit: very narrow windows and large text settings. */
+  .story .meta {
+    display: block;
+    margin: 0;
+    font-size: min(clamp(var(--meta-min), var(--row) * var(--meta-k), var(--meta-max)), 3.9cqw);
+    line-height: 1.3;
+  }
 }
 
 /* The smallest phones: the name and the marks take the row, and the Subscribe
    button's own mark is what gives. */
-@media (max-width: 359px) {
+@media (max-width: 22.4375em) {
   .nav-sub svg { display: none; }
+}
+
+/* Narrower still, which on a phone means a large text setting or page zoom: the
+   marks take their own row under the name, and story pages leave EPUB to the
+   footer. */
+@media (max-width: 19.5em) {
+  .site-head { grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "nav" "rule" "book"; }
+  .site-head .navbar { justify-self: end; }
+  .nav .nav-epub { display: none; }
 }
 
 /* --- Fingers ---------------------------------------------------------- */

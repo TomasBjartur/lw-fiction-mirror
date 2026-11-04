@@ -83,7 +83,7 @@ page opens with the author's name (Send Flowers), the book and the links
 (RSS, X, and a Substack-orange Subscribe button that goes to Substack)
 above a thin grey rule. The book is its title in Urbanist Light,
 plain (no link), followed by "EPUB" and a download mark in the accent red, the one
-link, underlined, that downloads the EPUB. From 1040 px up it sits in the
+link, underlined, that downloads the EPUB. From 1040 px up (65em, so a larger text setting gets it later) it sits in the
 nav, its EPUB link a nav item level with RSS and X; on narrower screens it goes below the
 rule, indented to the list, at story-title size. The footer carries it
 too (except on a phone's contents page, where it is already under the
@@ -109,7 +109,7 @@ markusstrasser.org's form; its Formspree endpoint is
 ID is supplied. Until then a deploy (CI set) leaves the form out and logs
 `[DEGRADED]`; a local build keeps it for review. The nav Subscribe button
 still goes to Substack, and a successful signup lands on `/subscribed/`. On
-phones (640 px and under) the meta sits on its own line under each
+phones (40em, 640 px at the default text size, and under) the meta sits on its own line under each
 title and the largest faces come partway back to the others
 (`--ts-spread`), so San Silvestro's swash clears the date above it. Rows
 stop shrinking at 1.9rem, or 2.3rem on phones to keep titles readable,
