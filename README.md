@@ -196,6 +196,23 @@ Commit `fonts/subsets/` after a local build that changed it (unused
 files are pruned). CSS and font URLs carry a hash of the file's bytes
 (`?v=`), so no browser or CDN cache serves an old copy after a deploy.
 
+Three title faces are colour fonts (Bitcount Double Ink, Kalnia Glaze,
+Bungee Spice; Foldit in the backlog too), and Google serves them as
+COLRv1, which Safari's engine cannot draw: on Macs and on every iPhone
+browser those titles were blank. `scripts/colr-twin.py` adds an OpenType
+SVG table to a copy of each file, and the `@font-face` offers the original
+with `tech(color-COLRv1)` first, so Chrome and Firefox never fetch the
+copy and Safari only fetches the copy. Firefox must stay on the original,
+because it prefers SVG and draws that Bitcount black. The copies are
+committed as `fonts/subsets/<key>.safari.woff2` and take `uv` to make. CI
+has no `uv`, so a retitled colour story logs `[DEGRADED]` there and Safari
+sets that title in the sans until a local build commits its copy. Safari
+draws Bitcount a little pinker than Chrome does. `node scripts/ink-check.mjs
+<chrome|firefox|webkit>` reads the pixels of every title, specimen, date
+and count at a desktop and a phone width, and fails on a blank box, a face
+that did not load or a colour face drawn without colour. Run it after
+changing a title face; the width checks cannot see a blank glyph.
+
 `dist/title-fonts/` (the unlinked `/title-fonts/` page) is a specimen of
 every face the site has picked: each story's title face in contents
 order, then the backlog. Each shows the family name set in the face, the

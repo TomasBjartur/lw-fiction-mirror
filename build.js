@@ -487,9 +487,14 @@ function pruneSubsets() {
   }
 }
 
+function subsetKey(spec, text) {
+  const chars = [...new Set(text)].sort().join('');
+  return require('crypto').createHash('sha1').update(spec + '\n' + chars).digest('hex').slice(0, 16);
+}
+
 async function fetchGoogleSubset(spec, text) {
   const chars = [...new Set(text)].sort().join('');
-  const key = require('crypto').createHash('sha1').update(spec + '\n' + chars).digest('hex').slice(0, 16);
+  const key = subsetKey(spec, text);
   const cached = path.join(SUBSET_DIR, `${key}.woff2`);
   usedSubsets.add(`${key}.woff2`);
   if (fs.existsSync(cached)) return fs.readFileSync(cached);
@@ -512,6 +517,56 @@ async function downloadSubset(url, cached) {
   fs.mkdirSync(path.dirname(cached), { recursive: true });
   fs.writeFileSync(cached, buf);
   return buf;
+}
+
+// True if a woff2 file has a COLR table. WOFF2's table directory numbers the
+// known tags; COLR is 34, and 63 means a four-byte tag follows.
+function woff2HasColr(buf) {
+  let o = 48;
+  const skipVarint = () => { while (buf[o++] & 0x80); };
+  for (let i = 0, n = buf.readUInt16BE(12); i < n; i++) {
+    const flags = buf[o++], tag = flags & 63, transform = flags >> 6;
+    if (tag === 34) return true;
+    if (tag === 63) o += 4;
+    skipVarint();
+    if (tag === 10 || tag === 11 ? transform === 0 : transform !== 0) skipVarint();
+  }
+  return false;
+}
+
+// Safari's engine, so every iPhone browser, has no COLRv1 and draws those
+// faces as nothing. scripts/colr-twin.py makes the copy it can draw, kept in
+// fonts/subsets/ beside the subset and committed, so CI (which has no uv) only
+// needs it for a new colour title. Without a twin the @font-face offers just
+// the COLR file: Safari then sets that title in the list's sans, never blank.
+function colrTwin(spec, text) {
+  const key = subsetKey(spec, text), name = `${key}.safari.woff2`, twin = path.join(SUBSET_DIR, name);
+  usedSubsets.add(name);
+  if (fs.existsSync(twin)) return fs.readFileSync(twin);
+  const made = require('child_process').spawnSync('uv', ['run', '--quiet', '--python', '3.12', '--with', 'nanoemoji', '--with', 'brotli',
+    'python3', path.join(__dirname, 'scripts', 'colr-twin.py'), path.join(SUBSET_DIR, `${key}.woff2`), twin], { stdio: 'inherit' });
+  if (made.status === 0) return fs.readFileSync(twin);
+  console.warn(`[DEGRADED] no Safari copy of ${spec} ("${text.slice(0, 40)}"): Safari sets it in the fallback sans. Run node build.js where uv is installed and commit fonts/subsets/.`);
+  return null;
+}
+
+// Writes a title or specimen face to dist/ and returns what its @font-face
+// needs: the file, and for a colour face the twin (null if it could not be made).
+async function writeTitleFace(spec, text, file) {
+  const buf = await fetchGoogleSubset(spec, text);
+  fs.writeFileSync(path.join(OUTPUT_DIR, file), buf);
+  if (!woff2HasColr(buf)) return { file };
+  const twin = colrTwin(spec, text), twinFile = file.replace(/\.woff2$/, '.safari.woff2');
+  if (twin) fs.writeFileSync(path.join(OUTPUT_DIR, twinFile), twin);
+  return { file, twin: twin ? twinFile : null, colour: true };
+}
+
+// The src of a title face. tech() keeps Chrome and Firefox on the COLR file
+// and sends everything else to the twin.
+function titleFaceSrc(face) {
+  if (!face.colour) return `url('${assetUrl(face.file)}') format('woff2')`;
+  const colr = `url('${assetUrl(face.file)}') format('woff2') tech(color-COLRv1)`;
+  return face.twin ? `${colr},url('${assetUrl(face.twin)}') format('woff2')` : colr;
 }
 
 // Writes every subset font; any failure throws (see fetchGoogleSubset).
@@ -631,31 +686,27 @@ async function fetchTitleFontSpecimens(faces) {
       const i = next++;
       const f = faces[i];
       const text = SPECIMEN_CHARS + f.name + f.posts.map(p => p.title).join('');
-      const file = `fonts/title-specimen-${i}.woff2`;
       try {
-        fs.writeFileSync(path.join(OUTPUT_DIR, file), await fetchGoogleSubset(f.spec, text));
+        files[i] = await writeTitleFace(f.spec, text, `fonts/title-specimen-${i}.woff2`);
       } catch (err) {
         throw new Error(`title specimen for ${f.name} (${f.spec}): ${err.message}`);
       }
-      files[i] = file;
     }
   }));
   console.log(`Title specimens: ${faces.length} faces`);
   return files;
 }
 
-// Returns Map slug -> { file, size, weight, stroke } for the faces that were written.
+// Returns Map slug -> { face, size, weight, stroke } for the faces that were written.
 async function fetchTitleFonts(posts, faces = titleFontFor(posts)) {
   const out = new Map();
   await Promise.all(posts.map(async p => {
     const [spec, size, weight, stroke = 0] = faces.get(p.slug);
-    const file = `fonts/title-${p.slug}.woff2`;
     try {
-      fs.writeFileSync(path.join(OUTPUT_DIR, file), await fetchGoogleSubset(spec, p.title));
+      out.set(p.slug, { face: await writeTitleFace(spec, p.title, `fonts/title-${p.slug}.woff2`), size, weight, stroke });
     } catch (err) {
       throw new Error(`title font for ${p.slug} (${spec}): ${err.message}`);
     }
-    out.set(p.slug, { file, size, weight, stroke });
   }));
   console.log(`Title fonts: ${out.size}/${posts.length} stories`);
   return out;
@@ -675,7 +726,7 @@ function buildTitlesCss(posts, subsetFonts, titleFonts) {
     .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2')${f.weight ? `;font-weight:${f.weight}` : ''};font-display:${f.display}}\n`)
     .join('');
   const titleFaces = [...titleFonts].map(([slug, f]) =>
-    `@font-face{font-family:'tf-${slug}';src:url('${assetUrl(f.file)}') format('woff2');font-weight:${f.weight};font-display:block}\n`).join('');
+    `@font-face{font-family:'tf-${slug}';src:${titleFaceSrc(f.face)};font-weight:${f.weight};font-display:block}\n`).join('');
   return face + titleFaces + byDate.map((p, rank) => {
     const f = titleFonts.get(p.slug);
     const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}${f.stroke ? `;--tk:${f.stroke}em` : ''}` : '';
@@ -687,7 +738,7 @@ function buildTitlesCss(posts, subsetFonts, titleFonts) {
 // face, with its own family name, then the page styles from title-fonts.css.
 function buildTitleFontsCss(faces, files) {
   const generated = faces.map((f, i) =>
-    `@font-face{font-family:'TF${i}';src:url('${assetUrl(files[i])}') format('woff2');font-weight:${f.weight};font-display:block}\n`
+    `@font-face{font-family:'TF${i}';src:${titleFaceSrc(files[i])};font-weight:${f.weight};font-display:block}\n`
     + `.tf-face-${i}{--f:'TF${i}';--w:${f.weight};--sz:${f.size};--stroke:${f.stroke}em}`).join('\n');
   return `/* Title fonts specimen; faces generated by build.js. */\n${generated}\n\n`
     + fs.readFileSync(path.join(__dirname, 'title-fonts.css'), 'utf8');
