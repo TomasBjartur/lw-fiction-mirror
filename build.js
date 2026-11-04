@@ -1076,6 +1076,14 @@ ${(currentSlug || opts.nav) ? `  <header class="nav">
         show();
       });
       show();
+      // A page restored from the back/forward cache keeps the theme it was
+      // left with, which may have changed on another page since.
+      addEventListener('pageshow',function(e){
+        if(!e.persisted)return;
+        var t=null;try{t=localStorage.getItem('theme')}catch(x){}
+        if(t==='dark')h.setAttribute('data-theme','dark');else h.removeAttribute('data-theme');
+        show();
+      });
     }
 
     // Story pages, as on markusstrasser.org (Nav.svelte): the nav slides
@@ -1149,6 +1157,24 @@ ${(currentSlug || opts.nav) ? `  <header class="nav">
       var fitFrame=0;
       (document.fonts?document.fonts.ready:Promise.resolve()).then(fit);
       addEventListener('resize',function(){cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(fit)},{passive:true});
+    }
+
+    // Footer email signup, the form from markusstrasser.org: submit by
+    // fetch and show the message in place; without JS the form still POSTs.
+    var signup=document.querySelector('.site-signup .subscribe');
+    if(signup){
+      var signupMsg=signup.parentElement.querySelector('.subscribe-message');
+      var signupBtn=signup.querySelector('button');
+      var signupPage=signup.querySelector('input[name="_page"]');
+      if(signupPage)signupPage.value=location.pathname;
+      signup.addEventListener('submit',function(e){
+        if(!window.fetch)return;
+        e.preventDefault();
+        signupBtn.disabled=true;
+        fetch(signup.action,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({email:signup.email.value,_source:'footer',_page:location.pathname})})
+          .then(function(r){if(!r.ok)throw new Error();location.href=signup.getAttribute('data-success')||'/subscribed/';})
+          .catch(function(){signupMsg.textContent='Something went wrong. Please try again.';signupMsg.className='subscribe-message error';signupMsg.setAttribute('role','alert');signupBtn.disabled=false;});
+      });
     }
 
     // Hovering a title turns it, letter by letter at uneven speed, into Major Mono
@@ -1256,29 +1282,15 @@ ${(currentSlug || opts.nav) ? `  <header class="nav">
       }
       a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
       // A resize rescales the titles, so pins measured at the old size are
-      // dropped; the next hover measures afresh.
-      addEventListener('resize',function(){if(!spans)return;stop();a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null});
+      // dropped; the next hover measures afresh. A click leaves the page with
+      // the title morphed and no mouseleave, so a page restored from the
+      // back/forward cache starts over too.
+      function reset(){if(!spans)return;stop();dir=0;a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null}
+      addEventListener('resize',reset);
+      addEventListener('pageshow',function(e){if(e.persisted)reset()});
       // Leaving resets the title at once; the morph only plays forwards.
       a.addEventListener('mouseleave',function(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}});
     });
-
-    // Footer email signup, the form from markusstrasser.org: submit by
-    // fetch and show the message in place; without JS the form still POSTs.
-    var signup=document.querySelector('.site-signup .subscribe');
-    if(signup){
-      var signupMsg=signup.parentElement.querySelector('.subscribe-message');
-      var signupBtn=signup.querySelector('button');
-      var signupPage=signup.querySelector('input[name="_page"]');
-      if(signupPage)signupPage.value=location.pathname;
-      signup.addEventListener('submit',function(e){
-        if(!window.fetch)return;
-        e.preventDefault();
-        signupBtn.disabled=true;
-        fetch(signup.action,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({email:signup.email.value,_source:'footer',_page:location.pathname})})
-          .then(function(r){if(!r.ok)throw new Error();location.href=signup.getAttribute('data-success')||'/subscribed/';})
-          .catch(function(){signupMsg.textContent='Something went wrong. Please try again.';signupMsg.className='subscribe-message error';signupMsg.setAttribute('role','alert');signupBtn.disabled=false;});
-      });
-    }
   })();
   </script>
 </body>
