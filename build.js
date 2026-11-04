@@ -429,8 +429,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
-// - Inconsolata as 'Hover Mono': the title hover morph (letters of the
-//   titles), with its width axis (50-200%), which the morph sets per title.
+// - Major Mono Display: the title hover morph (letters of the titles).
 // - Send Flowers as 'Author Name': the author's name (the contents page
 //   h1) and the TB home link on story pages.
 // - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
@@ -438,7 +437,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 //   whatever font the reader's device has. The stacks in style.css put
 //   'Site Marks' right after each text face.
 const SUBSET_FONTS = [
-  { family: 'Inconsolata:wdth,wght@50..200,400', as: 'Hover Mono', file: 'fonts/hover-inconsolata.woff2', display: 'block', stretch: '50% 200%',
+  { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
   { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
     text: () => AUTHOR },
@@ -607,7 +606,7 @@ function titleColor(rank, n) {
 function buildTitlesCss(posts, subsetFonts, titleFonts) {
   const byDate = sortByDate(posts);
   const face = subsetFonts
-    .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2');${f.stretch ? `font-stretch:${f.stretch};` : ''}font-display:${f.display}}\n`)
+    .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2');font-display:${f.display}}\n`)
     .join('');
   const titleFaces = [...titleFonts].map(([slug, f]) =>
     `@font-face{font-family:'tf-${slug}';src:url('${assetUrl(f.file)}') format('woff2');font-weight:${f.weight};font-display:block}\n`).join('');
@@ -882,42 +881,26 @@ ${currentSlug ? `  <header class="nav">
       addEventListener('resize',function(){cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(fit)},{passive:true});
     }
 
-    // Hovering a title turns it, letter by letter at uneven speed, into
-    // Inconsolata; leaving resets it at once. The title (or, if it wraps, each
-    // word) keeps its resting box, so nothing around it moves (see .morph in
-    // style.css).
+    // Hovering a title turns it, letter by letter at uneven speed, into Major Mono
+    // Display; leaving resets it at once. The title (or, if it wraps, each
+    // word) keeps its resting box, so nothing around it moves; the mono
+    // letters keep the title's size, never distorted (see .morph in style.css).
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
-    var mono=document.fonts?document.fonts.load('1em "Hover Mono"'):Promise.resolve();
-    // The mono letters keep the title's letter height (the mean of its
-    // x-height and capitals) and its width: Inconsolata's width axis
-    // (50-200%) takes up the difference, so the letters are drawn at one of
-    // the face's own widths, never scaled.
+    var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
+    // The mono text keeps the title's width and height about equally: its
+    // size is the geometric mean of the size that makes it as wide as the
+    // title and the size that makes its letters as tall as the title's (the
+    // mean of x-height and capitals; Major Mono is unicase, so one height).
+    // Major Mono is wider than every title face, so a hovered title grows a
+    // little wider and a little shorter, never much of either.
     var cx=document.createElement('canvas').getContext('2d');
     function up(font,t){cx.font=font;return cx.measureText(t).actualBoundingBoxAscent}
     function heightSize(a,t,fontPx){
       var cs=getComputedStyle(a);
       var xs=(t.match(/[acemnorsuvwxz]/g)||[]).join('')||t;
-      var f=cs.fontStyle+' '+cs.fontWeight+' '+fontPx+'px '+cs.fontFamily,mf='400 100px "Hover Mono"';
+      var f=cs.fontStyle+' '+cs.fontWeight+' '+fontPx+'px '+cs.fontFamily,mf='400 100px "Major Mono Display"';
       var h=(up(f,xs)+up(f,t))/2,m=(up(mf,xs)+up(mf,t))/200;
       return m>0?h/m:fontPx;
-    }
-    // The axis does not widen the letters in proportion (its avar map bends
-    // at 62.5, 125 and 150%), so the advance, in em (the face is
-    // monospaced), is measured once at each 12.5% step and read between.
-    var steps=null;
-    function advances(){
-      if(steps)return steps;
-      var p=document.createElement('span');steps=[];
-      p.style.cssText='position:absolute;visibility:hidden;white-space:pre;font:400 100px "Hover Mono"';
-      p.textContent='nnnnnnnnnn';document.body.appendChild(p);
-      for(var w=50;w<=200;w+=12.5){p.style.fontStretch=w+'%';steps.push([w,p.getBoundingClientRect().width/1000])}
-      p.remove();return steps;
-    }
-    // The width whose advance is e em (e within the axis's range).
-    function wdthFor(e){
-      var s=advances(),i=1;
-      while(i<s.length-1&&e>s[i][1])i++;
-      return s[i-1][0]+(s[i][0]-s[i-1][0])*(e-s[i-1][1])/(s[i][1]-s[i-1][1]);
     }
     document.querySelectorAll('.morph').forEach(function(a){
       var spans=null,text=null,timer=null,left=null,dir=0;
@@ -949,58 +932,56 @@ ${currentSlug ? `  <header class="nav">
         // kern across the letter spans, which widens some titles (The Distaff
         // Texts by 1.5%).
         var rest=oneLine?[textW]:boxes.map(width);
-        // Letters in each box, and the room the spaces take (they stay in
-        // the title's face).
-        var n=oneLine?[spans.length]:boxes.map(function(w){return w.children.length});
-        var sp=oneLine?Array.from(mi.childNodes).reduce(function(t,c){return c.nodeType===3?t+width(c):t},0):0;
-        // The advance that makes the letters, at the title's height, as wide
-        // as the title (as the tightest word, if it wraps); past the axis's
-        // range the size gives way instead (--mfit).
-        var size=heightSize(a,text,fontPx),s=advances();
-        var e=Math.min.apply(null,rest.map(function(r,i){return (r-sp)/(n[i]*size)}));
-        var ew=Math.max(s[0][1],Math.min(s[s.length-1][1],e));
-        a.style.setProperty('--mono-size',size.toFixed(1)+'px');
-        a.style.setProperty('--mono-wdth',wdthFor(ew).toFixed(1)+'%');
+        spans.forEach(function(s){s.className='mq'});
+        var wide=boxes.map(width);
+        spans.forEach(function(s){s.className=''});
+        var widthSize=fontPx*Math.min.apply(null,rest.map(function(r,i){return r/wide[i]}));
+        a.style.setProperty('--mono-size',Math.sqrt(heightSize(a,text,fontPx)*widthSize).toFixed(1)+'px');
         if(oneLine){
           // The link keeps its resting box, so nothing moves.
           var c=a.closest('.title-cell')||a.parentElement,cr=c.getBoundingClientRect(),ar=a.getBoundingClientRect();
-          // If the width axis runs out, the mono text may run past the title,
-          // up to the end of the title column (the meta beside it fades
-          // meanwhile) or half the newer/older row; only there does it shrink.
-          // It always has the title's own width, even where the title at
-          // rest is wider than half the row.
-          var room=Math.max(rest[0],a.closest('.post-nav')?cr.width/2-16:cr.right-ar.left-4);
-          a.style.setProperty('--mfit',((room-sp)/(spans.length*ew)).toFixed(1)+'px');
+          // The mono text may run past the title, up to the end of the title
+          // column (the meta beside it fades meanwhile) or, in the newer/older
+          // row, up to the other link; if it needs more, the other link fades
+          // too (.spread) and it has the whole row. Only past that does it
+          // shrink further.
+          var nav=a.closest('.post-nav'),room=cr.right-ar.left-4;
+          if(nav){
+            var o=Array.from(nav.querySelectorAll('.morph')).filter(function(x){return x!==a})[0],or=o&&o.getBoundingClientRect();
+            room=cr.width-(ar.width-textW);
+            var need=wide[0]*parseFloat(a.style.getPropertyValue('--mono-size'))/fontPx,beside=or&&Math.abs(or.top-ar.top)<ar.height?or.width+24:0;
+            if(need>room-beside)a.classList.add('spread');else room-=beside;
+          }
+          a.style.setProperty('--mfit',(room*fontPx/wide[0]).toFixed(1)+'px');
           // An inline title (the contents list) pins to its line height, so
           // the line it sits on keeps its height; a block-level link (a flex
           // item in the newer/older row) pins to its own resting box.
           var h=inline?(parseFloat(getComputedStyle(a).lineHeight)||boxH):boxH;
           a.style.boxSizing='border-box';a.style.width=box+'px';a.style.height=h+'px';a.classList.add('pinned');
         }else{
-          // Wrapped: each word keeps its width; the letters shrink only where
-          // the width axis runs out.
+          // Wrapped: each word keeps its width and the mono letters shrink to fit.
           a.style.whiteSpace='';
-          a.style.setProperty('--mfit',(size*e/ew).toFixed(1)+'px');
+          a.style.setProperty('--mfit',(fontPx*Math.min.apply(null,[1].concat(rest.map(function(r,i){return r/wide[i]})))).toFixed(1)+'px');
           boxes.forEach(function(w,i){w.style.setProperty('--w',rest[i]+'px')});
         }
       }
       // The change sweeps left to right but not in strict order: each step
       // turns one of the next three unchanged letters (two at once a quarter
-      // of the time), then waits 4-40 ms, mostly short with rare pauses (cubed
-      // random; browsers clamp chained timers to 4 ms). About 9.6 ms a letter.
+      // of the time), then waits 4-52 ms, mostly short with rare pauses (cubed
+      // random; browsers clamp chained timers to 4 ms). About 12.5 ms a letter.
       function run(){
         clearTimeout(timer);
         (function step(){
           if(!left.length)return;
           for(var k=Math.random()<0.25?2:1;k>0&&left.length;k--)
             spans[left.splice(Math.floor(Math.random()*Math.min(3,left.length)),1)[0]].className='mm';
-          var r=Math.random();timer=setTimeout(step,2+38*r*r*r);
+          var r=Math.random();timer=setTimeout(step,2.6+49.4*r*r*r);
         })();
       }
       a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left)left=spans.map(function(_,i){return i});run()})});
       // A resize rescales the titles, so pins measured at the old size are
       // dropped; the next hover measures afresh.
-      addEventListener('resize',function(){if(!spans)return;clearTimeout(timer);a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned');spans=null});
+      addEventListener('resize',function(){if(!spans)return;clearTimeout(timer);a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null});
       // Leaving resets the title at once; the morph only plays forwards.
       a.addEventListener('mouseleave',function(){dir=-1;clearTimeout(timer);if(spans){spans.forEach(function(s){s.className=''});left=null}});
     });

@@ -179,27 +179,22 @@ files are pruned). CSS and font URLs carry a hash of the file's bytes
 (`?v=`), so no browser or CDN cache serves an old copy after a deploy.
 
 Hovering a title turns it red (the accent of every hover) and, letter
-by letter, into Inconsolata (a build-time subset of just the letters the
-titles use, with its 50-200% width axis). The letters change in a loose
-left-to-right sweep: each step turns one of the next three, sometimes
-two at once, after a random 4-40 ms, about 10 ms a letter. The morph
-only plays forwards; leaving resets it. The title keeps its resting box,
-so nothing on the page moves, and the mono text keeps both its size and
-its width: it takes the title's letter height (x-height and capitals
-averaged), and the width axis, set per title, makes it as wide as the
-title. The axis does not widen the letters in proportion (its avar map
-bends at 62.5, 125 and 150%), so the script measures the face's advance
-at each 12.5% step once per page and reads between them. The title faces
-run from condensed to extended (The Distaff Texts needs 58%, That Mad
-Olympiad 144%); a fixed-width hover face would make some hovered titles
-much wider or much shorter. The meta beside a hovered title fades out. A
-title that needed a width beyond the axis would run past its resting
-end, up to the end of the column (half the row for newer/older links),
-and shrink only there.
-`node scripts/hover-check.mjs <chrome|firefox|webkit>` hovers every
-title in a real engine (the list and the newer/older links, at three
-desktop widths) and fails if a hovered title's width or letter height is
-more than 2% off its resting one, or its row moves.
+by letter, into Major Mono Display (a build-time subset of just the
+letters the titles use). The letters change in a loose left-to-right
+sweep: each step turns one of the next three, sometimes two at once,
+after a random 4-52 ms, about 12.5 ms a letter. The morph only plays
+forwards; leaving resets it. The title keeps its resting box, so nothing
+on the page moves. Major Mono is wider than every title face, so the
+mono text takes the geometric mean of the size that matches the title's
+width and the size that matches its letters' height, set 0.08em tight:
+a hovered title grows a little wider and a little shorter, never much of
+either. It may run past the title (the meta beside it fades out) up to
+the end of the column, or in the newer/older row up to the other link,
+where it shrinks to fit. `node scripts/hover-check.mjs
+<chrome|firefox|webkit>` hovers every title in a real engine (the list
+and the newer/older links, at three desktop widths) and fails if a
+hovered title breaks that rule (width times height off by more than 3%,
+either off by more than 40%, a wrapped word growing) or its row moves.
 Story pages sign the story in the name's face (Send Flowers), as in the
 header. Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.

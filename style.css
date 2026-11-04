@@ -92,6 +92,7 @@
   --w-strong: 600;
   --track-label: 0.08em;  /* letter-spaced sans labels: nav, EPUB */
   --track-caps:  0.16em;  /* the story title's spaced capitals */
+  --track-mono: -0.08em;  /* the hover face, into its 0.09em sidebearings */
 
   /* Space. */
   --s-1: 0.25rem;
@@ -299,19 +300,18 @@ main {
 }
 
 /* Hover morph (script in build.js): the title turns, letter by letter,
-   into Inconsolata. The script pins the title's resting box (.pinned; or,
-   for a wrapped title, each word's: --w), so nothing reflows, and sets
-   --mono-size (the title's letter height), --mono-wdth (the width-axis
-   value that makes the letters as wide as the title) and --mfit (the most
-   that fits, if the axis runs out). line-height: 0 keeps the mono glyphs
-   from growing the line. */
+   into Major Mono Display. The script pins the title's resting box
+   (.pinned; or, for a wrapped title, each word's: --w), so nothing
+   reflows, and sets --mono-size (the geometric mean of the sizes that
+   match the title's width and its letter height) and --mfit (the most
+   that fits its room). line-height: 0 keeps the mono glyphs from growing the line. */
 .morph .w[style] { display: inline-block; width: var(--w); white-space: nowrap; }
-.morph .mm {
-  font: 400 min(var(--mono-size, 1em), var(--mfit, 1em))/0 'Hover Mono', var(--mono);
-  font-stretch: var(--mono-wdth, 100%);
-}
+.morph .mq, .morph .mm { font-family: 'Major Mono Display', var(--mono); font-weight: 400; letter-spacing: var(--track-mono); }
+.morph .mm { font-size: min(var(--mono-size, 1em), var(--mfit, 1em)); line-height: 0; }
 .morph.pinned { display: inline-flex; white-space: nowrap; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
+.post-nav .morph { transition: opacity var(--dur) ease-out; }
+.post-nav:has(.spread .mm) .morph:not(.spread) { opacity: 0; }
 
 /* --- Meta: dates, reading times and reader counts --------------------- */
 /* Date and reading time in Inter Light (the served stand-in for
@@ -552,8 +552,11 @@ main {
 .end-mark { margin-top: 2em; font-family: var(--serif); text-align: center; letter-spacing: 0.5em; color: var(--muted); }
 
 .post-footer { margin-top: var(--s-6); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
+/* Two titles that don't fit side by side take a line each (the older
+   one still on the right) rather than breaking a title over two lines. */
 .post-nav {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   /* Centre, not baseline: the two links are in different faces, and a
      hovered (pinned) link's baseline must not nudge the other one. */
