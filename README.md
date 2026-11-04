@@ -115,7 +115,9 @@ title and the largest faces come partway back to the others
 stop shrinking at 1.9rem, or 2.3rem on phones to keep titles readable,
 and past that the page scrolls. A title too
 wide for its space (a long title in a wide face in a list row, or a long
-word in a story's title, on a phone) is shrunk to fit by a small script.
+word in a story's title, on a phone) is shrunk to fit by a small script
+(`site.js`, which holds all the behaviour except the geo curtain; that
+stays inline so it can act before first paint).
 Each title is followed by its month and reading time in Urbanist Light,
 upright (reading time at 260 words a minute, Brysbaert's 2019 mean for
 fiction, rounded to the minute under 10 and to 5 minutes above), then its

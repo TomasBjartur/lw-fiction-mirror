@@ -249,7 +249,7 @@ main {
 .nav-sub svg { align-self: center; width: auto; height: 0.85em; fill: currentColor; }
 
 /* Story pages: the bar slides up out of the way while reading down and
-   returns on scroll up (script in build.js); a hairline across the top
+   returns on scroll up (site.js); a hairline across the top
    shows progress through the story. Both as on markusstrasser.org. */
 .nav {
   position: fixed;
@@ -269,7 +269,7 @@ main {
 /* Reading progress: a 4px bar across the top in the EPUB accent at 70%
    alpha, faded in over the first 100-140px of scroll, filling from the
    story text's top at the window's top to its last line at the window's
-   bottom. A small script (build.js) measures it, so every browser gets the
+   bottom. A small script (site.js) measures it, so every browser gets the
    same bar. */
 .reading-progress {
   position: fixed;
@@ -445,7 +445,7 @@ main {
 /* --- Story titles ----------------------------------------------------- */
 /* In the contents list and the newer/older links: each story's own face,
    weight, size factor, stroke and recency colour from titles.css; --fit shrinks
-   a title too wide for its row (script in build.js). */
+   a title too wide for its row (site.js). */
 
 .story-title, .post-nav-link {
   font-family: var(--tf, var(--sans)), var(--sans);
@@ -456,7 +456,7 @@ main {
   -webkit-text-stroke: var(--tk, 0) currentColor;
 }
 
-/* Hover morph (script in build.js): the title turns, letter by letter,
+/* Hover morph (site.js): the title turns, letter by letter,
    into Major Mono Display. The script pins the title's resting box
    (.pinned; or, for a wrapped title, each word's: --w), so nothing
    reflows, and sets --mono-size (the geometric mean of the sizes that
