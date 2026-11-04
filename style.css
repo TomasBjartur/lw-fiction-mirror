@@ -118,7 +118,8 @@
   --nav-h:  2.6rem;
   --gutter: clamp(1rem, 3vw, 2.5rem);
   --page-w: min(100% - 2 * var(--gutter), var(--col));
-  --indent: clamp(1.25rem, 4vw, 3.5rem);  /* the list sits one indent in from the name */
+  --indent: clamp(1.25rem, 4vw, 3.5rem);  /* the list sits at least one indent in from the name */
+  --list-w: 55rem;  /* the widest contents row at its largest */
 
   /* The contents list (Contents, below): one row per story, all the same
      height, at most --row-max and at least --row-min. The title is
@@ -610,7 +611,11 @@ main {
   align-content: start;
   min-height: calc(var(--n) * var(--row-min));
   margin-top: var(--s-2);
-  padding-left: var(--indent);
+  /* Wide windows start the list on the left edge of a story page's frame, so
+     opening a story keeps the eye on the same line. A narrower window gives
+     that up to keep the widest row whole, then settles on the one indent, so
+     no breakpoint is needed. */
+  padding-left: max(var(--indent), min((100% - var(--col)) / 2, 100% - var(--list-w)));
   list-style: none;
   container-type: size;
 }

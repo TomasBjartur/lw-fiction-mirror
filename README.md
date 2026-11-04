@@ -85,7 +85,7 @@ above a thin grey rule. The book is its title in Urbanist Light,
 plain (no link), followed by "EPUB" and a download mark in the accent red, the one
 link, underlined, that downloads the EPUB. From 1040 px up (65em, so a larger text setting gets it later) it sits in the
 nav, its EPUB link a nav item level with RSS and X; on narrower screens it goes below the
-rule, indented to the list, at story-title size. The footer carries it
+rule, indented to the list, at story-title size. In wide windows the list starts on the left edge of a story page's frame, so opening a story keeps the eye on the same line; a narrower window gives that up to keep the widest row whole, then settles on one indent, all from one `padding-left` with no breakpoint. The footer carries it
 too (except on a phone's contents page, where it is already under the
 name). Story pages put "TB" (in the name's face) and the EPUB link in
 their nav. The tab icon is "TB" in the name's face, in the accent red on
