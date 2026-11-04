@@ -11,7 +11,7 @@
 //   mkdir -p ~/.cache/pw && cd ~/.cache/pw && bun add playwright && bunx playwright install firefox webkit
 //   PLAYWRIGHT_DIR=~/.cache/pw node scripts/initials-check.mjs webkit
 //
-// "chrome" drives the agent-browser Chrome over CDP instead.
+// "chrome" drives the installed Google Chrome (Playwright channel "chrome").
 //
 // At a desktop and a phone width, for each .first/.sect paragraph:
 // - the next paragraph must start at its own indent, not pushed right by
@@ -22,7 +22,6 @@
 // With a clip directory it also saves clips of reference spots to look at.
 // Exits 1 on any failure.
 import { createRequire } from 'node:module';
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -45,15 +44,8 @@ const stories = fs.readdirSync(dist).filter(f => f.endsWith('.html') &&
 if (!stories.length) { console.error('no story pages in dist/: run node build.js'); process.exit(2); }
 const sizes = [[1024, 800], [390, 664]];
 
-let browser;
-if (engine === 'chrome') {
-  execSync('agent-browser open about:blank');
-  const http = execSync('agent-browser get cdp-url', { encoding: 'utf8' }).trim()
-    .replace(/^"|"$/g, '').replace(/^ws/, 'http').replace(/\/devtools\/.*$/, '');
-  browser = await pw.chromium.connectOverCDP(http);
-} else {
-  browser = await pw[engine].launch();
-}
+// "chrome" is the installed Google Chrome, driven by Playwright.
+const browser = engine === 'chrome' ? await pw.chromium.launch({ channel: 'chrome' }) : await pw[engine].launch();
 
 const CHECK = () => {
   const texts = el => { const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), out = [];
@@ -116,7 +108,7 @@ for (const [w, h] of sizes) {
   }
   await ctx.close();
 }
-if (engine !== 'chrome') await browser.close();
+await browser.close();
 
 console.log(`${engine}: ${checked} initials on ${stories.length} stories at ${sizes.map(s => s[0]).join(' and ')}px`);
 for (const f of failures) console.log(`  ✗ ${f}`);
