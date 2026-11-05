@@ -2,7 +2,7 @@
 story nav's home link), in the accent red on the page's paper colour, with
 the dark theme's values under prefers-color-scheme: dark.
 
-    node build.js   # first: writes dist/fonts/author-send-flowers.woff2
+    node build.js   # first: writes dist/fonts/author-monoton.woff2
     uv run --with fonttools --with brotli python3 scripts/favicon.py
 
 The glyphs are outlines, so the icon needs no font. Colours are style.css's
@@ -18,7 +18,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT = ROOT / "dist/fonts/author-send-flowers.woff2"
+FONT = ROOT / "dist/fonts/author-monoton.woff2"
 OUT = ROOT / "favicon.svg"
 TEXT = "TB"
 ACCENT = ((0.52, 0.22, 24), (0.80, 0.11, 24))

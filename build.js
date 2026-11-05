@@ -433,7 +433,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
 // - Major Mono Display: the title hover morph (letters of the titles).
-// - Send Flowers as 'Author Name': the author's name (the contents page
+// - Monoton (Duane Arnold's title face) as 'Author Name': the author's name (the contents page
 //   h1) and the TB home link on story pages.
 // - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
 //   character in a story that the latin text faces lack. Without it they come from
@@ -442,7 +442,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 const SUBSET_FONTS = [
   { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
-  { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
+  { family: 'Monoton', as: 'Author Name', file: 'fonts/author-monoton.woff2', display: 'block',
     text: () => AUTHOR },
   { family: 'Homemade Apple', as: 'Signature', file: 'fonts/signature-homemade-apple.woff2', display: 'block',
     text: () => 'Tomás B.' },
@@ -630,10 +630,10 @@ const TITLE_FONT_BACKLOG = [
   ['Bitcount Prop Double Ink', 1.0, 400],
 ];
 
-// Every title on the site wears Duane Arnold's face (Patrick, 2026-11-04).
+// Every title on the site wears The Company Man's face (Patrick, 2026-11-04).
 // TITLE_FONTS and the backlog stay as they are, so the per-story faces come
 // back by setting this to null.
-const ALL_TITLES_FONT = TITLE_FONTS['duane-arnold-1'];
+const ALL_TITLES_FONT = TITLE_FONTS['the-company-man'];
 
 // Slug -> [spec, size, weight, stroke?] for every story: its pick, or a backlog face.
 function titleFontFor(posts) {
@@ -721,7 +721,13 @@ async function fetchTitleFonts(posts, faces = titleFontFor(posts)) {
   return out;
 }
 
+// Every title in one colour, black on paper (Patrick, 2026-11-04); dark
+// mode takes the ramp's lightest end, since black would vanish there. Set to
+// null to bring back the oldest-to-newest ramp below.
+const ALL_TITLES_COLOR = 'light-dark(#000, oklch(0.9 0.005 305))';
+
 function titleColor(rank, n) {
+  if (ALL_TITLES_COLOR) return ALL_TITLES_COLOR;
   const t = n > 1 ? rank / (n - 1) : 0;
   const mix = (a, b) => (a + (b - a) * t).toFixed(3);
   // Newest is the highest-contrast in both themes: dark mirrors the ramp.
@@ -839,7 +845,7 @@ function buildSuccessPage(posts) {
     robots: 'noindex',
     // The name's face first: while it loads, Chrome reaches for the next face in
     // its stack, which would fetch EB Garamond for a page that sets no story.
-    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
+    preload: ['fonts/author-monoton.woff2', 'fonts/urbanist-meta.woff2'],
   });
 }
 
@@ -861,7 +867,7 @@ function buildNotFoundPage(posts) {
     nav: true,
     skipLabel: 'message',
     robots: 'noindex',
-    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
+    preload: ['fonts/author-monoton.woff2', 'fonts/urbanist-meta.woff2'],
   });
 }
 
@@ -1033,7 +1039,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   const base = opts.base || '';
   const styles = opts.styles || [];
   const preloads = opts.preload || [
-    currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2',
+    currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-monoton.woff2',
     'fonts/urbanist-meta.woff2',
   ];
 
