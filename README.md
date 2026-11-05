@@ -221,8 +221,8 @@ Commit `fonts/subsets/` after a local build that changed it (unused
 files are pruned). CSS and font URLs carry a hash of the file's bytes
 (`?v=`), so no browser or CDN cache serves an old copy after a deploy.
 
-Three title faces are colour fonts (Bitcount Double Ink, Kalnia Glaze,
-Bungee Spice; Foldit in the backlog too), and Google serves them as
+Two title faces are colour fonts (Kalnia Glaze, Bungee Spice; Bitcount
+Double Ink and Foldit in the backlog too), and Google serves them as
 COLRv1, which Safari's engine cannot draw: on Macs and on every iPhone
 browser those titles were blank. `scripts/colr-twin.py` adds an OpenType
 SVG table to a copy of each file, and the `@font-face` offers the original
@@ -251,8 +251,8 @@ letters the titles use). The whole title changes strictly left to right,
 one letter at a time, each after a random wait (3-54 ms, mostly short).
 A title longer than 20 letters speeds up letter by letter, so the sweep
 finishes in about the time a 20-letter title would. The waits follow the
-clock rather than the timer: where a step is slow to draw (Safari takes
-about 90 ms a step on Customer Satisfaction Opportunities, whose glyphs
+clock rather than the timer: where a step is slow to draw (Safari took
+about 90 ms a step on a 35-letter title in Bitcount Double Ink, whose glyphs
 are OpenType SVG) several letters turn together and the sweep still takes
 the same time. Each
 letter turns red as it changes; the rest keep the title's colour. The morph only plays
