@@ -296,16 +296,18 @@
     if(a.href)a.addEventListener('click',function(e){if(dir>0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey)try{sessionStorage.setItem('carry',a.pathname)}catch(x){}});
     // A title clicked in the list or the newer/older row opens on its story page
     // already turned, holds there a moment, then turns back letter by letter, left
-    // to right at the hover's own pace, so the hover plays out rather than snaps
+    // to right and slower than the hover, so the hover plays out rather than snaps
     // off. A pointer resting on it keeps it turned, and leaving resets it, as a
     // hover. The page's head decides this and keeps the title hidden until then
     // (.carry). The title's own face must be in first, or its resting box is
     // measured wrong; if that outlasts the wait in style.css, the title has shown
     // at rest and stays so. Hovering it meanwhile takes over as a hover does.
-    var HOLD=700;
+    var HOLD=700,UNTURN=1200;
     function unrun(){
+      // Slower than the hover, and the same length for every title: about
+      // UNTURN ms in all (a step averages 15.5 ms at pace 1).
       var back=[];words.forEach(function(g){back=back.concat(g)});
-      var pace=Math.min(1,20/spans.length),next=performance.now();
+      var pace=UNTURN/(15.5*spans.length),next=performance.now();
       (function step(){
         var now=performance.now();
         while(back.length&&next<=now){
