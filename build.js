@@ -716,7 +716,7 @@ async function fetchSubsetFonts(posts) {
 const TITLE_FONTS = {
   'duane-arnold-1': ['Monoton', 0.95, 400],
   'san-silvestro': ['Ballet', 1.7, 400],
-  'the-distaff-texts': ['Astloch:wght@700', 1.35, 700],
+  'the-distaff-texts': ['IM Fell English:ital@1', 1.15, 400],
   'customer-satisfaction-opportunities-1': ['Tiny5:BLED,JITT,ROND,wdth,wght@0,0,100,75,300', 1.15, 300],
   'the-elect-2': ['Jacques Francois Shadow', 1.1, 400],
   'goldfish': ['Kalnia Glaze:wght@500', 1.1, 500],
@@ -749,6 +749,7 @@ const TITLE_FONT_BACKLOG = [
   ['Climate Crisis', 0.85, 400],
   ['Josefin Sans:wght@300', 1.05, 300],
   ['Bungee Shade', 0.9, 400],
+  ['Astloch:wght@700', 1.35, 700],
   ['Twinkle Star', 1.2, 400],
   ['Urbanist:wght@300', 1.05, 300],
   ['Foldit:wght@500', 1.15, 500],
