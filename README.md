@@ -252,7 +252,7 @@ one letter at a time, each after a random wait (3-54 ms, mostly short).
 A title longer than 20 letters speeds up letter by letter, so the sweep
 finishes in about the time a 20-letter title would. The waits follow the
 clock rather than the timer: where a step is slow to draw (Safari took
-about 90 ms a step on a 35-letter title in Bitcount Double Ink, whose glyphs
+about 90 ms a step on a 33-letter title in Bitcount Double Ink, whose glyphs
 are OpenType SVG) several letters turn together and the sweep still takes
 the same time. Each
 letter turns red as it changes; the rest keep the title's colour. The morph only plays
