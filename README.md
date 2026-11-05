@@ -39,6 +39,12 @@ const SITE_SUBTITLE = 'by Tomás Bjartur';
 
 Story ordering lives in `COLLECTION_ORDER`. Stories not in the list are inserted before the final entry (the title story keeps closing the book), sorted by karma. `EXCLUDED_SLUGS` hides posts entirely; `FORCE_INCLUDE_SLUGS` admits stories below the karma cutoff.
 
+**Currently off.** `GEO_CURTAIN = false` in `build.js` switches the whole curtain
+off while keeping the rules: no page carries the lookup script and no second EPUB
+is built. It was turned off on 2026-11-05 because ipapi.co was rate-limiting
+lookups, and a reader it refuses is shown everything anyway. Set it back to
+`true` to restore everything below.
+
 `GEO_HIDDEN` hides individual stories from readers in a given place. Each rule
 matches on whichever of `city` / `region` / `country` it specifies:
 
@@ -290,8 +296,8 @@ Title colours shade from near-black (newest) to dark purple
 
 Book order (`COLLECTION_ORDER`) now only shapes the EPUB. The only
 external request on the reader's end is the `GEO_HIDDEN` lookup to
-ipapi.co, which runs on every page view (cached 24h) while any rule is
-configured.
+ipapi.co, which runs on every page view (cached 24h) while `GEO_CURTAIN`
+is on and any rule is configured.
 
 Stories marked as editor's picks (`EDITOR_PICKS`) get a red rule (the
 link-hover and EPUB accent, dark fading to mid) in the margin of the contents list. A story with no `TITLE_FONTS`

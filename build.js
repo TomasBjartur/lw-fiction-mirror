@@ -123,6 +123,12 @@ const FORCE_INCLUDE_SLUGS = ['san-silvestro', 'the-distaff-texts'];
 const GEO_HIDDEN = [
   { slug: 'our-beloved-monsters', region: 'BC', country: 'CA' },
 ];
+// The curtain's on/off switch. Off, no page carries the lookup script and no
+// second EPUB is built; the rules above stay, so turning it back on is this
+// one line. Off since 2026-11-05: ipapi.co rate-limits readers, and a reader
+// it refuses is shown everything anyway.
+const GEO_CURTAIN = false;
+const GEO_ACTIVE = GEO_CURTAIN ? GEO_HIDDEN : [];
 const GEO_LOOKUP_URL = 'https://ipapi.co/json/';
 
 // External stories hosted outside LessWrong
@@ -1256,13 +1262,13 @@ ${(currentSlug || opts.nav) ? `  <header class="nav">
 
   ${siteFoot(base)}
 
-  <script>
+  ${GEO_ACTIVE.length ? `<script>
   (function(){
     // Geo curtain for GEO_HIDDEN. The page HTML is already delivered by the time
     // this runs, so it is a curtain, not a block: view-source, JS off, curl, a
     // VPN and the RSS feed all bypass it. Fails open by design — if the
     // lookup errors, times out or is blocked, nothing is hidden.
-    var RULES=${JSON.stringify(GEO_HIDDEN)},CUR=${JSON.stringify(currentSlug)};
+    var RULES=${JSON.stringify(GEO_ACTIVE)},CUR=${JSON.stringify(currentSlug)};
     var ALT_EPUB=${JSON.stringify(base + EPUB_FILENAME_ALT)};
     if(!RULES.length)return;
     var KEY='geo',TTL=864e5;
@@ -1298,7 +1304,7 @@ ${(currentSlug || opts.nav) ? `  <header class="nav">
       })
       .catch(function(){clearTimeout(timer)});
   })();
-  </script>
+  </script>` : ''}
 
 </body>
 </html>`;
@@ -1316,9 +1322,9 @@ function postNavLink(list, idx, step, base = '') {
   const target = list.length > 1 ? at(idx + step) : null;
   if (!target) return `<span class="${cls}"></span>`;
   let geo = '';
-  if (GEO_HIDDEN.some(r => r.slug === target.slug)) {
+  if (GEO_ACTIVE.some(r => r.slug === target.slug)) {
     let i = idx + step, guard = list.length;
-    while (guard-- > 0 && GEO_HIDDEN.some(r => r.slug === at(i).slug)) i += step;
+    while (guard-- > 0 && GEO_ACTIVE.some(r => r.slug === at(i).slug)) i += step;
     const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
     geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${base}${alt.slug}/` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
@@ -2788,7 +2794,7 @@ async function main() {
 
   // Variant EPUB without the GEO_HIDDEN stories, linked in place of the full one
   // for matching readers. Shares the full EPUB's cover so the two look alike.
-  const geoHiddenSlugs = GEO_HIDDEN.map(r => r.slug);
+  const geoHiddenSlugs = GEO_ACTIVE.map(r => r.slug);
   const altCollection = collection.filter(p => !geoHiddenSlugs.includes(p.slug));
   if (altCollection.length !== collection.length) {
     const epubAlt = await buildEpub(altCollection, 'collection', BOOK_TITLE, coverPng);
