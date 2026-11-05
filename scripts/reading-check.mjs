@@ -164,6 +164,7 @@ await run('place', async p => {
   check(await p.evaluate(() => document.querySelector('.nav').classList.contains('hidden')), 'the nav stays out of the way');
   await p.setViewportSize({ width: 430, height: 800 }); await p.waitForTimeout(500);
   check(near((await topBlock(p)).i, at.i), 'resizing keeps the paragraph');
+  await open(p, ''); // through the list: a goto to the same URL may count as a reload
   await open(p);
   check(near((await topBlock(p)).i, at.i), 'another width reopens at the paragraph');
 });
@@ -277,11 +278,52 @@ await run('place, slow fonts', async (p, ctx) => {
   await p.goto(url(), { waitUntil: 'commit' });
   await p.waitForFunction(() => document.querySelector('.post-body') && scrollY > 0, null, { timeout: 8000 });
   await p.waitForTimeout(150);
-  // A scrollbar drag: a press, then the page moves with no wheel or key.
+  check(await p.evaluate(() => document.fonts.status === 'loading'), 'the fonts are still on their way at the press');
+  // Stands in for a scrollbar drag: a press at the page's edge, then the page
+  // moves with no wheel or key.
   await p.mouse.move(4, 400); await p.mouse.down(); await p.mouse.up();
   await p.evaluate(() => scrollBy(0, -2000));
   await p.waitForTimeout(1600);
   check((await topBlock(p)).i < at.i, 'the fonts arriving do not pull back a reader who moved');
+});
+
+await run('place, late fonts', async (p, ctx) => {
+  await open(p);
+  const { at } = await readToMiddle(p);
+  await open(p, '');
+  await slowFonts(ctx, 1000);
+  await open(p);
+  await p.waitForTimeout(200); // the nav updates on the next frame
+  check(near((await topBlock(p)).i, at.i), 'the fonts arriving keep the paragraph');
+  check(await p.evaluate(() => document.querySelector('.nav').classList.contains('hidden')), 'their move does not bring the nav back');
+});
+
+await run('place, leaving at once', async p => {
+  await open(p); // a fresh visit, where any scroll counts as the reader's
+  await p.evaluate(() => new Promise(r => {
+    addEventListener('scroll', r, { once: true });
+    scrollTo({ top: 3 * innerHeight, behavior: 'instant' });
+  }));
+  const before = await key(p);
+  await open(p, '');
+  check(before === null, 'nothing saved yet when the reader leaves');
+  check(await key(p) !== null, 'leaving inside the 300 ms wait still saves the place');
+});
+
+await run('theme button', async p => {
+  const theme = () => p.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  await open(p);
+  await p.locator('#theme-btn').click();
+  const dark = await theme();
+  await p.mouse.move(640, 400); await p.mouse.wheel(0, 900); await p.waitForTimeout(500);
+  const y = await p.evaluate(() => scrollY);
+  await p.keyboard.press('Space'); await p.waitForTimeout(600);
+  check(await theme() === dark, 'Space after a click does not flip the theme');
+  check(await p.evaluate(() => scrollY) > y, 'Space after a click scrolls the page');
+  await p.locator('#theme-btn').focus();
+  await p.keyboard.press('Enter');
+  check(await theme() !== dark, 'a key press still flips it');
+  check(await p.evaluate(() => document.activeElement.id === 'theme-btn'), 'a key press keeps focus on the button');
 });
 
 console.log(failures ? `FAIL ${failures}` : 'PASS');
