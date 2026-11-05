@@ -74,7 +74,7 @@
   --meta-sans: 'Urbanist Meta', 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;  /* dates, counts and small labels */
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --mono:  'Fira Mono', ui-monospace, monospace;
-  --name:  'Author Name', var(--serif);  /* Monoton, subset to the name */
+  --name:  'Author Name', var(--serif);  /* Send Flowers, subset to the name */
   --initial: 'Initials', var(--serif);   /* story initials */
 
   /* Type scale. */
@@ -82,8 +82,7 @@
   --fs-xs:   0.8rem;    /* footer, captions, the story's meta line, arrows */
   --fs-s:    1rem;      /* nav labels */
   --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
-  --fs-name: clamp(0.85rem, 4.3vw, 2.3rem);  /* the name on the contents page; Monoton
-                         runs about 9.4em wide, so it scales to keep the header in the window */
+  --fs-name: 2.9rem;    /* the name on the contents page */
   --fs-book: clamp(0.9rem, 4.3vw, 1.65rem);  /* the book under the rule: a title's size, on one line */
   --icon-k:  1.2;       /* an icon is 1.2x its label */
   --title-size: 0.99rem; /* titles outside the filling list (newer/older, short windows) */
@@ -884,6 +883,7 @@ main {
 @media (max-width: 40em) {
   html { font-size: 100%; }
   :root {
+    --fs-name: clamp(1.5rem, 7vw, 2.3rem);
     --story-size: 1.1875rem;  /* 19px */
     /* The meta goes under each title: a row splits about 60/40 between
        title and meta. The floor keeps titles readable, so a short phone
