@@ -142,8 +142,10 @@ Fira Mono any code; Homemade Apple the footer signature.
 Story pages are set as a printed book page (treatment A of the reading
 lab, Markus's pick): EB Garamond at 19-21.5 px on a ~62-character line,
 justified and hyphenated (ragged on phones, where browser justification
-opens gaps), 1em indents, a centred spaced-capitals title over the
-author's name, and decorated initials with small-caps lead-ins. The
+opens gaps), 1em indents, and decorated initials with small-caps
+lead-ins. The title on top is the one from the contents list, in its
+face and colour at a heading's size, with the reading time and date on
+the line under it and the counts on the next. The
 build also typesets story text on the page only (`typeset()` in
 `build.js`; the EPUB and feed keep the source): curly quotes, spaced
 hyphens to em dashes, `...` to ellipses, and a lone acronym of 3+
@@ -211,8 +213,8 @@ treatments (book page in EB Garamond, Literata for screens, an editorial
 layout in Alegreya Sans) of three stories, to compare against the
 current page. A design tool, not part of the site.
 
-Each story's title in the contents list (and in the newer/older links)
-has its own display face, from Markus's picks: `TITLE_FONTS` in
+Each story's title in the contents list (and in the newer/older links
+and on its own page) has its own display face, from Markus's picks: `TITLE_FONTS` in
 `build.js` maps slug to [Google css2 spec, size factor, weight, and an
 optional stroke in em for faces drawn in hairlines]. The
 build fetches a subset of just that title's letters per story; a story
@@ -238,7 +240,8 @@ has no `uv`, so a retitled colour story logs `[DEGRADED]` there and Safari
 sets that title in the sans until a local build commits its copy. Safari
 draws Bitcount a little pinker than Chrome does. `node scripts/ink-check.mjs
 <chrome|firefox|webkit>` reads the pixels of every title, specimen, date
-and count at a desktop and a phone width, and fails on a blank box, a face
+and count on the contents page and `/title-fonts/`, and the title on every
+story, at a desktop and a phone width, and fails on a blank box, a face
 that did not load or a colour face drawn without colour. Run it after
 changing a title face; the width checks cannot see a blank glyph.
 
@@ -270,8 +273,7 @@ the end of the column, or in the newer/older row up to the other link,
 where it shrinks to fit. The mono glyphs overflow that box rather than
 resize it, so they are not hit-testable: the link's resting box is the
 whole hover target, and a hovered title cannot cover its neighbour. A
-story's own title, set in EB Garamond capitals, does the same, showing the
-letters as they are in the list. Opened by clicking a title with a mouse, it
+story's own title does the same, with the whole window as its room. Opened by clicking a title with a mouse, it
 starts already turned and lets go when the pointer moves off it or on the first
 scroll. The click leaves a note in `sessionStorage`; a small script in the next
 page's head reads it before first paint and keeps the title hidden until it has
@@ -283,8 +285,7 @@ the title if there is none. `node scripts/hover-check.mjs
 each story's title and newer/older links, at three desktop widths) and fails if a
 hovered title breaks that rule (width times height off by more than 3%,
 either off by more than 40%, a wrapped word growing) or its row moves.
-Story pages sign the story in the name's face (Send Flowers), as in the
-header. Title colours shade from near-black (newest) to dark purple
+Title colours shade from near-black (newest) to dark purple
 (oldest); `dist/titles.css` holds them.
 
 Book order (`COLLECTION_ORDER`) now only shapes the EPUB. The only

@@ -1198,7 +1198,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   const base = opts.base || '';
   const styles = opts.styles || [];
   const preloads = opts.preload || [
-    currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2',
+    'fonts/author-send-flowers.woff2',
     'fonts/urbanist-meta.woff2',
   ];
 
@@ -1337,20 +1337,19 @@ function storyImages(html) {
   });
 }
 
-function buildPostPage(post, allPosts) {
-  const date = formatDate(post.postedAt);
-  const readTime = estimateReadingTime(post.wordCount);
+function buildPostPage(post, allPosts, titleFace) {
+  const when = [estimateReadingTime(post.wordCount), formatDate(post.postedAt)].filter(Boolean)
+    .map(t => `<span class="when">${t}</span>`).join('');
   const social = stats(post);
-  const metaLine = [readTime ? `<span class="when">${readTime}</span>` : '', social].filter(Boolean).join('');
   const byDate = sortByDate(allPosts);
   const idx = byDate.findIndex(p => p.slug === post.slug);
 
   const content = `
     <article>
       <header class="post-header">
-        <h1><span class="morph">${escapeHtml(post.title)}</span></h1>
-        <p class="post-byline"><span class="byline">${AUTHOR}</span><span class="when">${date}</span></p>
-        ${metaLine ? `<p class="post-meta meta">${metaLine}</p>` : ''}
+        <h1 class="t-${post.slug}"><span class="morph">${escapeHtml(post.title)}</span></h1>
+        <p class="post-meta meta">${when}</p>
+        ${social ? `<p class="post-meta meta">${social}</p>` : ''}
         <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">
@@ -1369,6 +1368,13 @@ function buildPostPage(post, allPosts) {
     description: extractExcerpt(post.htmlBody),
     base: '../',
     published: post.postedAt,
+    // The page opens on the title, which stays blank until its face arrives. A
+    // colour face has two files and the browser picks one, so it isn't named here.
+    preload: [
+      ...(titleFace && !titleFace.face.colour ? [titleFace.face.file] : []),
+      'fonts/eb-garamond-latin-normal-400-v1.woff2',
+      'fonts/urbanist-meta.woff2',
+    ],
   });
 }
 
@@ -2774,7 +2780,7 @@ async function main() {
   for (const post of fiction) {
     const dir = path.join(OUTPUT_DIR, post.slug);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction));
+    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction, titleFonts.get(post.slug)));
     fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(post));
     console.log(`Wrote ${post.slug}/index.html (+ ${post.slug}.html redirect)`);
   }

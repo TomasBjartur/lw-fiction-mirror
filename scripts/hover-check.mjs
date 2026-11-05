@@ -66,7 +66,7 @@ const HOVER = async sel => {
   const out = [];
   for (const a of document.querySelectorAll(sel)) {
     const t = a.textContent, cs = getComputedStyle(a), row = a.closest('.story, .post-nav, .post-header');
-    const w0 = width(a), h0 = height(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, cs.textTransform === 'uppercase' ? t.toUpperCase() : t);
+    const w0 = width(a), h0 = height(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, t);
     const r0 = row.getBoundingClientRect(), b0 = a.closest('.story, .post-header') ? baseline(a) : null;
     a.dispatchEvent(new MouseEvent('mouseenter'));
     const done = () => a.querySelector('.mi') && !a.querySelector('.mi .w > span:not(.mm)');

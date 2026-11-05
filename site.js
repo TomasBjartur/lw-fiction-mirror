@@ -183,10 +183,9 @@
   function up(font,t){cx.font=font;return cx.measureText(t).actualBoundingBoxAscent}
   function heightSize(a,t,fontPx){
     var cs=getComputedStyle(a);
-    var shown=cs.textTransform==='uppercase'?t.toUpperCase():t;
     var xs=function(s){return (s.match(/[acemnorsuvwxz]/g)||[]).join('')||s};
     var f=cs.fontStyle+' '+cs.fontWeight+' '+fontPx+'px '+cs.fontFamily,mf='400 100px "Major Mono Display"';
-    var h=(up(f,xs(shown))+up(f,shown))/2,m=(up(mf,xs(t))+up(mf,t))/200;
+    var h=(up(f,xs(t))+up(f,t))/2,m=(up(mf,xs(t))+up(mf,t))/200;
     return m>0?h/m:fontPx;
   }
   document.querySelectorAll('.morph').forEach(function(a){
@@ -234,9 +233,10 @@
         // The mono text may run past the title, up to the end of the title
         // column (the meta beside it fades meanwhile) or, in the newer/older
         // row, up to the other link; if it needs more, the other link fades
-        // too (.spread) and it has the whole row. Only past that does it
-        // shrink further.
-        var nav=a.closest('.post-nav'),room=own?cr.width:cr.right-ar.left-4;
+        // too (.spread) and it has the whole row. A story's own title is
+        // centred with nothing beside it, so it has the window. Only past that
+        // does it shrink further.
+        var nav=a.closest('.post-nav'),room=own?document.documentElement.clientWidth-32:cr.right-ar.left-4;
         if(nav){
           var o=Array.from(nav.querySelectorAll('.morph')).filter(function(x){return x!==a})[0],or=o&&o.getBoundingClientRect();
           room=cr.width-(ar.width-textW);
