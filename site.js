@@ -16,11 +16,14 @@
       document.querySelector('meta[name=color-scheme]').content=c;
       document.querySelector('meta[name=theme-color]').content=getComputedStyle(document.body).backgroundColor;
     };
-    tb.addEventListener('click',function(){
+    tb.addEventListener('click',function(e){
       var n=cur()==='dark'?'light':'dark';
       if(n==='dark')h.setAttribute('data-theme','dark');else h.removeAttribute('data-theme');
-      try{localStorage.setItem('theme',n)}catch(e){}
+      try{localStorage.setItem('theme',n)}catch(x){}
       show();
+      // A mouse leaves it focused, where Space would flip the theme again instead
+      // of scrolling, with the nav hidden. A key press has no pointer and keeps focus.
+      if(e.pointerType)tb.blur();
     });
     show();
     // A page restored from the back/forward cache keeps the theme it was
