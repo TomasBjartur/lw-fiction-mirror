@@ -294,12 +294,28 @@
     a.addEventListener('mouseleave',leave);
     // A title clicked while it is hovered leaves a note for the next page's head.
     if(a.href)a.addEventListener('click',function(e){if(dir>0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey)try{sessionStorage.setItem('carry',a.pathname)}catch(x){}});
-    // A title clicked in the list or the newer/older row is still hovered when the
-    // page changes, so a story's own title opens already turned, and lets go the
-    // way a hover does: when the pointer moves off it, or on the first scroll. The
-    // page's head decides this and keeps the title hidden until then (.carry). The
-    // title's own face must be in first, or its resting box is measured wrong; if
-    // that outlasts the wait in style.css, the title has shown at rest and stays so.
+    // A title clicked in the list or the newer/older row opens on its story page
+    // already turned, holds there a moment, then turns back letter by letter, left
+    // to right at the hover's own pace, so the hover plays out rather than snaps
+    // off. A pointer resting on it keeps it turned, and leaving resets it, as a
+    // hover. The page's head decides this and keeps the title hidden until then
+    // (.carry). The title's own face must be in first, or its resting box is
+    // measured wrong; if that outlasts the wait in style.css, the title has shown
+    // at rest and stays so. Hovering it meanwhile takes over as a hover does.
+    var HOLD=700;
+    function unrun(){
+      var back=[];words.forEach(function(g){back=back.concat(g)});
+      var pace=Math.min(1,20/spans.length),next=performance.now();
+      (function step(){
+        var now=performance.now();
+        while(back.length&&next<=now){
+          spans[back.shift()].className='';
+          var r=Math.random();next+=pace*(2.7+51.4*r*r*r);
+        }
+        if(!back.length){dir=-1;left=null;return}
+        timers.push(setTimeout(step,next-now));
+      })();
+    }
     var carried=own&&h.classList.contains('carry'),late=false,release=null;
     // A prerendered story ran its head script before any click, so it turned its
     // title on trust. Only now can it read the note; with none, no title was clicked.
@@ -316,19 +332,11 @@
         if(late)return;
         split();dir=1;left=[];
         spans.forEach(function(s){s.className='mm'});
-        // A browser may send one move with no movement after a page loads.
-        var x=null,y=null;
-        function end(e){
-          if(e.type==='mousemove'){
-            if(a.contains(e.target))return;
-            if(x===null){x=e.clientX;y=e.clientY;return}
-            if(e.clientX===x&&e.clientY===y)return;
-          }
-          release();
-        }
-        release=function(){removeEventListener('mousemove',end);removeEventListener('scroll',end);leave()};
-        addEventListener('mousemove',end,{passive:true});
-        addEventListener('scroll',end,{passive:true});
+        release=leave;
+        // A prerendered page waits to be shown before it starts the clock; the
+        // listener above runs first and may already have let go.
+        var start=function(){if(dir>0)timers.push(setTimeout(function(){if(dir>0&&!running&&!a.matches(':hover'))unrun()},HOLD))};
+        if(document.prerendering)document.addEventListener('prerenderingchange',start,{once:true});else start();
       });
     }
   });
