@@ -130,8 +130,9 @@
     var moved=entry&&entry.type==='navigate'&&entry.name.indexOf('#')<0;
     if(moved&&kept&&kept.n===blocks.length){
       moved=false;place=kept;goTo(kept);
-      // The text face can arrive after this and move the text.
-      document.fonts.ready.then(function(){if(!moved)goTo(kept)});
+      // The text face can arrive after this and move the text. That scroll is this
+      // code's, so the nav doesn't read it as the reader scrolling back up.
+      document.fonts.ready.then(function(){if(moved)return;goTo(kept);if(nav){nav.classList.add('hidden');lastY=scrollY}});
     }
     if(!moved)['wheel','touchstart','keydown','pointerdown'].forEach(function(t){addEventListener(t,function(){moved=true},{passive:true,once:true})});
     addEventListener('scroll',function(){if(!readTimer)readTimer=setTimeout(saveRead,300)},{passive:true});
