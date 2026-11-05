@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { execFileSync } = require('child_process');
 const { createCanvas, registerFont, loadImage } = require('canvas');
 
 // Cover typeface, bundled so the CI runner (which has no Georgia) renders the
@@ -1010,19 +1011,32 @@ function sortByDate(posts) {
 const SUBSTACK_BASE = SUBSTACK_URL.replace(/\/subscribe.*$/, '');
 const normTitle = t => String(t).toLowerCase().replace(/[‘’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
-// The last counts fetched. Substack answers 403 to GitHub's build machines on
-// every path and with any user agent, so the workflow can't fetch them; a local
-// build refreshes this file, and committing it updates the site's counts.
+// Substack shows GitHub's build machines a Cloudflare bot check (HTTP 403), so the
+// workflow starts a WARP proxy and names it in SUBSTACK_SOCKS. This goes through
+// curl there, because Node's fetch can't use SOCKS.
+async function substackJson(url) {
+  if (process.env.SUBSTACK_SOCKS) {
+    const body = execFileSync('curl', ['-sS', '--fail', '--max-time', '30', '--socks5-hostname', process.env.SUBSTACK_SOCKS, url],
+      { maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    return JSON.parse(body);
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// The last counts fetched, used when a fetch fails. A local build refreshes it.
 const SUBSTACK_SAVED = path.join(__dirname, 'data', 'substack-metrics.json');
 
 function saveSubstackMetrics(metrics) {
+  if (process.env.CI) return; // the runner's copy is thrown away
   const posts = Object.fromEntries([...metrics].sort(([a], [b]) => a.localeCompare(b)));
   let old = null;
   try { old = JSON.parse(fs.readFileSync(SUBSTACK_SAVED, 'utf8')).posts; } catch { /* first save */ }
   if (!metrics.size || JSON.stringify(old) === JSON.stringify(posts)) return;
   fs.mkdirSync(path.dirname(SUBSTACK_SAVED), { recursive: true });
   fs.writeFileSync(SUBSTACK_SAVED, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), posts }, null, 1) + '\n');
-  console.log(`Saved Substack metrics to ${path.relative(__dirname, SUBSTACK_SAVED)}: commit it to update the site's counts`);
+  console.log(`Saved Substack metrics to ${path.relative(__dirname, SUBSTACK_SAVED)}: commit it to keep the fallback current`);
 }
 
 // Likes, restacks and comments for each Substack post, keyed by normalised
@@ -1032,9 +1046,7 @@ async function fetchSubstackMetrics() {
   const out = new Map();
   try {
     for (let offset = 0; ; offset += 50) {
-      const res = await fetch(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const page = await res.json();
+      const page = await substackJson(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
       for (const p of page) {
         out.set(normTitle(p.title), {
           url: p.canonical_url,
@@ -1049,12 +1061,13 @@ async function fetchSubstackMetrics() {
     saveSubstackMetrics(out);
   } catch (err) {
     out.clear();
+    const why = String(err.stderr || err.message).trim();
     try {
       const saved = JSON.parse(fs.readFileSync(SUBSTACK_SAVED, 'utf8'));
       for (const [title, m] of Object.entries(saved.posts)) out.set(title, m);
-      console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}; using the counts saved on ${saved.fetched}`);
+      console.error(`[DEGRADED] Substack metrics unavailable: ${why}; using the counts saved on ${saved.fetched}`);
     } catch (e) {
-      console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}, and no saved copy: ${e.message}`);
+      console.error(`[DEGRADED] Substack metrics unavailable: ${why}, and no saved copy: ${e.message}`);
     }
   }
   return out;

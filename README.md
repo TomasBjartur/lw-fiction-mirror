@@ -124,10 +124,11 @@ fiction, rounded to the minute under 10 and to 5 minutes above), then its
 LessWrong karma and comments and Substack likes, restacks and comments,
 small, in Urbanist Light. LessWrong's come from the GraphQL query; a failed
 fetch logs `[DEGRADED]` and the build continues without them. Substack's come
-from `/api/v1/archive`, which answers 403 to GitHub's build machines, so the
-deployed site uses the counts saved in `data/substack-metrics.json` and logs
-`[DEGRADED]`. A local build refreshes that file, and committing it updates the
-site's counts. Story pages link to the
+from `/api/v1/archive`. Substack shows GitHub's build machines a Cloudflare bot
+check (HTTP 403), so the workflow fetches them through Cloudflare's WARP, as a
+proxy nothing else on the runner uses. If that fails, the build logs `[DEGRADED]`
+and uses the last counts saved in `data/substack-metrics.json`, which a local
+build refreshes. Story pages link to the
 newer and older story; the list wraps, so the newest story's "newer" link
 is the oldest story and the oldest's "older" link is the newest.
 
