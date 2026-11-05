@@ -22,7 +22,7 @@ python3 -m http.server 8787 -d dist
 A local server, not `file://`, because story URLs are clean directories
 (`/duane-arnold-1/`). The old `.html` paths still redirect.
 
-Requires Node 18+ and the `canvas` package (used for cover text rendering). The cover typeface, EB Garamond (SIL OFL), is bundled in `fonts/` so local and CI builds render identically.
+Requires Node 20+ and the `canvas` package (used for cover text rendering). The cover typeface, EB Garamond (SIL OFL), is bundled in `fonts/` so local and CI builds render identically.
 
 ## Deploying
 
