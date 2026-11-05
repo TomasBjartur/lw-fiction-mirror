@@ -5,7 +5,7 @@ A static site that mirrors fiction posts from [LessWrong](https://www.lesswrong.
 ## How it works
 
 - `build.js` queries the LessWrong GraphQL API for posts tagged "Fiction" (plus a hardcoded list of external stories) and generates static HTML + CSS
-- Story pages are written as `dist/<slug>/index.html`, so their URLs are `/<slug>/`; each old `dist/<slug>.html` path is a redirect stub, so existing links still land on the clean page
+- Story pages are written as `dist/<slug>/index.html`, so their URLs are `/<slug>/`; each `dist/<slug>.html` is a full copy that sends browsers on to the clean page. GitHub Pages also serves that copy for `/<slug>` with no slash, which is how chatbots and other fetchers often request a link, so they get the whole story without running any script
 - Story images are downloaded and self-hosted under `dist/images/`
 - An EPUB of the collection, an RSS feed (`feed.xml`), and a shareable cover image (`cover.png`, also used for social previews) are generated in the same pass
 - A GitHub Action rebuilds every 6 hours and deploys `dist/` to GitHub Pages

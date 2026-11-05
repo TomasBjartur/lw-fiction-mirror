@@ -1379,25 +1379,19 @@ function buildPostPage(post, allPosts, titleFace) {
   });
 }
 
-// Old /slug.html links keep working: a tiny page that sends the reader to
-// the story's clean /slug/ URL. Static GitHub Pages cannot return a 301,
-// so this is the HTML equivalent (meta refresh plus script), with a
-// canonical so search engines see only the clean page.
-function buildPostRedirect(post) {
-  const href = `${post.slug}/`;
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(post.title)} — ${escapeHtml(SITE_TITLE)}</title>
-<link rel="canonical" href="${SITE_URL}/${post.slug}/">
-<meta name="robots" content="noindex">
-<meta http-equiv="refresh" content="0; url=${href}">
-<script>location.replace(${JSON.stringify(href)})</script>
-</head>
-<body><p><a href="${href}">${escapeHtml(post.title)}</a></p></body>
-</html>`;
+// Old /slug.html links keep working. GitHub Pages also serves this file for
+// /slug with no trailing slash, which is the URL chatbots and other fetchers
+// often normalise a link to, so it is the whole story page rather than a bare
+// redirect: a client that runs no script reads the full text here. A browser
+// is moved to the clean /slug/ URL before anything paints (reading position
+// and the title carry are keyed by that path). No meta refresh: a fetcher that
+// follows it would drop the slash again and land back here. The canonical
+// already points at /slug/, so search engines see only the clean page.
+function buildPostRedirect(page, post) {
+  // The <base> makes the page's relative links resolve as they do from /slug/.
+  const head = `<base href="${post.slug}/">
+  <script>location.replace("./"+location.search+location.hash)</script>`;
+  return page.replace('<head>\n', `<head>\n  ${head}\n`);
 }
 
 function buildIndexPage(posts) {
@@ -2781,8 +2775,9 @@ async function main() {
   for (const post of fiction) {
     const dir = path.join(OUTPUT_DIR, post.slug);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction, titleFonts.get(post.slug)));
-    fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(post));
+    const page = buildPostPage(post, fiction, titleFonts.get(post.slug));
+    fs.writeFileSync(path.join(dir, 'index.html'), page);
+    fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(page, post));
     console.log(`Wrote ${post.slug}/index.html (+ ${post.slug}.html redirect)`);
   }
 
@@ -2844,10 +2839,13 @@ function checkLocalReferences() {
   for (const page of pages) {
     const html = fs.readFileSync(page, 'utf8');
     const start = html.indexOf('<div class="post-body">'), end = html.indexOf('<p class="end-mark"');
+    const base = html.match(/<base href="([^"]+)">/);
+    const dir = path.resolve(path.dirname(page), base ? base[1] : '.');
     for (const m of html.matchAll(/\s(src|href)="([^"]+)"/g)) {
       const url = m[2].replace(/&amp;/g, '&').split(/[?#]/)[0];
       if (!url || /^[a-z][a-z0-9+.-]*:|^\/\//i.test(m[2])) continue;
-      const target = url.startsWith('/') ? path.join(OUTPUT_DIR, url) : path.resolve(path.dirname(page), url);
+      if (base && m.index === base.index + '<base'.length) continue;
+      const target = url.startsWith('/') ? path.join(OUTPUT_DIR, url) : path.resolve(dir, url);
       if (fs.existsSync(target) && (!fs.statSync(target).isDirectory() || fs.existsSync(path.join(target, 'index.html')))) continue;
       const where = `${path.relative(OUTPUT_DIR, page)}: ${m[2]}`;
       (m[1] === 'href' && m.index > start && start >= 0 && m.index < end ? soft : broken).push(where);
