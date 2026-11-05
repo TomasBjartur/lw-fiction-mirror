@@ -19,7 +19,8 @@
 // At a desktop and a phone width, for each .first/.sect paragraph:
 // - the next paragraph must start at its own indent, not pushed right by
 //   an initial reaching down from a short paragraph above;
-// - the paragraph must be at least as tall as its initial;
+// - an opening (.first) must be at least as tall as its initial (a .sect
+//   after a scene break has a small-caps lead-in and no initial);
 // - copying the paragraph must give its text: the opening quote, and the
 //   space after a one-letter first word (word joiners aside).
 // With a clip directory it also saves clips of reference spots to look at.
@@ -58,7 +59,7 @@ const CHECK = () => {
     while (tw.nextNode()) if (tw.currentNode.data.trim()) out.push(tw.currentNode); return out; };
   const charRect = (t, i) => { const r = document.createRange(); r.setStart(t, i); r.setEnd(t, i + 1); return r.getBoundingClientRect(); };
   return [...document.querySelectorAll('.post-body p.first, .post-body p.sect')].map(p => {
-    const need = p.classList.contains('first') ? 3 : 2;
+    const need = p.classList.contains('first') ? 3 : 0;  // .sect has a lead-in, no initial
     const lh = parseFloat(getComputedStyle(p).lineHeight);
     const pr = p.getBoundingClientRect();
     const last = texts(p).at(-1);

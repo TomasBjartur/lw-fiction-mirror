@@ -335,7 +335,7 @@ function smarten(text) {
     .replace(/ {2,}/g, ' ');
 }
 
-function typeset(body) {
+function typeset(body, slug = '') {
   // A quote at the start of a text node that follows an inline tag keeps
   // the previous character's context; code is left alone.
   let out = '', prev = ' ', inCode = 0;
@@ -359,13 +359,115 @@ function typeset(body) {
   }
   out = out.replace(/\s+<\/p>/g, '</p>');
   // Mark each beginning and resumption of the text (Bringhurst 4.1.4): the
-  // story's first paragraph (.first) and the first after each scene break
-  // (.sect) get an initial (CSS: three lines, two after a break, as in a
-  // manuscript's major and minor initials) and their first words in small
-  // caps, a bridge from the initial into the text.
+  // story's first paragraph (.first) gets a three-line initial and its
+  // first words in small caps, a bridge from the initial into the text; the
+  // first paragraph after each scene break (.sect) gets the small caps only.
   const inline = '((?:<(?:span|i|em|b|strong)\\b[^>]*>)*)([^<]*)';
-  out = out.replace(new RegExp('^<p>' + inline), (m, open, text) => markOpening(m, '', open, text, 'first'));
+  const gen = !ORNATE_INITIALS.has(slug);
+  out = out.replace(new RegExp('^<p>' + inline), (m, open, text) => markOpening(m, '', open, text, 'first', gen && `${slug}:0`));
   return out.replace(new RegExp('(<hr>\\s*)<p>' + inline, 'g'), (m, hr, open, text) => markOpening(m, hr, open, text, 'sect'));
+}
+
+// Which stories open on the ornate engraved initials (Zallman Caps): the
+// scholarly ones, told as letters, confessions, scripture or memoir in a
+// formal voice. Every other story gets a generated initial (genInitial):
+// the letter drawn by code as a dot-matrix readout, for the bloggier,
+// present-day and science-fiction voices. Patrick, 2026-11-04.
+const ORNATE_INITIALS = new Set([
+  'the-distaff-texts',
+  'san-silvestro',
+  'penny-s-hands',
+  'the-elect-2',
+  'lobsang-s-children-1',
+  'the-liar-and-the-scold',
+]);
+
+// Zallman Caps has no X or Y: those slots hold a "Sorry, no" placeholder.
+// An ornate opening on one of them is set in the text face instead.
+const ORNATE_MISSING = /^[XY]/;
+
+// 5x7 dot-matrix capitals, one string of 7 rows per letter, '#' lit.
+const MATRIX = {
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+  C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+  D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+  E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+  F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+  G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.####'],
+  H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  I: ['###', '.#.', '.#.', '.#.', '.#.', '.#.', '###'],
+  J: ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..'],
+  K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+  N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#', '#...#'],
+  O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+  Q: ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+  W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '#.#.#', '.#.#.'],
+  X: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+  Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+  Z: ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+};
+
+// A small seeded generator, so each opening draws the same way every build.
+function seededRandom(seed) {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) { h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+// The generated initial: the letter on a 5x7 dot matrix, each lit cell
+// three scanlines, unlit cells left as faint pixels, inside the corner
+// brackets of a display readout. One row, picked by the seed, has slipped
+// sideways in the accent colour, with a ghost where it was. Drawn as
+// inline SVG in currentColor, so it follows the theme; returns null for a
+// letter outside the matrix.
+function genInitial(letter, seed) {
+  const thin = MATRIX[letter.toUpperCase()];
+  if (!thin) return null;
+  // Emboldened as dot-matrix printers do: each lit pixel also lights the
+  // one to its right, so strokes are two pixels wide.
+  const rows = thin.map(r => [...r + '.'].map((ch, c) => ch === '#' || r[c - 1] === '#' ? '#' : '.').join(''));
+  const rnd = seededRandom(seed);
+  const C = 10, P = 6, cols = rows[0].length;
+  const w = cols * C + 2 * P, h = rows.length * C + 2 * P;
+  // The slipped row: one with lit cells, never the top or bottom row.
+  const lit = r => rows[r].includes('#');
+  const candidates = [1, 2, 3, 4, 5].filter(lit);
+  const slip = candidates[Math.floor(rnd() * candidates.length)];
+  const dx = (rnd() < 0.5 ? -1 : 1) * (2.5 + rnd() * 2);
+  const f = n => +n.toFixed(2);
+  let off = '', on = '', hot = '', ghost = '';
+  rows.forEach((row, r) => [...row].forEach((ch, c) => {
+    const x = P + c * C, y = P + r * C;
+    if (ch !== '#') { off += `<rect x="${f(x + 4)}" y="${f(y + 4)}" width="2" height="2"/>`; return; }
+    // Three scanlines per lit cell, each a touch shorter or longer.
+    const cell = (x0) => {
+      let d = '';
+      for (const [yo, hh] of [[0.4, 2.6], [3.7, 2.6], [7, 2.6]]) {
+        const inset = 0.3 + rnd() * 0.5;
+        d += `M${f(x0 + inset)} ${f(y + yo)}h${f(C - 2 * inset)}v${hh}h${f(-(C - 2 * inset))}z`;
+      }
+      return d;
+    };
+    if (r === slip) { ghost += cell(x); hot += cell(x + dx); }
+    else on += cell(x);
+  }));
+  const b = 5; // bracket arm
+  const hud = `M0.5 ${b}V0.5H${b}M${w - b} 0.5H${w - 0.5}V${b}M${w - 0.5} ${h - b}V${h - 0.5}H${w - b}M${b} ${h - 0.5}H0.5V${h - b}`;
+  return `<svg class="gi" viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">`
+    + `<path class="gi-hud" d="${hud}"/><g class="gi-off">${off}</g>`
+    + `<path class="gi-ghost" d="${ghost}"/><path class="gi-on" d="${on}"/><path class="gi-hot" d="${hot}"/></svg>`;
 }
 
 // One opening paragraph, matched as `before`<p>`open``text`: up to five
@@ -388,7 +490,11 @@ function typeset(body) {
 //   moving the line, and a word joiner keeps the letter's text node from
 //   being emptied by ::first-letter, which would drop the letter from
 //   Chrome's accessibility tree.
-function markOpening(m, before, open, text, cls) {
+// A generated opening (seed set) draws its initial as SVG floated beside
+// the first lines and keeps the real letter (and any opening quote) in the
+// text, visually hidden (.gl), so copies, Reader view and screen readers
+// still get the whole word.
+function markOpening(m, before, open, text, cls, seed) {
   if (!/^[\u201c\u2018]?\p{L}/u.test(text)) return m;
   const q = /^[\u201c\u2018]/.test(text) ? text[0] : '';
   const rest = text.slice(q.length).replace(/^\p{L}(?=\p{P})/u, '$&\u2060');
@@ -397,11 +503,29 @@ function markOpening(m, before, open, text, cls) {
   let n = 0;
   while (n < Math.min(5, head === rest ? words.length - 1 : words.length)) { n++; if (/[.,;:!?\u201d]$/.test(words[n - 1])) break; }
   let lead = words.slice(0, n).join(' '), tail = rest.slice(lead.length);
+  // After a scene break only the small-caps lead-in marks the resumption,
+  // as in books: the initial is for the story's opening alone (Patrick,
+  // 2026-11-04). No initial, so none of the ::first-letter workarounds.
+  if (cls === 'sect') {
+    const plainLead = lead.replace('\u2060', ''), plainTail = tail;
+    return `${before}<p class="sect">${open}${plainLead ? `<span class="lead">${q}${plainLead}</span>${plainTail}` : q + rest.replace('\u2060', '')}`;
+  }
   const sp = '\u2060<span class="sp"> </span>';
   if (/^\p{L} /u.test(lead)) lead = lead.replace(' ', sp);
   else if (/^\p{L}$/u.test(lead) && tail.startsWith(' ')) { lead += sp; tail = tail.slice(1); }
+  const svg = seed && genInitial(rest[0], seed);
+  if (svg) cls += ' gen';
+  else if (ORNATE_MISSING.test(rest)) cls += ' plain';
   const attrs = q ? ` class="${cls} oq" data-q="${q}"` : ` class="${cls}"`;
-  const body = lead ? `<span class="lead">${q}${lead}</span>${tail}` : q + rest;
+  if (svg) {
+    const hidden = `<span class="gl">${q}${rest[0]}</span>`;
+    const body = lead ? `${hidden}<span class="lead">${lead.slice(1)}</span>${tail}` : hidden + rest.slice(1);
+    return `${before}<p${attrs}>${open}${svg}${body}`;
+  }
+  // The text face would draw an opening quote at initial size inside
+  // ::first-letter; out of the flow (.gl) it stays in the text only.
+  const qt = q && / plain/.test(cls) ? `<span class="gl">${q}</span>` : q;
+  const body = lead ? `<span class="lead">${qt}${lead}</span>${tail}` : qt + rest;
   return `${before}<p${attrs}>${open}${body}`;
 }
 
@@ -1195,7 +1319,7 @@ function buildPostPage(post, allPosts) {
         <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">
-        ${storyImages(typeset(cleanHtml(post.htmlBody).trim()))}
+        ${storyImages(typeset(cleanHtml(post.htmlBody).trim(), post.slug))}
       </div>
       <p class="end-mark" aria-hidden="true">· · ·</p>
       <footer class="post-footer">

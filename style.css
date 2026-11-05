@@ -75,7 +75,7 @@
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --mono:  'Fira Mono', ui-monospace, monospace;
   --name:  'Author Name', var(--serif);  /* Monoton, subset to the name */
-  --initial: 'Initials', var(--serif);   /* story and section initials */
+  --initial: 'Initials', var(--serif);   /* story initials */
 
   /* Type scale. */
   --fs-2xs:  0.75rem;   /* reader counts */
@@ -719,7 +719,8 @@ main {
   row-gap: 0.15em;
   margin-top: 0.4em;
 }
-.byline { font: 400 1.5em/1.2 var(--name); }
+/* The byline is set in the story's own face, not the name's display face. */
+.byline { font: 400 1.25em/1.2 var(--serif); }
 .post-byline .when {
   font-family: var(--meta-sans);
   font-weight: var(--w-light);
@@ -765,11 +766,12 @@ main {
 /* Initials (scripts/initials-lab.js has the research and the other
    faces): each beginning and resumption of the text is marked, graded as
    in manuscripts and Bringhurst 4.1.4. The story opens on a three-line
-   capital (.first) and each section after a scene break on a two-line one
-   (.sect), both with a small-caps lead-in; ordinary paragraphs get none.
+   capital (.first) with a small-caps lead-in; each section after a scene
+   break (.sect) gets the lead-in alone, as in books. Ordinary paragraphs
+   get neither.
    The face's cap height is its whole decorated box, so initial-letter
    sizes the box, not just the letter inside it. */
-.post-body :is(p.first, p.sect)::first-letter {
+.post-body p.first:not(.gen)::first-letter {
   font-family: var(--initial);
   font-weight: 400;
   font-variant-caps: normal;
@@ -778,16 +780,35 @@ main {
   -webkit-initial-letter: 3;
   margin-right: 0.12em;
 }
-.post-body p.sect::first-letter { initial-letter: 2; -webkit-initial-letter: 2; }
+/* Zallman Caps has no X or Y (build.js): those openings take the text
+   face, at the same size. */
+.post-body p.first.plain::first-letter { font-family: var(--serif); }
 /* A paragraph shorter than its initial still holds it, so the next one
    starts below the initial instead of wrapping around it. */
 .post-body p.first { min-height: 3lh; }
-.post-body p.sect { min-height: 2lh; }
 @supports not ((initial-letter: 3) or (-webkit-initial-letter: 3)) {
   /* A float sized from the box (0.769 em) to three lines, or two. */
-  .post-body :is(p.first, p.sect)::first-letter { float: left; font-size: 4.75em; line-height: 0.77; margin: 0.05em 0.08em 0 0; }
-  .post-body p.sect::first-letter { font-size: 2.8em; }
+  .post-body p.first:not(.gen)::first-letter { float: left; font-size: 4.75em; line-height: 0.77; margin: 0.05em 0.08em 0 0; }
 }
+/* The generated initial (build.js genInitial): a dot-matrix readout drawn
+   as SVG and floated so its box runs from the first line's cap height to
+   the third line's baseline, like the
+   engraved initials. --cap is EB Garamond's cap height. The letter itself
+   stays in the text, hidden (.gl). */
+.post-body p.gen { --cap: 0.65em; }
+.post-body .gi {
+  float: left;
+  height: calc(2lh + var(--cap));
+  width: auto;
+  margin: calc((1lh - var(--cap)) / 2 + 0.03em) 0.4em 0 0;
+  overflow: visible;
+}
+.post-body .gi-on { fill: currentColor; }
+.post-body .gi-off { fill: currentColor; opacity: 0.22; }
+.post-body .gi-ghost { fill: currentColor; opacity: 0.16; }
+.post-body .gi-hot { fill: var(--accent); }
+.post-body .gi-hud { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0.45; }
+.post-body .gl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* A leading quotation mark hangs in the margin at text size, left of the
    initial (Bringhurst 4.1.5). The text keeps its own quote inside
    ::first-letter, where the initials face draws it as nothing (build.js,
@@ -796,6 +817,8 @@ main {
 .post-body p.oq { position: relative; }
 .post-body p.oq::before { content: attr(data-q) / ""; position: absolute; top: 0; left: -0.45em; }
 .post-body p.oq:has(> :is(i, em):first-child)::before { font-style: italic; }
+/* Clear of the generated initial's corner bracket. */
+.post-body p.gen.oq::before { left: -0.65em; }
 /* The space after a one-letter first word, kept for copies and screen
    readers in a box that takes no room (build.js). */
 .post-body .sp { display: inline-block; width: 0; white-space: pre; }
