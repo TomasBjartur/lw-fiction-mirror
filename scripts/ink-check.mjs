@@ -5,9 +5,10 @@
 // Serve dist/ first and install the engines as for initials-check.mjs (its
 // header says how). The other checks measure boxes, and a colour font an engine
 // cannot draw still has its full width: Safari showed three titles as nothing
-// while every check passed. So this one reads pixels. On the contents page and
-// /title-fonts/, at a desktop and a phone width, every title, specimen, date and
-// count must put ink on its own box, and a face must have loaded for its title.
+// while every check passed. So this one reads pixels. At a desktop and a phone
+// width, every title, specimen, date and count on the contents page and
+// /title-fonts/, and the title on every story, must put ink on its own box, and
+// a face must have loaded for its title.
 // A colour face must also draw in colour, since a wrong table choice draws it
 // black (Firefox, on an OpenType SVG Bitcount). An item's ink is what changes
 // when it is hidden: boxes overlap their neighbours' letters, so counting
@@ -40,11 +41,20 @@ for (const css of ['titles.css', 'title-fonts.css']) {
 if (!colourFamilies.size) { console.error('no colour faces in dist/: run node build.js'); process.exit(2); }
 
 // [page, the things on it that must show ink, whether each must load its own face]
+const dist = new URL('../dist/', import.meta.url);
+const stories = fs.readdirSync(dist, { withFileTypes: true })
+  .filter(d => d.isDirectory() && fs.existsSync(new URL(`${d.name}/index.html`, dist))
+    && fs.readFileSync(new URL(`${d.name}/index.html`, dist), 'utf8').includes('class="post-nav"'))
+  .map(d => `${d.name}/`);
+if (!stories.length) { console.error('no story pages in dist/: run node build.js'); process.exit(2); }
 const PAGES = [
   ['', '.story-title', true],
   ['', '.story .when, .story .n, .site-h1, .bk-title', false],
   ['title-fonts/', '.tf-specimen', true],
+  ...stories.map(s => [s, '.post-header .morph', true]),
 ];
+// A story is long and its title is at the top, so only the first screen is read.
+const WHOLE_PAGE = new Set(['', 'title-fonts/']);
 const MIN_INK = 0.015, MIN_COLOUR = 0.01;  // shares of the box's pixels
 // Foldit's own palette is three greys, so it has no colour to lose. If a story
 // takes it from the backlog, add that story's title here.
@@ -77,8 +87,8 @@ function inkIn(shown, hidden, W, H, box, dpr) {
   return { ink: total ? ink / total : 0, colour: total ? colour / total : 0 };
 }
 
-async function pixels(page) {
-  const img = await loadImage(await page.screenshot({ fullPage: true }));
+async function pixels(page, fullPage) {
+  const img = await loadImage(await page.screenshot({ fullPage }));
   const cv = createCanvas(img.width, img.height), cx = cv.getContext('2d');
   cx.drawImage(img, 0, 0);
   return { data: cx.getImageData(0, 0, img.width, img.height).data, W: img.width, H: img.height };
@@ -92,24 +102,35 @@ const SET_HIDDEN = ([sel, half, hide]) => {
   });
 };
 
-const browser = engine === 'chrome' ? await pw.chromium.launch({ channel: 'chrome' }) : await pw[engine].launch();
+// "chrome" is the installed Google Chrome, driven by Playwright. macOS quits it
+// 30 s after it starts (see initials-check.mjs), so a browser older than LIFE_MS
+// is replaced before the next page; the slowest page takes about 10 s.
+const launch = () => engine === 'chrome' ? pw.chromium.launch({ channel: 'chrome' }) : pw[engine].launch();
+const LIFE_MS = 15000;
 const failures = [];
 let checked = 0;
 for (const [w, h] of [[1280, 800], [393, 659]]) {
-  const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
-  await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
-  const page = await ctx.newPage();
+  let browser = null, page = null, born = 0;
   for (const file of new Set(PAGES.map(p => p[0]))) {
+    if (Date.now() - born > LIFE_MS) {
+      await browser?.close();
+      browser = await launch();
+      born = Date.now();
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+      await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
+      page = await ctx.newPage();
+    }
+    const fullPage = WHOLE_PAGE.has(file);
     await page.goto(new URL(file, base).href, { waitUntil: 'load' });
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => Promise.all([...document.fonts].map(f => f.load().catch(() => {}))));
-    const shown = await pixels(page);
+    const shown = await pixels(page, fullPage);
     for (const [, sel, ownFace] of PAGES.filter(p => p[0] === file)) {
       const items = await page.evaluate(COLLECT, sel);
       if (!items.length) failures.push(`${w}px /${file} ${sel}: no elements`);
       for (const half of [0, 1]) {
         await page.evaluate(SET_HIDDEN, [sel, half, true]);
-        const hidden = await pixels(page);
+        const hidden = await pixels(page, fullPage);
         await page.evaluate(SET_HIDDEN, [sel, half, false]);
         items.forEach((it, i) => {
           if (i % 2 !== half) return;
@@ -123,9 +144,8 @@ for (const [w, h] of [[1280, 800], [393, 659]]) {
       }
     }
   }
-  await ctx.close();
+  await browser.close();
 }
-await browser.close();
 
 console.log(`${engine}: ${checked} boxes, ${colourFamilies.size} colour faces`);
 for (const f of failures) console.log(`  ✗ ${f}`);

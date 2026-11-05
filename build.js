@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { execFileSync } = require('child_process');
 const { createCanvas, registerFont, loadImage } = require('canvas');
 
 // Cover typeface, bundled so the CI runner (which has no Georgia) renders the
@@ -557,7 +558,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 // Fonts the build subsets from Google Fonts with `text=`, so each file holds
 // only the characters used and readers never contact Google:
 // - Major Mono Display: the title hover morph (letters of the titles).
-// - Monoton (Duane Arnold's title face) as 'Author Name': the author's name (the contents page
+// - Send Flowers as 'Author Name': the author's name (the contents page
 //   h1) and the TB home link on story pages.
 // - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
 //   character in a story that the latin text faces lack. Without it they come from
@@ -566,7 +567,7 @@ const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999"
 const SUBSET_FONTS = [
   { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
     text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
-  { family: 'Monoton', as: 'Author Name', file: 'fonts/author-monoton.woff2', display: 'block',
+  { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
     text: () => AUTHOR },
   { family: 'Homemade Apple', as: 'Signature', file: 'fonts/signature-homemade-apple.woff2', display: 'block',
     text: () => 'Tomás B.' },
@@ -754,10 +755,9 @@ const TITLE_FONT_BACKLOG = [
   ['Bitcount Prop Double Ink', 1.0, 400],
 ];
 
-// Every title on the site wears The Company Man's face (Patrick, 2026-11-04).
-// TITLE_FONTS and the backlog stay as they are, so the per-story faces come
-// back by setting this to null.
-const ALL_TITLES_FONT = TITLE_FONTS['the-company-man'];
+// null gives each story its own face. An entry of TITLE_FONTS here, such as
+// TITLE_FONTS['the-company-man'], puts every title in that one face.
+const ALL_TITLES_FONT = null;
 
 // Slug -> [spec, size, weight, stroke?] for every story: its pick, or a backlog face.
 function titleFontFor(posts) {
@@ -845,10 +845,9 @@ async function fetchTitleFonts(posts, faces = titleFontFor(posts)) {
   return out;
 }
 
-// Every title in one colour, black on paper (Patrick, 2026-11-04); dark
-// mode takes the ramp's lightest end, since black would vanish there. Set to
-// null to bring back the oldest-to-newest ramp below.
-const ALL_TITLES_COLOR = 'light-dark(#000, oklch(0.9 0.005 305))';
+// null keeps the oldest-to-newest ramp below. A colour here puts every title in
+// it, such as 'light-dark(#000, oklch(0.9 0.005 305))' for black on paper.
+const ALL_TITLES_COLOR = null;
 
 function titleColor(rank, n) {
   if (ALL_TITLES_COLOR) return ALL_TITLES_COLOR;
@@ -969,7 +968,7 @@ function buildSuccessPage(posts) {
     robots: 'noindex',
     // The name's face first: while it loads, Chrome reaches for the next face in
     // its stack, which would fetch EB Garamond for a page that sets no story.
-    preload: ['fonts/author-monoton.woff2', 'fonts/urbanist-meta.woff2'],
+    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
   });
 }
 
@@ -991,7 +990,7 @@ function buildNotFoundPage(posts) {
     nav: true,
     skipLabel: 'message',
     robots: 'noindex',
-    preload: ['fonts/author-monoton.woff2', 'fonts/urbanist-meta.woff2'],
+    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
   });
 }
 
@@ -1010,15 +1009,42 @@ function sortByDate(posts) {
 const SUBSTACK_BASE = SUBSTACK_URL.replace(/\/subscribe.*$/, '');
 const normTitle = t => String(t).toLowerCase().replace(/[‘’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
+// Substack shows GitHub's build machines a Cloudflare bot check (HTTP 403), so the
+// workflow starts a WARP proxy and names it in SUBSTACK_SOCKS. This goes through
+// curl there, because Node's fetch can't use SOCKS.
+async function substackJson(url) {
+  if (process.env.SUBSTACK_SOCKS) {
+    const body = execFileSync('curl', ['-sS', '--fail', '--max-time', '30', '--socks5-hostname', process.env.SUBSTACK_SOCKS, url],
+      { maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    return JSON.parse(body);
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// The last counts fetched, used when a fetch fails. A local build refreshes it.
+const SUBSTACK_SAVED = path.join(__dirname, 'data', 'substack-metrics.json');
+
+function saveSubstackMetrics(metrics) {
+  if (process.env.CI) return; // the runner's copy is thrown away
+  const posts = Object.fromEntries([...metrics].sort(([a], [b]) => a.localeCompare(b)));
+  let old = null;
+  try { old = JSON.parse(fs.readFileSync(SUBSTACK_SAVED, 'utf8')).posts; } catch { /* first save */ }
+  if (!metrics.size || JSON.stringify(old) === JSON.stringify(posts)) return;
+  fs.mkdirSync(path.dirname(SUBSTACK_SAVED), { recursive: true });
+  fs.writeFileSync(SUBSTACK_SAVED, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), posts }, null, 1) + '\n');
+  console.log(`Saved Substack metrics to ${path.relative(__dirname, SUBSTACK_SAVED)}: commit it to keep the fallback current`);
+}
+
 // Likes, restacks and comments for each Substack post, keyed by normalised
-// title. Fails loud and returns an empty map, so the site still builds.
+// title. A failed fetch fails loud and falls back to the saved counts, so the
+// site still builds with them.
 async function fetchSubstackMetrics() {
   const out = new Map();
   try {
     for (let offset = 0; ; offset += 50) {
-      const res = await fetch(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const page = await res.json();
+      const page = await substackJson(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
       for (const p of page) {
         out.set(normTitle(p.title), {
           url: p.canonical_url,
@@ -1030,8 +1056,17 @@ async function fetchSubstackMetrics() {
       if (page.length < 50) break;
     }
     console.log(`Fetched Substack metrics for ${out.size} posts`);
+    saveSubstackMetrics(out);
   } catch (err) {
-    console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}`);
+    out.clear();
+    const why = String(err.stderr || err.message).trim();
+    try {
+      const saved = JSON.parse(fs.readFileSync(SUBSTACK_SAVED, 'utf8'));
+      for (const [title, m] of Object.entries(saved.posts)) out.set(title, m);
+      console.error(`[DEGRADED] Substack metrics unavailable: ${why}; using the counts saved on ${saved.fetched}`);
+    } catch (e) {
+      console.error(`[DEGRADED] Substack metrics unavailable: ${why}, and no saved copy: ${e.message}`);
+    }
   }
   return out;
 }
@@ -1163,7 +1198,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   const base = opts.base || '';
   const styles = opts.styles || [];
   const preloads = opts.preload || [
-    currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-monoton.woff2',
+    'fonts/author-send-flowers.woff2',
     'fonts/urbanist-meta.woff2',
   ];
 
@@ -1302,20 +1337,19 @@ function storyImages(html) {
   });
 }
 
-function buildPostPage(post, allPosts) {
-  const date = formatDate(post.postedAt);
-  const readTime = estimateReadingTime(post.wordCount);
+function buildPostPage(post, allPosts, titleFace) {
+  const when = [estimateReadingTime(post.wordCount), formatDate(post.postedAt)].filter(Boolean)
+    .map(t => `<span class="when">${t}</span>`).join('');
   const social = stats(post);
-  const metaLine = [readTime ? `<span class="when">${readTime}</span>` : '', social].filter(Boolean).join('');
   const byDate = sortByDate(allPosts);
   const idx = byDate.findIndex(p => p.slug === post.slug);
 
   const content = `
     <article>
       <header class="post-header">
-        <h1><span class="morph">${escapeHtml(post.title)}</span></h1>
-        <p class="post-byline"><span class="byline">${AUTHOR}</span><span class="when">${date}</span></p>
-        ${metaLine ? `<p class="post-meta meta">${metaLine}</p>` : ''}
+        <h1 class="t-${post.slug}"><span class="morph">${escapeHtml(post.title)}</span></h1>
+        <p class="post-meta meta">${when}</p>
+        ${social ? `<p class="post-meta meta">${social}</p>` : ''}
         <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">
@@ -1334,6 +1368,13 @@ function buildPostPage(post, allPosts) {
     description: extractExcerpt(post.htmlBody),
     base: '../',
     published: post.postedAt,
+    // The page opens on the title, which stays blank until its face arrives. A
+    // colour face has two files and the browser picks one, so it isn't named here.
+    preload: [
+      ...(titleFace && !titleFace.face.colour ? [titleFace.face.file] : []),
+      'fonts/eb-garamond-latin-normal-400-v1.woff2',
+      'fonts/urbanist-meta.woff2',
+    ],
   });
 }
 
@@ -2739,7 +2780,7 @@ async function main() {
   for (const post of fiction) {
     const dir = path.join(OUTPUT_DIR, post.slug);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction));
+    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction, titleFonts.get(post.slug)));
     fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(post));
     console.log(`Wrote ${post.slug}/index.html (+ ${post.slug}.html redirect)`);
   }

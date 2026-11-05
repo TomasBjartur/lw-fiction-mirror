@@ -74,7 +74,7 @@
   --meta-sans: 'Urbanist Meta', 'Inter', 'Site Marks', -apple-system, system-ui, sans-serif;  /* dates, counts and small labels */
   --serif: 'EB Garamond', 'Site Marks', Garamond, Georgia, serif;
   --mono:  'Fira Mono', ui-monospace, monospace;
-  --name:  'Author Name', var(--serif);  /* Monoton, subset to the name */
+  --name:  'Author Name', var(--serif);  /* Send Flowers, subset to the name */
   --initial: 'Initials', var(--serif);   /* story initials */
 
   /* Type scale. */
@@ -82,8 +82,7 @@
   --fs-xs:   0.8rem;    /* footer, captions, the story's meta line, arrows */
   --fs-s:    1rem;      /* nav labels */
   --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
-  --fs-name: clamp(0.85rem, 4.3vw, 2.3rem);  /* the name on the contents page; Monoton
-                         runs about 9.4em wide, so it scales to keep the header in the window */
+  --fs-name: 2.9rem;    /* the name on the contents page */
   --fs-book: clamp(0.9rem, 4.3vw, 1.65rem);  /* the book under the rule: a title's size, on one line */
   --icon-k:  1.2;       /* an icon is 1.2x its label */
   --title-size: 0.99rem; /* titles outside the filling list (newer/older, short windows) */
@@ -97,7 +96,6 @@
   --w-ui:     400;
   --w-strong: 600;
   --track-label: 0.08em;  /* letter-spaced sans labels: nav, EPUB */
-  --track-caps:  0.16em;  /* the story title's spaced capitals */
   --track-mono: -0.08em;  /* the hover face, into its 0.09em sidebearings */
 
   /* Space. */
@@ -449,11 +447,11 @@ main {
 }
 
 /* --- Story titles ----------------------------------------------------- */
-/* In the contents list and the newer/older links: each story's own face,
+/* In the contents list, the newer/older links and on top of a story: each story's own face,
    weight, size factor, stroke and recency colour from titles.css; --fit shrinks
    a title too wide for its row (site.js). */
 
-.story-title, .post-nav-link {
+.story-title, .post-nav-link, .post-header h1 {
   font-family: var(--tf, var(--sans)), var(--sans);
   font-weight: var(--tw, var(--w-light));
   font-size: calc(var(--title-size) * (1 + (var(--ts, 1) - 1) * var(--ts-spread)) * var(--fit, 1));
@@ -500,10 +498,8 @@ main {
 .morph .mi, .morph .mi * { pointer-events: none; }
 .post-nav-next.morph.pinned { justify-content: flex-end; }
 /* A story's own title is centred, so its mono text runs past its box evenly
-   either way, and shows the same letters as in the list: Major Mono's capitals
-   are different drawings, and this title is set in capitals. */
+   either way. */
 .post-header .morph.pinned { justify-content: center; }
-.post-header .morph .mq, .post-header .morph .mm { text-transform: none; }
 /* Opened by clicking a title, a story's title starts turned (site.js), and until
    then stays hidden rather than flash its resting face: about 80 ms in Firefox
    and Safari. It shows anyway if the script or the fonts are slow, and site.js
@@ -696,44 +692,26 @@ main {
 /* --- Story: a printed book page ---------------------------------------- */
 /* Treatment A from the reading lab (scripts/reading-lab.js): EB Garamond
    at ~21px on a justified, hyphenated ~62-character line (ragged on
-   phones), 1em indents, a centred spaced-capitals title, decorated
-   initials and small-caps lead-ins. Bringhurst's 66-character ideal and
-   Standard Ebooks' indents. */
+   phones), 1em indents, decorated initials and small-caps lead-ins.
+   Bringhurst's 66-character ideal and Standard Ebooks' indents. The title
+   is the one from the contents list, in its face and colour, at a
+   heading's size. */
 
 .is-post article { max-width: calc(29 * var(--story-size)); margin: 0 auto; }
 
 .post-header { margin-bottom: var(--s-5); text-align: center; font-size: var(--story-size); }
 .post-header h1 {
-  font: 400 calc(1.8em * var(--fit, 1))/1.15 var(--serif);
-  text-transform: uppercase;
-  letter-spacing: var(--track-caps);
-  margin-right: calc(-1 * var(--track-caps));
+  --title-size: calc(1.8 * var(--story-size));
+  line-height: 1.15;
   text-wrap: balance;
 }
-.post-byline {
-  display: flex;
-  justify-content: center;
-  align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: 0.7em;
-  row-gap: 0.15em;
-  margin-top: 0.4em;
-}
-/* The byline is set in the story's own face, not the name's display face. */
-.byline { font: 400 1.25em/1.2 var(--serif); }
-.post-byline .when {
-  font-family: var(--meta-sans);
-  font-weight: var(--w-light);
-  font-size: calc(var(--fs-xs) * 1.08);
-  line-height: 1;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
 .post-meta { margin-top: 0.5em; font-size: var(--fs-xs); }
+/* Display faces hang their descenders well below the baseline. */
+.post-header h1 + .post-meta { margin-top: 0.9em; }
 /* Inline blocks so a narrow window can wrap between the groups: Firefox will not
    break between two nowrap spans, and the whole page then scrolls sideways. */
-.post-meta .m { display: inline-block; margin-left: 0; }
-.post-meta .when + .m,
+.post-meta .when, .post-meta .m { display: inline-block; margin-left: 0; white-space: nowrap; }
+.post-meta .when + .when,
 .post-meta .m + .m { margin-left: 0.8em; }
 .orn { display: block; width: 2.4em; margin: 1em auto 0; border-top: 1px solid var(--muted); }
 
@@ -884,6 +862,7 @@ main {
 @media (max-width: 40em) {
   html { font-size: 100%; }
   :root {
+    --fs-name: clamp(1.5rem, 7vw, 2.3rem);
     --story-size: 1.1875rem;  /* 19px */
     /* The meta goes under each title: a row splits about 60/40 between
        title and meta. The floor keeps titles readable, so a short phone
