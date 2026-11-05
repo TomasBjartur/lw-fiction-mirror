@@ -122,9 +122,12 @@ Each title is followed by its month and reading time in Urbanist Light,
 upright (reading time at 260 words a minute, Brysbaert's 2019 mean for
 fiction, rounded to the minute under 10 and to 5 minutes above), then its
 LessWrong karma and comments and Substack likes, restacks and comments,
-small, in Urbanist Light (LessWrong from the GraphQL
-query, Substack from `/api/v1/archive`; a failed fetch logs `[DEGRADED]`
-and the build continues without those numbers). Story pages link to the
+small, in Urbanist Light. LessWrong's come from the GraphQL query; a failed
+fetch logs `[DEGRADED]` and the build continues without them. Substack's come
+from `/api/v1/archive`, which answers 403 to GitHub's build machines, so the
+deployed site uses the counts saved in `data/substack-metrics.json` and logs
+`[DEGRADED]`. A local build refreshes that file, and committing it updates the
+site's counts. Story pages link to the
 newer and older story; the list wraps, so the newest story's "newer" link
 is the oldest story and the oldest's "older" link is the newest.
 

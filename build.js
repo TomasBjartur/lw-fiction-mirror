@@ -1010,8 +1010,24 @@ function sortByDate(posts) {
 const SUBSTACK_BASE = SUBSTACK_URL.replace(/\/subscribe.*$/, '');
 const normTitle = t => String(t).toLowerCase().replace(/[‘’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
+// The last counts fetched. Substack answers 403 to GitHub's build machines on
+// every path and with any user agent, so the workflow can't fetch them; a local
+// build refreshes this file, and committing it updates the site's counts.
+const SUBSTACK_SAVED = path.join(__dirname, 'data', 'substack-metrics.json');
+
+function saveSubstackMetrics(metrics) {
+  const posts = Object.fromEntries([...metrics].sort(([a], [b]) => a.localeCompare(b)));
+  let old = null;
+  try { old = JSON.parse(fs.readFileSync(SUBSTACK_SAVED, 'utf8')).posts; } catch { /* first save */ }
+  if (!metrics.size || JSON.stringify(old) === JSON.stringify(posts)) return;
+  fs.mkdirSync(path.dirname(SUBSTACK_SAVED), { recursive: true });
+  fs.writeFileSync(SUBSTACK_SAVED, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), posts }, null, 1) + '\n');
+  console.log(`Saved Substack metrics to ${path.relative(__dirname, SUBSTACK_SAVED)}: commit it to update the site's counts`);
+}
+
 // Likes, restacks and comments for each Substack post, keyed by normalised
-// title. Fails loud and returns an empty map, so the site still builds.
+// title. A failed fetch fails loud and falls back to the saved counts, so the
+// site still builds with them.
 async function fetchSubstackMetrics() {
   const out = new Map();
   try {
@@ -1030,8 +1046,16 @@ async function fetchSubstackMetrics() {
       if (page.length < 50) break;
     }
     console.log(`Fetched Substack metrics for ${out.size} posts`);
+    saveSubstackMetrics(out);
   } catch (err) {
-    console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}`);
+    out.clear();
+    try {
+      const saved = JSON.parse(fs.readFileSync(SUBSTACK_SAVED, 'utf8'));
+      for (const [title, m] of Object.entries(saved.posts)) out.set(title, m);
+      console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}; using the counts saved on ${saved.fetched}`);
+    } catch (e) {
+      console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}, and no saved copy: ${e.message}`);
+    }
   }
   return out;
 }
