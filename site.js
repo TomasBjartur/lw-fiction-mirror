@@ -189,7 +189,7 @@
     return m>0?h/m:fontPx;
   }
   document.querySelectorAll('.morph').forEach(function(a){
-    var spans=null,words=null,text=null,timers=[],left=null,dir=0,running=false;
+    var spans=null,words=null,text=null,timers=[],left=null,dir=0,running=false,turning=false;
     // The letters are hidden from screen readers, so the name goes on the link,
     // or on the heading for a story's own title, whose span cannot carry one.
     var named=a.closest('h1')||a,own=a.closest('.post-header');
@@ -260,7 +260,7 @@
     // waits a random time before the next, mostly short with rare pauses
     // (cubed random). A layout change under the pointer can fire mouseenter
     // again; 'running' keeps a second chain from starting on the same queue.
-    function stop(){timers.forEach(clearTimeout);timers=[];running=false}
+    function stop(){timers.forEach(clearTimeout);timers=[];running=false;turning=false}
     function run(){
       if(running)return;
       running=true;
@@ -281,7 +281,7 @@
         timers.push(setTimeout(step,next-now));
       })();
     }
-    a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
+    a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(turning){stop();left=spans.map(function(s,i){return s.className?-1:i}).filter(function(i){return i>=0})}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
     // A resize rescales the titles, so pins measured at the old size are
     // dropped; the next hover measures afresh. A click leaves the page with
     // the title morphed and no mouseleave, so a page restored from the
@@ -301,11 +301,13 @@
     // hover. The page's head decides this and keeps the title hidden until then
     // (.carry). The title's own face must be in first, or its resting box is
     // measured wrong; if that outlasts the wait in style.css, the title has shown
-    // at rest and stays so. Hovering it meanwhile takes over as a hover does.
+    // at rest and stays so. Hovering it while it turns back stops that and turns
+    // it again from where it got to, as a hover does.
     var HOLD=700,UNTURN=1200;
     function unrun(){
       // Slower than the hover, and the same length for every title: about
       // UNTURN ms in all (a step averages 15.5 ms at pace 1).
+      turning=true;
       var back=[];words.forEach(function(g){back=back.concat(g)});back.reverse();
       var pace=UNTURN/(15.5*spans.length),next=performance.now();
       (function step(){
@@ -314,7 +316,7 @@
           spans[back.shift()].className='';
           var r=Math.random();next+=pace*(2.7+51.4*r*r*r);
         }
-        if(!back.length){dir=-1;left=null;return}
+        if(!back.length){turning=false;dir=-1;left=null;return}
         timers.push(setTimeout(step,next-now));
       })();
     }
