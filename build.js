@@ -630,9 +630,18 @@ const TITLE_FONT_BACKLOG = [
   ['Bitcount Prop Double Ink', 1.0, 400],
 ];
 
+// Every title on the site wears Duane Arnold's face (Patrick, 2026-11-04).
+// TITLE_FONTS and the backlog stay as they are, so the per-story faces come
+// back by setting this to null.
+const ALL_TITLES_FONT = TITLE_FONTS['duane-arnold-1'];
+
 // Slug -> [spec, size, weight, stroke?] for every story: its pick, or a backlog face.
 function titleFontFor(posts) {
   const map = new Map();
+  if (ALL_TITLES_FONT) {
+    for (const p of posts) map.set(p.slug, ALL_TITLES_FONT);
+    return map;
+  }
   let next = 0;
   for (const p of [...posts].sort((a, b) => new Date(a.postedAt) - new Date(b.postedAt))) {
     if (TITLE_FONTS[p.slug]) { map.set(p.slug, TITLE_FONTS[p.slug]); continue; }
