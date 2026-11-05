@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { createCanvas, registerFont } = require('canvas');
+const { createCanvas, registerFont, loadImage } = require('canvas');
 
 // Cover typeface, bundled so the CI runner (which has no Georgia) renders the
 // same cover as a local Mac build. EB Garamond, SIL OFL — see fonts/OFL.txt.
@@ -15,10 +15,18 @@ const FICTION_TAG_SLUG = 'fiction';
 
 // Site config - edit these
 const SITE_TITLE = 'The Origami Men and Other Stories';
-const SITE_SUBTITLE = 'by Tomás Bjartur';
+const AUTHOR = 'Tomás Bjartur';
+const SITE_SUBTITLE = `by ${AUTHOR}`;
 const SITE_DESCRIPTION = 'Fiction by Tomás Bjartur.';
 const SITE_URL = 'https://tomasbjartur.com';
 const SUBSTACK_URL = 'https://tomasbjartur.substack.com/subscribe?';
+// The footer email signup's form action. Placeholder: replace this with
+// Tomás's own Formspree form URL (or another provider's POST endpoint)
+// before the signup can work.
+const NEWSLETTER_FORM_ACTION = 'https://formspree.io/f/REPLACE_WITH_YOUR_FORM_ID';
+// A deploy leaves the form out until then, since every signup would fail; a
+// local build keeps it, so the footer can still be reviewed.
+const SHOW_SIGNUP = !NEWSLETTER_FORM_ACTION.includes('REPLACE_WITH') || !process.env.CI;
 const BOOK_TITLE = 'The Origami Men and Other Stories by Tom\u00e1s Bjartur';
 const EPUB_FILENAME = 'The_Origami_Men_and_Other_Stories.epub';
 // Variant EPUB served to readers matched by GEO_HIDDEN: same cover and title,
@@ -197,6 +205,26 @@ const COLLECTION_ORDER = [
   'the-origami-men',
 ];
 
+// Every slug written into this file must name a story the APIs return
+// (LessWrong slugs, like 'the-elect-2', are the canonical ones in its post
+// URLs). A GEO_HIDDEN slug that matches nothing fails the build, since the
+// story would otherwise show where it must not (the last good deploy stays
+// live). Any other stale slug only costs a face, a pick mark or a book
+// position, so it logs [DEGRADED] and the build goes on: new stories keep
+// deploying.
+function checkSlugs(posts) {
+  const known = new Set(posts.map(p => p.slug));
+  const stale = slugs => slugs.filter(s => !known.has(s));
+  const geo = stale(GEO_HIDDEN.map(r => r.slug));
+  if (geo.length) throw new Error(`GEO_HIDDEN slugs match no story (renamed on LessWrong?): ${geo.join(', ')}; known: ${[...known].join(', ')}`);
+  const lists = {
+    COLLECTION_ORDER, FORCE_INCLUDE_SLUGS, TITLE_FONTS: Object.keys(TITLE_FONTS), EDITOR_PICKS: [...EDITOR_PICKS],
+  };
+  for (const [name, slugs] of Object.entries(lists)) {
+    for (const s of stale(slugs)) console.error(`[DEGRADED] ${name} names '${s}', which matches no story (renamed on LessWrong?)`);
+  }
+}
+
 // Arrange posts in collection order. Stories not yet in COLLECTION_ORDER are
 // inserted (sorted by karma) before the final entry, so the title story keeps
 // closing the book.
@@ -223,30 +251,63 @@ function orderForCollection(posts) {
   return bookOrder(eligible);
 }
 
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+// "17 September 2025"
 function formatDate(dateStr) {
   const d = new Date(dateStr);
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// "Sep 2025"
+function formatMonthYear(dateStr) {
+  const d = new Date(dateStr);
+  return `${MONTHS[d.getUTCMonth()].slice(0, 3)} ${d.getUTCFullYear()}`;
+}
+
+// Minutes to read: 260 words a minute, the mean silent reading rate for
+// English fiction in Brysbaert's 2019 meta-analysis (190 studies; 238 for
+// non-fiction). Rounded to the nearest minute under 10 and to the nearest
+// 5 above, since a reader's own speed varies far more than one minute.
+function readingMinutes(wordCount) {
+  if (!wordCount) return 0;
+  const m = wordCount / 260;
+  return m < 9.5 ? Math.max(1, Math.round(m)) : Math.round(m / 5) * 5;
 }
 
 function estimateReadingTime(wordCount) {
-  if (!wordCount) return '';
-  const minutes = Math.ceil(wordCount / 250);
-  return `${minutes} min read`;
+  const minutes = readingMinutes(wordCount);
+  return minutes ? `${minutes} min read` : '';
 }
 
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201C', rdquo: '\u201D',
+  mdash: '\u2014', ndash: '\u2013', hellip: '\u2026',
+};
+
+function decodeEntities(str) {
+  return str
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? ' ');
+}
+
+// Plain-text opening of a story. Returns unescaped text: escape it for the
+// context it goes into (escapeAttr / escapeHtml).
 function extractExcerpt(html, maxLen = 160) {
-  const text = (html || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&[a-zA-Z]+;|&#\d+;|&#x[0-9a-fA-F]+;/g, ' ')
+  const text = decodeEntities((html || '').replace(/<[^>]+>/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
   if (text.length <= maxLen) return text;
   const cut = text.slice(0, maxLen);
-  return cut.slice(0, cut.lastIndexOf(' ')) + '…';
+  return cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:.\u2014\u2013-]+$/, '') + '\u2026';
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function escapeAttr(str) {
@@ -256,7 +317,95 @@ function escapeAttr(str) {
     .replace(/</g, '&lt;');
 }
 
-function cleanHtml(html) {
+// Book typesetting for story pages (the reading lab's treatment A, picked
+// by Markus 2026-11-04): typographer's quotes, dashes and ellipses in text
+// nodes only (tags and attributes untouched; the source mixes straight and
+// curly), acronyms of 3+ capitals wrapped for small caps, and the opening
+// words of the first paragraph wrapped for a small-caps lead-in under the
+// drop cap. Feed and EPUB keep the source text.
+function smarten(text) {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/(^|[\s(\[\u2014\u2013])"/g, '$1\u201c')
+    .replace(/"/g, '\u201d')
+    .replace(/(^|[\s(\[\u2014\u2013\u201c])'/g, '$1\u2018')
+    .replace(/'/g, '\u2019')
+    .replace(/ - /g, '\u202f\u2014\u2009') // a dash never starts a line
+    .replace(/\.\.\./g, '\u2026')
+    .replace(/ {2,}/g, ' ');
+}
+
+function typeset(body) {
+  // A quote at the start of a text node that follows an inline tag keeps
+  // the previous character's context; code is left alone.
+  let out = '', prev = ' ', inCode = 0;
+  for (const part of body.split(/(<[^>]+>)/)) {
+    if (part.startsWith('<')) {
+      if (/^<(pre|code)\b/i.test(part)) inCode++;
+      else if (/^<\/(pre|code)>/i.test(part)) inCode = Math.max(0, inCode - 1);
+      if (/^<\/?(p|hr|div|blockquote|li|h\d)\b/i.test(part)) prev = ' ';
+      out += part;
+    } else if (inCode) {
+      out += part;
+    } else {
+      const t = smarten(prev + part).slice(1);
+      // Only a lone acronym (MIND, AGI): a run of capitalised words is
+      // shouting, a sign or a redaction ("GIVE ME MONEY FOR FENT",
+      // "[RESPONSE REDACTED]") and keeps the author's full capitals.
+      out += t.replace(/(^|[^A-Z\s]\s*|[a-z][^A-Za-z]*)\b([A-Z]{3,})\b(?!\W{0,3}[A-Z]{2,}\b)/g, (m, before, word) =>
+        /[A-Z]{2,}\W{0,3}$/.test(before) ? m : `${before}<span class="caps">${word}</span>`);
+      if (part) prev = part.slice(-1);
+    }
+  }
+  out = out.replace(/\s+<\/p>/g, '</p>');
+  // Mark each beginning and resumption of the text (Bringhurst 4.1.4): the
+  // story's first paragraph (.first) and the first after each scene break
+  // (.sect) get an initial (CSS: three lines, two after a break, as in a
+  // manuscript's major and minor initials) and their first words in small
+  // caps, a bridge from the initial into the text.
+  const inline = '((?:<(?:span|i|em|b|strong)\\b[^>]*>)*)([^<]*)';
+  out = out.replace(new RegExp('^<p>' + inline), (m, open, text) => markOpening(m, '', open, text, 'first'));
+  return out.replace(new RegExp('(<hr>\\s*)<p>' + inline, 'g'), (m, hr, open, text) => markOpening(m, hr, open, text, 'sect'));
+}
+
+// One opening paragraph, matched as `before`<p>`open``text`: up to five
+// opening words in a small-caps lead-in, stopping at a sentence or clause
+// end or a dash. Only when the paragraph opens on a word (or a quote): an
+// opening like an indented "[RESPONSE REDACTED]" gets no initial.
+// LessWrong's HTML often opens with inline tags (<span>, <i><span>); the
+// lead-in goes inside them.
+// The initial is the paragraph's ::first-letter, which takes any punctuation
+// touching the letter. Text stays whole for copying, Reader view and
+// screen readers, so:
+// - a leading quotation mark stays in front of the letter; the initials face
+//   draws it as nothing, and CSS hangs a visible one (data-q) in the margin
+//   at text size (Bringhurst 4.1.5);
+// - punctuation right after the letter (I'm) would be drawn at initial size;
+//   a word joiner (U+2060, invisible) ends ::first-letter at the letter;
+// - after a one-letter word (I, A) the space starts the line beside the
+//   initial, where Chrome drops it from copies and from what screen readers
+//   hear ("Iheard"). It goes in a zero-width box (.sp) that keeps it without
+//   moving the line, and a word joiner keeps the letter's text node from
+//   being emptied by ::first-letter, which would drop the letter from
+//   Chrome's accessibility tree.
+function markOpening(m, before, open, text, cls) {
+  if (!/^[\u201c\u2018]?\p{L}/u.test(text)) return m;
+  const q = /^[\u201c\u2018]/.test(text) ? text[0] : '';
+  const rest = text.slice(q.length).replace(/^\p{L}(?=\p{P})/u, '$&\u2060');
+  const head = rest.split(/[\u2009\u202f]?\u2014/)[0];
+  const words = head.split(' ');
+  let n = 0;
+  while (n < Math.min(5, head === rest ? words.length - 1 : words.length)) { n++; if (/[.,;:!?\u201d]$/.test(words[n - 1])) break; }
+  let lead = words.slice(0, n).join(' '), tail = rest.slice(lead.length);
+  const sp = '\u2060<span class="sp"> </span>';
+  if (/^\p{L} /u.test(lead)) lead = lead.replace(' ', sp);
+  else if (/^\p{L}$/u.test(lead) && tail.startsWith(' ')) { lead += sp; tail = tail.slice(1); }
+  const attrs = q ? ` class="${cls} oq" data-q="${q}"` : ` class="${cls}"`;
+  const body = lead ? `<span class="lead">${q}${lead}</span>${tail}` : q + rest;
+  return `${before}<p${attrs}>${open}${body}`;
+}
+
+function cleanHtml(html, { forFeed = false } = {}) {
   if (!html) return '';
   // Remove LW-specific widgets, voting buttons, etc.
   // Keep the prose clean
@@ -268,101 +417,669 @@ function cleanHtml(html) {
     .replace(/class="[^"]*"/g, '')
     // Remove style attributes
     .replace(/style="[^"]*"/g, '')
-    // Replace <hr> scene breaks with visible separator for RSS readers
-    .replace(/<hr\s*\/?>/gi, '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>');
+    // Double spaces typed after full stops show up as " &nbsp;"; justified
+    // text would stretch them, so set a single word space.
+    .replace(/(?:[ \t]+&nbsp;|&nbsp;[ \t]+)(?=\S)/g, ' ')
+    // Paragraphs holding only spaces/&nbsp; are spacer lines from the editor
+    .replace(/<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/gi, '')
+    // Feed readers ignore our stylesheet, so scene breaks there need visible text;
+    // the site keeps <hr> and draws it in CSS.
+    .replace(/<hr\s*\/?>/gi, forFeed ? SCENE_BREAK_INLINE : '<hr>');
 }
 
-function buildNav(posts, currentSlug, sortBy) {
-  const sorted = sortBy === 'book'
-    ? bookOrder(posts)
-    : [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+const SCENE_BREAK_INLINE = '<p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>';
+// --- Title typography -------------------------------------------------------
 
-  return sorted.map(p => {
-    const active = p.slug === currentSlug ? ' class="active"' : '';
-    return `<li data-slug="${p.slug}"><a href="${p.slug}.html"${active}><span class="nav-title">${p.title}</span></a></li>`;
-  }).join('\n');
+// Fonts the build subsets from Google Fonts with `text=`, so each file holds
+// only the characters used and readers never contact Google:
+// - Major Mono Display: the title hover morph (letters of the titles).
+// - Send Flowers as 'Author Name': the author's name (the contents page
+//   h1) and the TB home link on story pages.
+// - Noto Sans JP as 'Site Marks': the nav and arrow marks, and any other
+//   character in a story that the latin text faces lack. Without it they come from
+//   whatever font the reader's device has. The stacks in style.css put
+//   'Site Marks' right after each text face.
+const SUBSET_FONTS = [
+  { family: 'Major Mono Display', as: 'Major Mono Display', file: 'fonts/hover-major-mono.woff2', display: 'block',
+    text: posts => posts.map(p => p.title).join('') + 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+  { family: 'Send Flowers', as: 'Author Name', file: 'fonts/author-send-flowers.woff2', display: 'block',
+    text: () => AUTHOR },
+  { family: 'Homemade Apple', as: 'Signature', file: 'fonts/signature-homemade-apple.woff2', display: 'block',
+    text: () => 'Tomás B.' },
+  // Dates, reading times and counts, the book's title, EPUB and the small
+  // labels. Its Light weight is the face. The whole alphabet, so a wording
+  // change can't quietly drop a letter to the reader's device font.
+  { family: 'Urbanist:wght@300', as: 'Urbanist Meta', file: 'fonts/urbanist-meta.woff2', display: 'swap', weight: 300,
+    text: () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;·—–-&?!\'’()/' },
+  { family: 'Noto Sans JP', as: 'Site Marks', file: 'fonts/marks-noto-sans-jp.woff2', display: 'swap',
+    text: posts => '△←→↗' + outsideLatin(posts.map(p => p.title + ' ' + textOf(p.htmlBody)).join(' ')) },
+];
+
+// The unicode-range of Google Fonts' "latin" subset, which is what the
+// served text faces in fonts/web/ hold.
+const LATIN_RANGES = [[0x0, 0xff], [0x131, 0x131], [0x152, 0x153], [0x2bb, 0x2bc], [0x2c6, 0x2c6], [0x2da, 0x2da],
+  [0x2dc, 0x2dc], [0x304, 0x304], [0x308, 0x308], [0x329, 0x329], [0x2000, 0x206f], [0x20ac, 0x20ac], [0x2122, 0x2122],
+  [0x2191, 0x2191], [0x2193, 0x2193], [0x2212, 0x2212], [0x2215, 0x2215], [0xfeff, 0xfeff], [0xfffd, 0xfffd]];
+function outsideLatin(text) {
+  return [...new Set(text)].filter(ch => { const c = ch.codePointAt(0); return !LATIN_RANGES.some(([lo, hi]) => c >= lo && c <= hi); }).join('');
+}
+function textOf(html = '') {
+  return html.replace(/<[^>]*>/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d));
 }
 
-function buildSidebar(posts, currentSlug) {
-  return `
-    <nav class="sidebar">
-      <div class="sidebar-header">
-        <a href="index.html" class="site-title">${SITE_TITLE}</a>
-        <span class="site-subtitle">${SITE_SUBTITLE}</span>
-      </div>
+// Fetches a Google Fonts `text=` subset (spec as in css2, e.g. 'Astloch:wght@700')
+// and returns the woff2 bytes. Results are kept in fonts/subsets/ by spec and
+// text, and that folder is committed: CI builds use the committed files and
+// only ask Google when a title or story adds characters. A fetch that fails
+// stops the build, so a deploy never ships a title in the wrong face (the
+// last good deploy stays live). Commit fonts/subsets/ after a local build.
+const SUBSET_DIR = path.join(__dirname, 'fonts', 'subsets');
+const usedSubsets = new Set();
 
-      <div class="nav-section">
-        <div class="sort-toggle">
-          <button class="sort-btn active" data-sort="book">Book Order</button>
-          <button class="sort-btn" data-sort="date">Recent</button>
-        </div>
-        <ul class="nav-list" data-sort="book">
-          ${buildNav(posts, currentSlug, 'book')}
-        </ul>
-        <ul class="nav-list" data-sort="date" style="display:none">
-          ${buildNav(posts, currentSlug, 'date')}
-        </ul>
-      </div>
-
-      <div class="sidebar-footer">
-        <a href="${SUBSTACK_URL}" class="lw-link">Subscribe on Substack</a>
-      </div>
-    </nav>`;
+// Deletes subset files this build did not use, so the committed set holds
+// only the current titles' and stories' characters.
+function pruneSubsets() {
+  for (const f of fs.readdirSync(SUBSET_DIR)) {
+    if (f.endsWith('.woff2') && !usedSubsets.has(f)) fs.unlinkSync(path.join(SUBSET_DIR, f));
+  }
 }
 
-const FAVICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23a0734f'/%3E%3Ctext x='50' y='73' font-size='62' text-anchor='middle' font-family='Georgia,serif' fill='%23fff'%3ET%3C/text%3E%3C/svg%3E";
+function subsetKey(spec, text) {
+  const chars = [...new Set(text)].sort().join('');
+  return require('crypto').createHash('sha1').update(spec + '\n' + chars).digest('hex').slice(0, 16);
+}
+
+async function fetchGoogleSubset(spec, text) {
+  const chars = [...new Set(text)].sort().join('');
+  const key = subsetKey(spec, text);
+  const cached = path.join(SUBSET_DIR, `${key}.woff2`);
+  usedSubsets.add(`${key}.woff2`);
+  if (fs.existsSync(cached)) return fs.readFileSync(cached);
+  const url = `https://fonts.googleapis.com/css2?family=${spec.replace(/ /g, '+')}&text=${encodeURIComponent(chars)}`;
+  for (let attempt = 1; ; attempt++) {
+    try { return await downloadSubset(url, cached); } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
+}
+
+async function downloadSubset(url, cached) {
+  const css = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' } })).text();
+  const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+  if (!m) throw new Error(`no woff2 in CSS response: ${css.slice(0, 120)}`);
+  const res = await fetch(m[1]);
+  if (!res.ok) throw new Error(`font HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  fs.mkdirSync(path.dirname(cached), { recursive: true });
+  fs.writeFileSync(cached, buf);
+  return buf;
+}
+
+// True if a woff2 file has a COLR table. WOFF2's table directory numbers the
+// known tags; COLR is 34, and 63 means a four-byte tag follows.
+function woff2HasColr(buf) {
+  let o = 48;
+  const skipVarint = () => { while (buf[o++] & 0x80); };
+  for (let i = 0, n = buf.readUInt16BE(12); i < n; i++) {
+    const flags = buf[o++], tag = flags & 63, transform = flags >> 6;
+    if (tag === 34) return true;
+    if (tag === 63) o += 4;
+    skipVarint();
+    if (tag === 10 || tag === 11 ? transform === 0 : transform !== 0) skipVarint();
+  }
+  return false;
+}
+
+// Safari's engine, so every iPhone browser, has no COLRv1 and draws those
+// faces as nothing. scripts/colr-twin.py makes the copy it can draw, kept in
+// fonts/subsets/ beside the subset and committed, so CI (which has no uv) only
+// needs it for a new colour title. Without a twin the @font-face offers just
+// the COLR file: Safari then sets that title in the list's sans, never blank.
+function colrTwin(spec, text) {
+  const key = subsetKey(spec, text), name = `${key}.safari.woff2`, twin = path.join(SUBSET_DIR, name);
+  usedSubsets.add(name);
+  if (fs.existsSync(twin)) return fs.readFileSync(twin);
+  const made = require('child_process').spawnSync('uv', ['run', '--quiet', '--python', '3.12', '--with', 'nanoemoji', '--with', 'brotli',
+    'python3', path.join(__dirname, 'scripts', 'colr-twin.py'), path.join(SUBSET_DIR, `${key}.woff2`), twin], { stdio: 'inherit' });
+  if (made.status === 0) return fs.readFileSync(twin);
+  console.warn(`[DEGRADED] no Safari copy of ${spec} ("${text.slice(0, 40)}"): Safari sets it in the fallback sans. Run node build.js where uv is installed and commit fonts/subsets/.`);
+  return null;
+}
+
+// Writes a title or specimen face to dist/ and returns what its @font-face
+// needs: the file, and for a colour face the twin (null if it could not be made).
+async function writeTitleFace(spec, text, file) {
+  const buf = await fetchGoogleSubset(spec, text);
+  fs.writeFileSync(path.join(OUTPUT_DIR, file), buf);
+  if (!woff2HasColr(buf)) return { file };
+  const twin = colrTwin(spec, text), twinFile = file.replace(/\.woff2$/, '.safari.woff2');
+  if (twin) fs.writeFileSync(path.join(OUTPUT_DIR, twinFile), twin);
+  return { file, twin: twin ? twinFile : null, colour: true };
+}
+
+// The src of a title face. tech() keeps Chrome and Firefox on the COLR file
+// and sends everything else to the twin.
+function titleFaceSrc(face) {
+  if (!face.colour) return `url('${assetUrl(face.file)}') format('woff2')`;
+  const colr = `url('${assetUrl(face.file)}') format('woff2') tech(color-COLRv1)`;
+  return face.twin ? `${colr},url('${assetUrl(face.twin)}') format('woff2')` : colr;
+}
+
+// Writes every subset font; any failure throws (see fetchGoogleSubset).
+async function fetchSubsetFonts(posts) {
+  fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
+  return Promise.all(SUBSET_FONTS.map(async f => {
+    try {
+      fs.writeFileSync(path.join(OUTPUT_DIR, f.file), await fetchGoogleSubset(f.family, f.text(posts)));
+    } catch (err) {
+      throw new Error(`subset font ${f.family}: ${err.message}`);
+    }
+    console.log(`Wrote ${f.file}`);
+    return f;
+  }));
+}
+
+// Each story's title has its own display face, picked by Markus from his
+// "reviewed and cool experimental fonts" (2026-11-03). [Google css2 spec,
+// size factor against the list's base size, weight, and optionally a stroke
+// in em that thickens a face whose outlines are hairlines]. The build fetches a
+// subset of just that title's letters per story; a story missing here falls
+// back to the list's sans, and a failed fetch stops the build.
+const TITLE_FONTS = {
+  'duane-arnold-1': ['Monoton', 0.95, 400],
+  'san-silvestro': ['Ballet', 1.7, 400],
+  'the-distaff-texts': ['Astloch:wght@700', 1.35, 700],
+  'customer-satisfaction-opportunities-1': ['Tiny5:BLED,JITT,ROND,wdth,wght@0,0,100,75,300', 1.15, 300],
+  'the-elect-2': ['Jacques Francois Shadow', 1.1, 400],
+  'goldfish': ['Kalnia Glaze:wght@500', 1.1, 500],
+  'lobsang-s-children-1': ['Tilt Prism', 1.0, 400],
+  'remembering-aubrey-chang': ['Moirai One', 1.1, 400, 0.01],
+  'penny-s-hands': ['League Script', 1.4, 400],
+  'that-mad-olympiad-1': ['Faster One', 1.0, 400],
+  'the-origami-men': ['Tourney', 1.0, 400],
+  'our-beloved-monsters': ['Bungee Spice', 1.0, 400],
+  'the-company-man': ['Tilt Warp', 1.0, 400],
+  'the-liar-and-the-scold': ['Workbench', 1.05, 400],
+  'the-maker-of-mind': ['Turret Road:wght@500', 1.1, 500],
+};
+
+// Editor's picks (Markus, 2026-11-03): marked in the contents list by a
+// faint purple rule in the margin.
+const EDITOR_PICKS = new Set(['that-mad-olympiad-1', 'the-origami-men', 'the-distaff-texts', 'the-company-man']);
+
+// Faces for stories that arrive without a TITLE_FONTS entry: Markus's
+// reviewed picks not currently on a title, ordered so neighbours differ. A new
+// story takes the next one, oldest new story first, so each story keeps
+// its face as more arrive; when the backlog runs out the faces are reused
+// from the top. To pin a face (or change one), add the story to
+// TITLE_FONTS. Colour faces go last: a new title in one needs a local build
+// for Safari's copy. Left out: Coral Pixels, Jersey 10, Wallpoet and Delius
+// Swash Caps (tried on titles, didn't land), Shizuru and Neonderthaw ("too
+// familiar" on titles), Send Flowers (the author's name) and Zen Tokyo
+// Zoo (the book title).
+const TITLE_FONT_BACKLOG = [
+  ['Climate Crisis', 0.85, 400],
+  ['Josefin Sans:wght@300', 1.05, 300],
+  ['Bungee Shade', 0.9, 400],
+  ['Twinkle Star', 1.2, 400],
+  ['Urbanist:wght@300', 1.05, 300],
+  ['Foldit:wght@500', 1.15, 500],
+  ['Bitcount Prop Double Ink', 1.0, 400],
+];
+
+// Slug -> [spec, size, weight, stroke?] for every story: its pick, or a backlog face.
+function titleFontFor(posts) {
+  const map = new Map();
+  let next = 0;
+  for (const p of [...posts].sort((a, b) => new Date(a.postedAt) - new Date(b.postedAt))) {
+    if (TITLE_FONTS[p.slug]) { map.set(p.slug, TITLE_FONTS[p.slug]); continue; }
+    const f = TITLE_FONT_BACKLOG[next++ % TITLE_FONT_BACKLOG.length];
+    console.log(`Title font for ${p.slug}: ${f[0]} (from the backlog; pin it in TITLE_FONTS to keep it)`);
+    map.set(p.slug, f);
+  }
+  return map;
+}
+
+// One entry per distinct face in TITLE_FONTS and TITLE_FONT_BACKLOG, with
+// the stories that actually wear it. A pick whose story has gone still
+// appears (under "Waiting"), so the page never loses a reviewed face.
+function titleFaceCatalog(posts, assigned = titleFontFor(posts)) {
+  const faces = new Map();
+  const add = (f, backlogIndex = null) => {
+    const spec = f[0];
+    if (!faces.has(spec)) {
+      faces.set(spec, {
+        spec,
+        name: spec.split(':')[0],
+        size: f[1],
+        weight: f[2],
+        stroke: f[3] || 0,
+        backlogIndex,
+        posts: [],
+      });
+    }
+    return faces.get(spec);
+  };
+  for (const slug of Object.keys(TITLE_FONTS)) add(TITLE_FONTS[slug]);
+  TITLE_FONT_BACKLOG.forEach((f, i) => add(f, i));
+  for (const p of posts) {
+    const f = assigned.get(p.slug);
+    if (f && faces.has(f[0]) && !faces.get(f[0]).posts.some(q => q.slug === p.slug)) {
+      faces.get(f[0]).posts.push(p);
+    }
+  }
+  return [...faces.values()];
+}
+
+// The /title-fonts/ page gets one `text=` subset per face: its name, its
+// stories' titles and the alphabet, written to dist/fonts/.
+const SPECIMEN_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&?!.,:;\'’—';
+
+async function fetchTitleFontSpecimens(faces) {
+  const files = new Array(faces.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(6, faces.length) }, async () => {
+    while (next < faces.length) {
+      const i = next++;
+      const f = faces[i];
+      const text = SPECIMEN_CHARS + f.name + f.posts.map(p => p.title).join('');
+      try {
+        files[i] = await writeTitleFace(f.spec, text, `fonts/title-specimen-${i}.woff2`);
+      } catch (err) {
+        throw new Error(`title specimen for ${f.name} (${f.spec}): ${err.message}`);
+      }
+    }
+  }));
+  console.log(`Title specimens: ${faces.length} faces`);
+  return files;
+}
+
+// Returns Map slug -> { face, size, weight, stroke } for the faces that were written.
+async function fetchTitleFonts(posts, faces = titleFontFor(posts)) {
+  const out = new Map();
+  await Promise.all(posts.map(async p => {
+    const [spec, size, weight, stroke = 0] = faces.get(p.slug);
+    try {
+      out.set(p.slug, { face: await writeTitleFace(spec, p.title, `fonts/title-${p.slug}.woff2`), size, weight, stroke });
+    } catch (err) {
+      throw new Error(`title font for ${p.slug} (${spec}): ${err.message}`);
+    }
+  }));
+  console.log(`Title fonts: ${out.size}/${posts.length} stories`);
+  return out;
+}
+
+function titleColor(rank, n) {
+  const t = n > 1 ? rank / (n - 1) : 0;
+  const mix = (a, b) => (a + (b - a) * t).toFixed(3);
+  // Newest is the highest-contrast in both themes: dark mirrors the ramp.
+  return `light-dark(oklch(${mix(0.2, 0.36)} ${mix(0.005, 0.15)} 305), oklch(${mix(0.9, 0.76)} ${mix(0.005, 0.12)} 305))`;
+}
+
+// Per-story recency colour and the hover face, written to dist/titles.css.
+function buildTitlesCss(posts, subsetFonts, titleFonts) {
+  const byDate = sortByDate(posts);
+  const face = subsetFonts
+    .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2')${f.weight ? `;font-weight:${f.weight}` : ''};font-display:${f.display}}\n`)
+    .join('');
+  const titleFaces = [...titleFonts].map(([slug, f]) =>
+    `@font-face{font-family:'tf-${slug}';src:${titleFaceSrc(f.face)};font-weight:${f.weight};font-display:block}\n`).join('');
+  return face + titleFaces + byDate.map((p, rank) => {
+    const f = titleFonts.get(p.slug);
+    const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}${f.stroke ? `;--tk:${f.stroke}em` : ''}` : '';
+    return `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}${font}}`;
+  }).join('\n') + '\n';
+}
+
+// The /title-fonts/ page's faces and layout. One @font-face per catalog
+// face, with its own family name, then the page styles from title-fonts.css.
+function buildTitleFontsCss(faces, files) {
+  const generated = faces.map((f, i) =>
+    `@font-face{font-family:'TF${i}';src:${titleFaceSrc(files[i])};font-weight:${f.weight};font-display:block}\n`
+    + `.tf-face-${i}{--f:'TF${i}';--w:${f.weight};--sz:${f.size};--stroke:${f.stroke}em}`).join('\n');
+  return `/* Title fonts specimen; faces generated by build.js. */\n${generated}\n\n`
+    + fs.readFileSync(path.join(__dirname, 'title-fonts.css'), 'utf8');
+}
+
+// /title-fonts/ (dist/title-fonts/index.html): every face on a story in
+// contents order, then the backlog. The big line is the family name set in
+// the face; under it the story title (or the book's) and the alphabet.
+function buildTitleFontsPage(posts, faces, files) {
+  const newest = f => Math.max(...f.posts.map(p => new Date(p.postedAt).getTime()));
+  const inUse = faces.filter(f => f.posts.length).sort((a, b) => newest(b) - newest(a));
+  const waiting = faces.filter(f => !f.posts.length);
+  const faceIndex = new Map(faces.map((f, i) => [f, i]));
+
+  const card = (f, n) => {
+    const i = faceIndex.get(f);
+    const assigned = f.posts.length > 0;
+    const uses = assigned
+      ? `Sets ${f.posts.map(p => `<a href="../${p.slug}/">${escapeHtml(p.title)}</a>`).join('<span class="tf-sep" aria-hidden="true"> · </span>')}`
+      : (f.backlogIndex == null ? 'No story in the collection' : 'Waiting in the backlog');
+    const sample = escapeHtml(assigned ? f.posts.map(p => p.title).join(' · ') : SITE_TITLE);
+    const detail = [f.weight, `${f.size}×`, f.stroke ? `${f.stroke}em stroke` : ''].filter(Boolean).join(' · ');
+    return `<section class="tf-face tf-face-${i}${assigned ? ` t-${f.posts[0].slug}` : ''}">
+      <div class="tf-aside">
+        <span class="tf-no" aria-hidden="true">${String(n).padStart(2, '0')}</span>
+        <h3 class="tf-use">${uses}</h3>
+        <p class="tf-specs">${escapeHtml(f.name)}<br>${detail}</p>
+      </div>
+      <div class="tf-body">
+        <p class="tf-specimen">${escapeHtml(f.name)}</p>
+        <p class="tf-sample">${sample}</p>
+        <p class="tf-alpha" aria-hidden="true"><span>ABCDEFGHIJKLMNOPQRSTUVWXYZ</span><span>abcdefghijklmnopqrstuvwxyz 0123456789 &amp;?!.,:;’—</span></p>
+      </div>
+    </section>`;
+  };
+
+  const content = `
+    <a class="tf-back" href="../">← Contents</a>
+    <header class="tf-head">
+      <p class="tf-eyebrow">Type specimens</p>
+      <h1 class="tf-h1">Title <em>fonts</em></h1>
+      <p class="tf-intro">One display face for every story title in <a href="../">the collection</a>, and the ones waiting their turn. All are open fonts served by this site, so a title looks the same on every reader's device.</p>
+      <p class="tf-counts"><b>${inUse.length}</b> in use · <b>${waiting.length}</b> waiting · <b>${faces.length}</b> faces</p>
+    </header>
+    <section class="tf-section" aria-labelledby="tf-in-use">
+      <h2 class="tf-section-h" id="tf-in-use">In use <b>${inUse.length}</b></h2>
+      ${inUse.map((f, i) => card(f, i + 1)).join('\n')}
+    </section>${waiting.length ? `
+    <section class="tf-section" aria-labelledby="tf-waiting">
+      <h2 class="tf-section-h" id="tf-waiting">Waiting <b>${waiting.length}</b></h2>
+      <p class="tf-note">A new story without a face of its own takes the next of these. Their specimen line is the book's title.</p>
+      ${waiting.map((f, i) => card(f, i + 1)).join('\n')}
+    </section>` : ''}`;
+
+  return pageShell(content, 'Title fonts', posts, null, {
+    description: 'The display faces behind the story titles.',
+    canonicalUrl: `${SITE_URL}/title-fonts/`,
+    bodyClass: 'is-fonts',
+    base: '../',
+    skipLabel: 'title fonts',
+    robots: 'noindex',
+    styles: ['title-fonts.css'],
+    preload: ['fonts/eb-garamond-latin-normal-400-v1.woff2'],
+  });
+}
+
+// A story opened by clicking a title with a mouse takes over that title's hover
+// (site.js leaves a note for this page), unless a saved reading place will take the
+// reader past the title anyway. A prerendered page runs this before any click, so
+// it turns the title on trust and site.js lets go when it is shown with no note.
+// Before first paint, so the title can wait.
+const CARRY_SCRIPT = "try{let c=sessionStorage.getItem('carry');sessionStorage.removeItem('carry');if((c===location.pathname||document.prerendering)&&performance.getEntriesByType('navigation')[0].type==='navigate'&&matchMedia('(hover:hover) and (prefers-reduced-motion:no-preference)').matches&&!localStorage.getItem('read:'+location.pathname))document.documentElement.classList.add('carry')}catch(e){}";
+
+// Where the email form lands after a successful signup.
+function buildSuccessPage(posts) {
+  const content = `
+    <section class="success-page">
+      <h1><span>Thank you.</span> <span>The next story will come by email.</span></h1>
+      <p class="success-back"><a href="../">Back to the stories</a></p>
+    </section>`;
+
+  return pageShell(content, 'Subscribed', posts, null, {
+    description: 'Thank you for subscribing.',
+    canonicalUrl: `${SITE_URL}/subscribed/`,
+    bodyClass: 'is-success',
+    base: '../',
+    nav: true,
+    skipLabel: 'confirmation',
+    robots: 'noindex',
+    // The name's face first: while it loads, Chrome reaches for the next face in
+    // its stack, which would fetch EB Garamond for a page that sets no story.
+    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
+  });
+}
+
+
+// GitHub Pages serves this for any missing path at any depth, so its links are
+// root-absolute.
+function buildNotFoundPage(posts) {
+  const content = `
+    <section class="success-page">
+      <h1>This page isn’t here</h1>
+      <p class="success-back"><a href="/">Back to the stories</a></p>
+    </section>`;
+
+  return pageShell(content, 'Not found', posts, null, {
+    description: 'This page isn’t here.',
+    canonicalUrl: `${SITE_URL}/`,
+    bodyClass: 'is-success',
+    base: '/',
+    nav: true,
+    skipLabel: 'message',
+    robots: 'noindex',
+    preload: ['fonts/author-send-flowers.woff2', 'fonts/urbanist-meta.woff2'],
+  });
+}
+
+function buildSitemap(posts) {
+  const urls = [`  <url><loc>${SITE_URL}/</loc></url>`].concat(sortByDate(posts).map(p =>
+    `  <url><loc>${SITE_URL}/${p.slug}/</loc><lastmod>${new Date(p.postedAt).toISOString().slice(0, 10)}</lastmod></url>`));
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+}
+
+function sortByDate(posts) {
+  return [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+}
+
+// --- Reader metrics ----------------------------------------------------------
+
+const SUBSTACK_BASE = SUBSTACK_URL.replace(/\/subscribe.*$/, '');
+const normTitle = t => String(t).toLowerCase().replace(/[‘’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Likes, restacks and comments for each Substack post, keyed by normalised
+// title. Fails loud and returns an empty map, so the site still builds.
+async function fetchSubstackMetrics() {
+  const out = new Map();
+  try {
+    for (let offset = 0; ; offset += 50) {
+      const res = await fetch(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const page = await res.json();
+      for (const p of page) {
+        out.set(normTitle(p.title), {
+          url: p.canonical_url,
+          likes: p.reaction_count ?? 0,
+          restacks: p.restacks ?? 0,
+          comments: p.comment_count ?? 0,
+        });
+      }
+      if (page.length < 50) break;
+    }
+    console.log(`Fetched Substack metrics for ${out.size} posts`);
+  } catch (err) {
+    console.error(`[DEGRADED] Substack metrics unavailable: ${err.message}`);
+  }
+  return out;
+}
+
+function attachMetrics(posts, substack) {
+  for (const p of posts) {
+    p.lw = p.external ? null : {
+      url: `https://www.lesswrong.com/posts/${p._id}/${p.slug}`,
+      karma: p.baseScore,
+      comments: p.commentCount,
+    };
+    p.ss = substack.get(normTitle(p.title)) || null;
+  }
+}
+
+const ICON_LW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-4.6 6L18 18l-6-4.6L6 18l4.6-6L6 6l6 4.6z" opacity=".55"/><path d="M12 0l2.2 9.8L24 12l-9.8 2.2L12 24l-2.2-9.8L0 12l9.8-2.2z"/></svg>';
+const ICON_SS = '<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.4H0zM0 2.7h11v1.4H0zM0 5.4h11V12L5.5 9 0 12z"/></svg>';
+// Substack's mark, struck through: the form's "email, not Substack" field.
+const ICON_SS_OFF = `<svg viewBox="0 0 11 12" aria-hidden="true"><path d="M0 0h11v1.4H0zM0 2.7h11v1.4H0zM0 5.4h11V12L5.5 9 0 12z"/><path class="slash-bg" d="M1.2 11.1L9.8 0.9" fill="none" stroke-width="2.4" stroke-linecap="round"/><path class="slash" d="M1.2 11.1L9.8 0.9" fill="none" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+
+// Month and reading time, set inline after a title in the contents list.
+function whenText(p) {
+  const mins = readingMinutes(p.wordCount);
+  const read = mins ? ` · <span title="${mins} min read">${mins}m</span>` : '';
+  return `<span class="when"><span title="${formatDate(p.postedAt)}">${formatMonthYear(p.postedAt)}</span>${read}</span>`;
+}
+
+// Reader counts from LessWrong and Substack, each group led by its source
+// icon (a link to the story there); a number's kind is the small icon after it.
+function stats(p) {
+  const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}<span class="sr-only"> ${label}</span></span>`;
+  const lw = p.lw
+    ? `<span class="m"><a class="src src-lw" href="${p.lw.url}" title="On LessWrong" aria-label="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}</span>`
+    : '';
+  const ss = p.ss
+    ? `<span class="m"><a class="src src-ss" href="${p.ss.url}" title="On Substack" aria-label="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}</span>`
+    : '';
+  return lw + ss;
+}
+
+// --- Pages -------------------------------------------------------------------
+
+// style.css's --paper as hex, for the browser's own chrome before CSS loads
+// and for the phone toolbar tint.
+const PAPER = { light: '#fefcf7', dark: '#13110f' };
+
+// Set in main() once they exist: the cover's size for share cards, and whether
+// the touch icon could be drawn.
+let coverSize = null;
+let hasTouchIcon = false;
+
+// The home-screen icon: "TB" from favicon.svg (scripts/favicon.py writes it),
+// 180px. iOS ignores SVG icons and rounds the corners itself, so it fills the
+// square, in the light colours only.
+async function buildTouchIcon() {
+  const svg = fs.readFileSync(path.join(__dirname, 'favicon.svg'), 'utf8');
+  const [, accent] = svg.match(/path\{fill:(#[0-9a-f]+)/);
+  const [, transform, d] = svg.match(/<path transform='([^']+)' d='([^']+)'/);
+  const flat = `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 100 100'><rect width='100' height='100' fill='${PAPER.light}'/><path transform='${transform}' d='${d}' fill='${accent}' stroke='${accent}' stroke-width='45' stroke-linejoin='round'/></svg>`;
+  const canvas = createCanvas(180, 180);
+  canvas.getContext('2d').drawImage(await loadImage(Buffer.from(flat)), 0, 0, 180, 180);
+  return canvas.toBuffer('image/png');
+}
+
+// The bird from markusstrasser.org's Icon.svelte.
+const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>';
+// Theme toggle marks, one per mode; CSS shows the current one. Light: a
+// sun with long and short rays; dark: a crescent with two sparks.
+const ICON_THEME = '<svg class="ti ti-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19 12L22 12M16.95 16.95L18.08 18.08M12 19L12 22M7.05 16.95L5.92 18.08M5 12L2 12M7.05 7.05L5.92 5.92M12 5L12 2M16.95 7.05L18.08 5.92" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+  + '<svg class="ti ti-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 15.2A8 8 0 1 1 9.8 3.6a6.6 6.6 0 0 0 9.7 11.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M17 3.2l.55 1.45 1.45.55-1.45.55L17 7.2l-.55-1.45L15 5.2l1.45-.55zM20.6 8.6l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z"/></svg>';
+// Download mark: an arrow into a tray, so an EPUB link reads as a file.
+const ICON_DL = '<svg class="dl-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.5M7 10l5 5 5-5M4.5 16.5V20h15v-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// The author's signature, from the supplied SVG; set in Homemade Apple and
+// inlined so it can use the site's self-hosted subset and follow the theme.
+const SIGNATURE_SVG = `<svg class="signature-mark" viewBox="0 0 420 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <g transform="rotate(0.11 210.0 85.0)">
+    <text x="34.9" y="95.8" font-family="Signature, serif" font-size="67.2" fill="currentColor" stroke="currentColor" stroke-width="0.78" transform="skewX(-12.1) translate(20.5 0)">Tomás B.</text>
+    <path d="M 44.9 117.8 c 10.3 -20.1, 20.7 -20.1, 10.3 0 c -10.3 14.1, 103.5 4.3, 194.1 2.6 c 38.8 -1.3, 51.8 -4.3, 64.7 -9.5" fill="none" stroke="currentColor" stroke-width="2.18" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  </g>
+</svg>`;
+// The book as a download: its title (plain text) and, as the one link,
+// the underlined EPUB mark. `base` lets a page in a subdirectory link back
+// up to the root (the title-fonts specimen).
+const bookLink = (cls, base = '') => `<span class="book ${cls}"><span class="bk-title">${SITE_TITLE}</span> <a href="${base}${EPUB_FILENAME}" class="bk-dl epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a></span>`;
+const X_HANDLE = 'BjarturTomas';
+const X_URL = `https://x.com/${X_HANDLE}`;
+
+// One line at the foot of every page, with the email signup above it.
+function siteFoot(base = '') {
+  // The book with its separator, so a phone's contents page (where the
+  // book sits under the name) can drop it and keep the footer to a line.
+  const sep = '<span class="sep" aria-hidden="true">·</span>';
+  return `<div class="site-foot-wrap">
+    <div class="site-foot-main">
+      ${SHOW_SIGNUP ? `<div class="site-signup" id="subscribe">
+        <form class="subscribe" action="${NEWSLETTER_FORM_ACTION}" method="POST" data-success="${base}subscribed/">
+          <input type="hidden" name="_source" value="footer">
+          <input type="hidden" name="_page" value="">
+          <input type="hidden" name="_next" value="${SITE_URL}/subscribed/">
+          <div class="subscribe-field">
+            <span class="subscribe-mark" aria-hidden="true">${ICON_SS_OFF}</span>
+            <input type="email" name="email" aria-label="Email address" placeholder="Direct Email" required autocomplete="email" autocapitalize="off" spellcheck="false">
+          </div>
+          <button type="submit">Subscribe</button>
+        </form>
+        <p class="subscribe-message" role="status" aria-live="polite"></p>
+      </div>` : ''}
+      <p class="site-foot"><span class="foot-copy">© ${new Date().getFullYear()} ${AUTHOR}</span>${sep}<a href="${X_URL}" class="x-link" rel="me noopener">${ICON_X}@${X_HANDLE}</a><span class="foot-book-item">${sep}${bookLink('foot-book', base)}</span></p>
+    </div>${SIGNATURE_SVG}
+  </div>`;
+}
+
+// Site links: in the fixed bar on story pages, beside the title on the
+// contents page. Subscribe looks like Substack's own button, so readers
+// know where it goes. `base` is '../' on story pages, whose clean URLs are
+// one directory down; the contents page is at the site root.
+function navItems(currentSlug, base = '') {
+  return `<a href="${base || 'index.html'}" class="nav-item nav-home" title="Contents"${currentSlug ? '' : ' aria-current="page"'}>TB</a><a href="${base}${EPUB_FILENAME}" class="nav-item nav-epub epub-link" title="The whole collection as a free EPUB" download>EPUB${ICON_DL}</a><a href="${base}feed.xml" class="nav-item nav-rss" title="RSS feed">RSS</a><a href="${X_URL}" class="nav-item nav-x" title="@${X_HANDLE} on X" aria-label="@${X_HANDLE} on X" rel="me noopener">${ICON_X}</a><button type="button" class="nav-item theme-toggle" id="theme-btn">${ICON_THEME}</button><a href="${SUBSTACK_URL}" class="nav-sub" title="New stories by email, on Substack">${ICON_SS}<span>Subscribe</span></a>`;
+}
 
 function pageShell(content, title, posts, currentSlug, opts = {}) {
-  const pageTitle = title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`;
+  const pageTitle = escapeHtml(title ? `${title} — ${SITE_TITLE}` : `${SITE_TITLE} · ${SITE_SUBTITLE}`);
   const description = opts.description || SITE_DESCRIPTION;
-  const canonicalUrl = currentSlug ? `${SITE_URL}/${currentSlug}.html` : `${SITE_URL}/`;
+  const canonicalUrl = opts.canonicalUrl || (currentSlug ? `${SITE_URL}/${currentSlug}/` : `${SITE_URL}/`);
   const ogType = currentSlug ? 'article' : 'website';
   const ogTitle = title || `${SITE_TITLE} · ${SITE_SUBTITLE}`;
+  // Pages in a subdirectory (the title-fonts specimen) pass '../' so every
+  // root-relative asset and link resolves from the site root.
+  const base = opts.base || '';
+  const styles = opts.styles || [];
+  const preloads = opts.preload || [
+    currentSlug ? 'fonts/eb-garamond-latin-normal-400-v1.woff2' : 'fonts/author-send-flowers.woff2',
+    'fonts/urbanist-meta.woff2',
+  ];
 
   return `<!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${pageTitle}</title>
   <meta name="description" content="${escapeAttr(description)}">
+  ${opts.robots ? `<meta name="robots" content="${opts.robots}">` : ''}
   <link rel="canonical" href="${canonicalUrl}">
-  <link rel="icon" href="${FAVICON_SVG}">
+  <link rel="icon" href="${base}${assetUrl('favicon.svg')}" type="image/svg+xml">
+  ${hasTouchIcon ? `<link rel="apple-touch-icon" href="${base}apple-touch-icon.png">` : ''}
   <meta property="og:type" content="${ogType}">
   <meta property="og:site_name" content="${escapeAttr(SITE_TITLE)}">
   <meta property="og:title" content="${escapeAttr(ogTitle)}">
   <meta property="og:description" content="${escapeAttr(description)}">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:image" content="${SITE_URL}/cover.png">
+  ${coverSize ? `<meta property="og:image:width" content="${coverSize.width}">
+  <meta property="og:image:height" content="${coverSize.height}">` : ''}
+  <meta property="og:image:alt" content="${escapeAttr(`Cover of ${SITE_TITLE}`)}">
+  ${opts.published ? `<meta property="article:published_time" content="${new Date(opts.published).toISOString()}">` : ''}
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="${escapeAttr(ogTitle)}">
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
-  <link rel="stylesheet" href="style.css">
-  <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="feed.xml">
-  <script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <meta name="twitter:image:alt" content="${escapeAttr(`Cover of ${SITE_TITLE}`)}">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="${PAPER.light}">
+  <script>try{if(localStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name=color-scheme]').content='dark';document.querySelector('meta[name=theme-color]').content='${PAPER.dark}'}}catch(e){}</script>
+  ${currentSlug ? `<script>${CARRY_SCRIPT}</script>` : ''}
+  <script src="${base}${assetUrl('site.js')}" defer></script>
+  <link rel="stylesheet" href="${base}${assetUrl('style.css')}">
+  <link rel="stylesheet" href="${base}${assetUrl('titles.css')}">
+  ${styles.map(s => `<link rel="stylesheet" href="${base}${assetUrl(s)}">`).join('\n  ')}
+  <link rel="preload" href="${base}${assetUrl('fonts/inter-latin-normal-300-700-v1.woff2')}" as="font" type="font/woff2" crossorigin fetchpriority="high">
+  ${preloads.map(f => `<link rel="preload" href="${base}${assetUrl(f)}" as="font" type="font/woff2" crossorigin>`).join('\n  ')}
+  <script type="speculationrules">{"prerender":[{"where":{"href_matches":"/*/"},"eagerness":"moderate"}]}</script>
+  <link rel="alternate" type="application/rss+xml" title="${SITE_TITLE} — ${SITE_SUBTITLE}" href="${base}feed.xml">
 </head>
-<body>
+<body class="${opts.bodyClass || (currentSlug ? 'is-post' : 'is-index')}">
+  <a class="skip-link" href="#content">Skip to ${opts.skipLabel || (currentSlug ? 'story' : 'contents')}</a>
 
-  <input type="checkbox" id="menu-toggle" hidden>
-  <label for="menu-toggle" class="menu-overlay" aria-hidden="true"></label>
-
-  <header class="top-bar">
-    <label for="menu-toggle" class="menu-button" role="button" tabindex="0" aria-label="Toggle menu">☰</label>
-    <a href="index.html" class="top-bar-title">Tomás Bjartur</a>
-    <div class="top-bar-actions">
-      <button class="theme-toggle" id="theme-btn" aria-label="Toggle dark mode"></button>
-      <a href="${EPUB_FILENAME}" class="top-bar-btn epub-link">EPUB</a>
-      <a href="${SUBSTACK_URL}" class="top-bar-btn top-bar-btn-primary">Subscribe</a>
-      <a href="feed.xml" class="top-bar-btn top-bar-btn-rss" title="RSS Feed">RSS</a>
-    </div>
+${(currentSlug || opts.nav) ? `  <header class="nav">
+    <nav class="navbar" aria-label="Site">${navItems(currentSlug || (opts.nav ? 'page' : null), base)}</nav>
   </header>
-
-  ${buildSidebar(posts, currentSlug)}
-
-  <main>
+` : ''}${currentSlug ? `  <div class="reading-progress" aria-hidden="true"><div class="progress-bar"></div></div>
+` : ''}
+  <main id="content" tabindex="-1">
     ${content}
   </main>
+
+  ${siteFoot(base)}
 
   <script>
   (function(){
@@ -371,7 +1088,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
     // VPN and the RSS feed all bypass it. Fails open by design — if the
     // lookup errors, times out or is blocked, nothing is hidden.
     var RULES=${JSON.stringify(GEO_HIDDEN)},CUR=${JSON.stringify(currentSlug)};
-    var ALT_EPUB=${JSON.stringify(EPUB_FILENAME_ALT)};
+    var ALT_EPUB=${JSON.stringify(base + EPUB_FILENAME_ALT)};
     if(!RULES.length)return;
     var KEY='geo',TTL=864e5;
     function eq(a,b){return !b||String(a||'').toLowerCase()===String(b).toLowerCase()}
@@ -380,13 +1097,14 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
         if(!(eq(loc.city,r.city)&&eq(loc.region,r.region)&&eq(loc.country,r.country)))return;
         var els=document.querySelectorAll('[data-slug="'+r.slug+'"]');
         for(var i=0;i<els.length;i++)els[i].remove();
+        var ol=document.querySelector('.stories');if(ol)ol.style.setProperty('--n',ol.querySelectorAll('.story').length);
         var navs=document.querySelectorAll('[data-geo-slug="'+r.slug+'"]');
         for(var k=0;k<navs.length;k++){var a=navs[k],h=a.getAttribute('data-alt-href');
-          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label')}
+          if(h){a.href=h;a.textContent=a.getAttribute('data-alt-label');a.className=a.className.replace(/\\bt-\\S+/,'t-'+a.getAttribute('data-alt-slug'))}
           else{a.removeAttribute('href');a.textContent=''}}
         var eps=document.querySelectorAll('.epub-link');
         for(var j=0;j<eps.length;j++)eps[j].href=ALT_EPUB;
-        if(CUR===r.slug)location.replace('index.html');
+        if(CUR===r.slug)location.replace(${JSON.stringify(base || 'index.html')});
       });
     }
     var cached=null;
@@ -407,759 +1125,136 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   })();
   </script>
 
-  <script>
-  (function(){
-    // Theme toggle
-    var h=document.documentElement,b=document.getElementById('theme-btn');
-    function isDark(){var t=h.getAttribute('data-theme');return t==='dark'||(t==='auto'&&window.matchMedia('(prefers-color-scheme:dark)').matches)}
-    function updateTheme(){b.textContent=isDark()?'\u2600\uFE0F':'\uD83C\uDF19'}
-    b.addEventListener('click',function(){var t=h.getAttribute('data-theme'),n;if(t==='auto')n=isDark()?'light':'dark';else n=t==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('theme',n)}catch(e){}updateTheme()});
-    updateTheme();
-
-    // Sort toggle
-    var sort;try{sort=localStorage.getItem('sort')}catch(e){}
-    if(!sort)sort='book';
-    function applySort(s){
-      sort=s;try{localStorage.setItem('sort',s)}catch(e){}
-      document.querySelectorAll('.nav-list').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
-      document.querySelectorAll('.index-list[data-sort]').forEach(function(ul){ul.style.display=ul.getAttribute('data-sort')===s?'':'none'});
-      document.querySelectorAll('.sort-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-sort')===s)});
-      document.querySelectorAll('.post-nav-next,.post-nav-prev').forEach(function(a){a.style.display=a.getAttribute('data-sort')===s?'':'none'});
-    }
-    document.querySelectorAll('.sort-btn').forEach(function(btn){btn.addEventListener('click',function(){applySort(btn.getAttribute('data-sort'))})});
-    applySort(sort);
-
-    // Keyboard support for the hamburger label
-    var m=document.querySelector('.menu-button'),c=document.getElementById('menu-toggle');
-    if(m&&c){m.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();c.checked=!c.checked}})}
-  })();
-  </script>
 </body>
 </html>`;
 }
 
-// Prev/next link from list[idx] one step in direction `step` (-1 or 1). When
-// the target is a GEO_HIDDEN story, the link also carries the next story past
-// it (skipping every GEO_HIDDEN slug), which the geo curtain swaps in.
-function postNavLink(list, idx, step, sort) {
+// Newer/older link from list[idx] one step in direction `step` (-1 newer,
+// 1 older). When the target is a GEO_HIDDEN story, the link also carries the
+// next story past it (skipping every GEO_HIDDEN slug), which the geo curtain
+// swaps in.
+// The list wraps: the newest story's "newer" link is the oldest story and
+// the oldest's "older" link is the newest, so both links always lead on.
+function postNavLink(list, idx, step, base = '') {
   const cls = step < 0 ? 'post-nav-prev' : 'post-nav-next';
-  const style = sort === 'book' ? '' : ' style="display:none"';
-  const label = p => step < 0 ? `← ${p.title}` : `${p.title} →`;
-  const target = list[idx + step];
-  if (!target) return `<span class="${cls}" data-sort="${sort}"${style}></span>`;
+  const at = i => list[((i % list.length) + list.length) % list.length];
+  const target = list.length > 1 ? at(idx + step) : null;
+  if (!target) return `<span class="${cls}"></span>`;
   let geo = '';
   if (GEO_HIDDEN.some(r => r.slug === target.slug)) {
-    let i = idx + step;
-    while (list[i] && GEO_HIDDEN.some(r => r.slug === list[i].slug)) i += step;
-    const alt = list[i];
-    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${alt.slug}.html` : ''}" data-alt-label="${alt ? escapeAttr(label(alt)) : ''}"`;
+    let i = idx + step, guard = list.length;
+    while (guard-- > 0 && GEO_HIDDEN.some(r => r.slug === at(i).slug)) i += step;
+    const alt = guard >= 0 && at(i).slug !== list[idx].slug ? at(i) : null;
+    geo = ` data-geo-slug="${target.slug}" data-alt-href="${alt ? `${base}${alt.slug}/` : ''}" data-alt-label="${alt ? escapeAttr(alt.title) : ''}" data-alt-slug="${alt ? alt.slug : ''}"`;
   }
-  return `<a href="${target.slug}.html" class="post-nav-link ${cls}" data-sort="${sort}"${style}${geo}>${label(target)}</a>`;
+  return `<a href="${base}${target.slug}/" class="post-nav-link ${cls} morph t-${target.slug}"${geo} rel="${step < 0 ? 'prev' : 'next'}">${escapeHtml(target.title)}</a>`;
+}
+
+// A story's images, as they appear on its page: post bodies hold site-relative
+// paths (the EPUB and the feed read those), and a story's page is one directory
+// down, so they need the step up, plus their size and lazy loading.
+function storyImages(html) {
+  return html.replace(/<img\b[^>]*>/gi, tag => {
+    const src = tag.match(/\ssrc="(images\/[^"]+)"/i);
+    if (!src) return tag;
+    const { width, height } = LOCAL_IMAGES.get(src[1]) || {};
+    const size = width && height ? ` width="${width}" height="${height}"` : '';
+    return tag.replace(src[0], ` src="../${src[1]}"`).replace(/^<img/i, `<img${size} loading="lazy" decoding="async"`);
+  });
 }
 
 function buildPostPage(post, allPosts) {
+  const date = formatDate(post.postedAt);
   const readTime = estimateReadingTime(post.wordCount);
-  const meta = [formatDate(post.postedAt), readTime].filter(Boolean).join(' · ');
-
-  const byBook = bookOrder(allPosts);
-  const bookIdx = byBook.findIndex(p => p.slug === post.slug);
-  const byDate = [...allPosts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  const dateIdx = byDate.findIndex(p => p.slug === post.slug);
+  const social = stats(post);
+  const metaLine = [readTime ? `<span class="when">${readTime}</span>` : '', social].filter(Boolean).join('');
+  const byDate = sortByDate(allPosts);
+  const idx = byDate.findIndex(p => p.slug === post.slug);
 
   const content = `
     <article>
       <header class="post-header">
-        <h1>${post.title}</h1>
-        <p class="post-meta">${meta}</p>
+        <h1><span class="morph">${escapeHtml(post.title)}</span></h1>
+        <p class="post-byline"><span class="byline">${AUTHOR}</span><span class="when">${date}</span></p>
+        ${metaLine ? `<p class="post-meta meta">${metaLine}</p>` : ''}
+        <span class="orn" aria-hidden="true"></span>
       </header>
       <div class="post-body">
-        ${cleanHtml(post.htmlBody)}
-        <p style="text-align:center;margin:2em 0;color:#999">&#8226; &ensp; &#8226; &ensp; &#8226;</p>
-        <p style="text-align:center;margin:1em 0"><a href="${SUBSTACK_URL}" style="color:#a0734f;text-decoration:none;font-size:0.9em">Subscribe on Substack</a></p>
-        <p style="text-align:center;margin:0.5em 0"><a href="${EPUB_FILENAME}" class="epub-link" style="color:#a0734f;text-decoration:none;font-size:0.85em">Download the collection (EPUB, free)</a></p>
+        ${storyImages(typeset(cleanHtml(post.htmlBody).trim()))}
       </div>
-      <footer class="post-footer post-nav">
-        ${postNavLink(byBook, bookIdx, -1, 'book')}
-        ${postNavLink(byDate, dateIdx, -1, 'date')}
-        <a href="index.html" class="post-nav-link">Home</a>
-        ${postNavLink(byBook, bookIdx, 1, 'book')}
-        ${postNavLink(byDate, dateIdx, 1, 'date')}
+      <p class="end-mark" aria-hidden="true">· · ·</p>
+      <footer class="post-footer">
+        <nav class="post-nav" aria-label="Newer and older stories">
+          ${postNavLink(byDate, idx, -1, '../')}
+          ${postNavLink(byDate, idx, 1, '../')}
+        </nav>
       </footer>
     </article>`;
 
   return pageShell(content, post.title, allPosts, post.slug, {
     description: extractExcerpt(post.htmlBody),
+    base: '../',
+    published: post.postedAt,
   });
 }
 
-function buildIndexPage(posts) {
-  const byDate = [...posts].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
-  const byBook = bookOrder(posts);
+// Old /slug.html links keep working: a tiny page that sends the reader to
+// the story's clean /slug/ URL. Static GitHub Pages cannot return a 301,
+// so this is the HTML equivalent (meta refresh plus script), with a
+// canonical so search engines see only the clean page.
+function buildPostRedirect(post) {
+  const href = `${post.slug}/`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(post.title)} — ${escapeHtml(SITE_TITLE)}</title>
+<link rel="canonical" href="${SITE_URL}/${post.slug}/">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=${href}">
+<script>location.replace(${JSON.stringify(href)})</script>
+</head>
+<body><p><a href="${href}">${escapeHtml(post.title)}</a></p></body>
+</html>`;
+}
 
-  function buildListing(sorted) {
-    return sorted.map(p => {
-      const readTime = estimateReadingTime(p.wordCount);
-      const meta = [formatDate(p.postedAt), readTime].filter(Boolean).join(' · ');
-      return `
-      <li class="index-item" data-slug="${p.slug}">
-        <a href="${p.slug}.html">
-          <span class="index-title">${p.title}</span>
-          <span class="index-meta">${meta}</span>
-        </a>
-      </li>`;
-    }).join('\n');
-  }
+function buildIndexPage(posts) {
+  const rows = sortByDate(posts).map((p, i) => `
+        <li class="story${EDITOR_PICKS.has(p.slug) ? ' pick' : ''}" data-slug="${p.slug}"${EDITOR_PICKS.has(p.slug) ? ' title="Editor\'s pick"' : ''}>
+          <span class="title-cell"><a class="story-title morph t-${p.slug}" href="${p.slug}/">${escapeHtml(p.title)}</a>${EDITOR_PICKS.has(p.slug) ? '<span class="sr-only"> (editor\'s pick)</span>' : ''} <span class="meta">${whenText(p)}${stats(p)}</span></span>
+        </li>`).join('');
 
   const content = `
-    <div class="index-page">
-      <h1>${SITE_TITLE}</h1>
-      <p class="index-intro">${SITE_DESCRIPTION}</p>
-      <ul class="index-list" data-sort="book">
-        ${buildListing(byBook)}
-      </ul>
-      <ul class="index-list" data-sort="date" style="display:none">
-        ${buildListing(byDate)}
-      </ul>
-    </div>`;
+    <header class="site-head">
+      <h1 class="site-h1">${AUTHOR}</h1>
+      ${bookLink('head-book')}
+      <nav class="navbar" aria-label="Site">${navItems(null).replace(/^<a[^>]*nav-home[^>]*>TB<\/a>/, '').replace(/<a[^>]*nav-epub[^>]*>EPUB.*?<\/a>/, m => `<span class="nav-bk-title">${SITE_TITLE}</span>${m}`)}</nav>
+      <hr class="head-rule">
+    </header>
+    <ol class="stories" style="--n:${posts.length}">${rows}
+    </ol>`;
 
   return pageShell(content, null, posts, null);
 }
 
+// URL of a file already written to dist/, stamped with a hash of its bytes,
+// so a browser or CDN holding an older copy fetches the new one at once and
+// every reader sees the current CSS and fonts.
+const assetVersions = new Map();
+function assetUrl(rel) {
+  if (!assetVersions.has(rel)) {
+    const bytes = fs.readFileSync(path.join(OUTPUT_DIR, rel));
+    assetVersions.set(rel, require('crypto').createHash('sha1').update(bytes).digest('hex').slice(0, 10));
+  }
+  return `${rel}?v=${assetVersions.get(rel)}`;
+}
+
+// The stylesheet lives in style.css so it can be edited as CSS; font URLs get
+// their content stamp (the fonts must be in dist/ first).
 function buildStylesheet() {
-  return `/* Tomás B. Fiction — Static Mirror */
-
-:root {
-  --bg: #fcfbf9;
-  --text: #1a1a1a;
-  --text-light: #7a7570;
-  --accent: #8b4513;
-  --border: #e8e4de;
-  --sidebar-bg: #f5f2ed;
-  --sidebar-width: 260px;
-  --active-bg: #ebe7e0;
-  --link: #6b3a2e;
-  --max-prose: 38rem;
-  --serif: Charter, 'Bitstream Charter', 'Noto Serif', 'DejaVu Serif', 'Liberation Serif', Georgia, serif;
-  --sans: -apple-system, 'Segoe UI', system-ui, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
-  --radius: 6px;
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html {
-  font-size: 18px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  scroll-behavior: smooth;
-}
-
-body {
-  font-family: var(--serif);
-  color: var(--text);
-  background: var(--bg);
-  line-height: 1.75;
-  display: flex;
-  min-height: 100vh;
-}
-
-::selection {
-  background: rgba(139, 69, 19, 0.15);
-}
-
-/* --- Sidebar --- */
-.sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--border);
-  padding: 1.5rem 0;
-  position: fixed;
-  top: 3rem;
-  left: 0;
-  bottom: 0;
-  overflow-y: auto;
-  font-family: var(--sans);
-  font-size: 0.78rem;
-  z-index: 10;
-}
-
-.sidebar-header {
-  padding: 0 1.4rem 1.2rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1rem;
-}
-
-.site-title {
-  display: block;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text);
-  text-decoration: none;
-  letter-spacing: -0.01em;
-}
-.site-title:hover { color: var(--accent); }
-
-.site-subtitle {
-  display: block;
-  color: var(--text-light);
-  font-size: 0.8rem;
-  margin-top: 0.2rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.sort-toggle {
-  display: flex;
-  gap: 0;
-  padding: 0.6rem 1.4rem 0.5rem;
-}
-
-.sort-btn {
-  flex: 1;
-  padding: 0.3rem 0;
-  font-family: var(--sans);
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-light);
-  background: none;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.sort-btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.sort-btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; border-left: none; }
-.sort-btn.active {
-  background: var(--active-bg);
-  color: var(--accent);
-}
-.sort-btn:hover:not(.active) {
-  background: var(--active-bg);
-}
-
-.nav-section h3 {
-  padding: 0.8rem 1.4rem 0.3rem;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-light);
-  font-weight: 600;
-}
-
-.nav-section ul {
-  list-style: none;
-}
-
-.nav-section li a {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5em;
-  padding: 0.35rem 1.4rem;
-  color: var(--text);
-  text-decoration: none;
-  border-radius: 0;
-  transition: background 0.15s, color 0.15s;
-}
-
-.nav-section li a:hover {
-  background: var(--active-bg);
-  color: var(--accent);
-}
-
-.nav-section li a.active {
-  background: var(--active-bg);
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.nav-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* --- Top bar --- */
-.top-bar {
-  position: fixed;
-  top: 0;
-  left: var(--sidebar-width);
-  right: 0;
-  height: 3rem;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 1.5rem;
-  z-index: 15;
-  font-family: var(--sans);
-  gap: 1rem;
-}
-
-.top-bar-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  text-decoration: none;
-  margin-right: auto;
-  display: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.top-bar-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-left: auto;
-}
-
-.top-bar-btn {
-  padding: 0.35rem 0.9rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-decoration: none;
-  border-radius: var(--radius);
-  transition: background 0.15s, color 0.15s;
-  border: 1px solid var(--border);
-  color: var(--text);
-  background: var(--bg);
-}
-.top-bar-btn:hover {
-  background: var(--sidebar-bg);
-  color: var(--accent);
-}
-
-.top-bar-btn-rss {
-  font-size: 0.65rem;
-  padding: 0.25rem 0.55rem;
-  opacity: 0.45;
-  border-color: transparent;
-}
-.top-bar-btn-rss:hover { opacity: 0.85; border-color: var(--border); }
-
-.top-bar-btn-primary {
-  background: #a0734f;
-  color: #fff;
-  border-color: #a0734f;
-}
-.top-bar-btn-primary:hover {
-  background: #8b6243;
-  border-color: #8b6243;
-  color: #fff;
-}
-
-.sidebar-footer {
-  padding: 1.5rem 1.4rem 0;
-  border-top: 1px solid var(--border);
-  margin-top: 1rem;
-}
-
-.lw-link {
-  font-size: 0.75rem;
-  color: var(--text-light);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.lw-link:hover { color: var(--accent); }
-
-/* --- Main --- */
-main {
-  margin-left: var(--sidebar-width);
-  margin-top: 3rem;
-  flex: 1;
-  padding: 3rem 2.5rem 6rem;
-  display: flex;
-  justify-content: center;
-}
-
-article, .index-page {
-  max-width: var(--max-prose);
-  width: 100%;
-}
-
-/* --- Post --- */
-.post-header {
-  margin-bottom: 3rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.post-header h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.6rem;
-}
-
-.post-meta {
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  color: var(--text-light);
-  letter-spacing: 0.01em;
-}
-
-.post-body p {
-  margin-bottom: 1.3em;
-  hanging-punctuation: first last;
-}
-
-.post-body blockquote {
-  border-left: 2px solid var(--accent);
-  padding-left: 1.4em;
-  margin: 1.8em 0;
-  color: var(--text-light);
-  font-style: italic;
-}
-
-.post-body h2, .post-body h3 {
-  margin: 2.2em 0 0.8em;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-}
-
-.post-body h2 { font-size: 1.4rem; }
-.post-body h3 { font-size: 1.15rem; }
-
-.post-body a {
-  color: var(--link);
-  text-decoration: underline;
-  text-decoration-color: rgba(107, 58, 46, 0.3);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-  transition: text-decoration-color 0.15s;
-}
-.post-body a:hover {
-  text-decoration-color: var(--link);
-}
-
-.post-body hr {
-  border: none;
-  text-align: center;
-  margin: 3em 0;
-}
-.post-body hr::before {
-  content: '\\2022\\2003\\2022\\2003\\2022';
-  color: var(--text-light);
-  font-size: 0.85rem;
-}
-
-.post-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-}
-
-.post-body pre, .post-body code {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 0.85em;
-}
-
-.post-body pre {
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border);
-  padding: 1.2em;
-  overflow-x: auto;
-  border-radius: var(--radius);
-  margin: 1.8em 0;
-}
-
-.post-body code {
-  background: var(--sidebar-bg);
-  padding: 0.15em 0.4em;
-  border-radius: 3px;
-}
-
-.post-body pre code {
-  background: none;
-  padding: 0;
-}
-
-.post-footer {
-  margin-top: 4rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  color: var(--text-light);
-}
-
-.post-footer a {
-  color: var(--link);
-  text-decoration: underline;
-  text-decoration-color: rgba(107, 58, 46, 0.3);
-  text-underline-offset: 2px;
-}
-.post-footer a:hover {
-  text-decoration-color: var(--link);
-}
-
-.post-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-}
-
-.post-nav-link {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.post-nav-prev,
-.post-nav-next {
-  max-width: 40%;
-}
-
-.post-nav-next {
-  text-align: right;
-}
-
-/* --- Index page --- */
-.index-page h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin-bottom: 0.3rem;
-  letter-spacing: -0.02em;
-}
-
-.index-intro {
-  color: var(--text-light);
-  font-size: 0.95rem;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.index-list {
-  list-style: none;
-}
-
-.index-item a {
-  display: block;
-  padding: 1rem 0.8rem;
-  margin: 0 -0.8rem;
-  text-decoration: none;
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-  border-radius: var(--radius);
-  transition: background 0.15s;
-}
-
-.index-item:first-child a {
-  border-top: 1px solid var(--border);
-}
-
-.index-item a:hover {
-  background: var(--sidebar-bg);
-}
-
-.index-title {
-  display: block;
-  font-size: 1.15rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.index-meta {
-  display: block;
-  font-family: var(--sans);
-  font-size: 0.78rem;
-  color: var(--text-light);
-  margin-top: 0.2rem;
-}
-
-/* --- Mobile overlay for closing sidebar --- */
-.menu-overlay {
-  display: none;
-}
-
-/* --- Mobile hamburger (in top bar) --- */
-.menu-button {
-  display: none;
-  background: none;
-  border: none;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 2rem;
-  text-align: center;
-  color: var(--text);
-  flex-shrink: 0;
-}
-.menu-button:hover {
-  color: var(--accent);
-}
-
-@media (max-width: 860px) {
-  .menu-button { display: block; }
-  .top-bar-title { display: block; }
-
-  .top-bar {
-    left: 0;
-  }
-
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: none;
-    top: 3rem;
-    height: calc(100vh - 3rem);
-  }
-
-  #menu-toggle:checked ~ .sidebar {
-    transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0,0,0,0.08);
-  }
-
-  #menu-toggle:checked ~ .menu-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    top: 3rem;
-    z-index: 5;
-    background: rgba(0,0,0,0.15);
-  }
-
-  main {
-    margin-left: 0;
-    padding: 2rem 1.5rem 4rem;
-  }
-
-  .post-header h1, .index-page h1 {
-    font-size: 1.75rem;
-  }
-}
-
-@media (max-width: 520px) {
-  html { font-size: 17px; }
-
-  .top-bar { padding: 0 0.75rem; gap: 0.5rem; }
-  .top-bar-actions { gap: 0.35rem; }
-  .top-bar-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
-  .top-bar-btn-rss { display: none; }
-
-  main {
-    padding: 1.5rem 1.2rem 3rem;
-  }
-
-  .post-header {
-    margin-bottom: 2rem;
-  }
-
-  .post-header h1, .index-page h1 {
-    font-size: 1.55rem;
-  }
-
-  .post-body blockquote {
-    margin-left: 0;
-    padding-left: 1em;
-  }
-
-  .index-item a {
-    padding: 0.8rem 0.6rem;
-    margin: 0 -0.6rem;
-  }
-}
-
-/* --- Dark mode --- */
-[data-theme="dark"] {
-  --bg: #1a1a1e;
-  --text: #e0ddd8;
-  --text-light: #9a9590;
-  --accent: #c8956a;
-  --border: #2e2e33;
-  --sidebar-bg: #222226;
-  --active-bg: #2a2a2f;
-  --link: #c8956a;
-}
-
-[data-theme="dark"] ::selection {
-  background: rgba(200, 149, 106, 0.25);
-}
-
-[data-theme="dark"] .top-bar-btn-primary {
-  background: #a0734f;
-  border-color: #a0734f;
-}
-[data-theme="dark"] .top-bar-btn-primary:hover {
-  background: #8b6243;
-  border-color: #8b6243;
-}
-
-[data-theme="dark"] .post-body a {
-  text-decoration-color: rgba(200, 149, 106, 0.3);
-}
-[data-theme="dark"] .post-body a:hover {
-  text-decoration-color: var(--link);
-}
-[data-theme="dark"] .post-footer a {
-  text-decoration-color: rgba(200, 149, 106, 0.3);
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-theme="auto"] {
-    --bg: #1a1a1e;
-    --text: #e0ddd8;
-    --text-light: #9a9590;
-    --accent: #c8956a;
-    --border: #2e2e33;
-    --sidebar-bg: #222226;
-    --active-bg: #2a2a2f;
-    --link: #c8956a;
-  }
-  [data-theme="auto"] ::selection {
-    background: rgba(200, 149, 106, 0.25);
-  }
-  [data-theme="auto"] .top-bar-btn-primary {
-    background: #a0734f;
-    border-color: #a0734f;
-  }
-  [data-theme="auto"] .top-bar-btn-primary:hover {
-    background: #8b6243;
-    border-color: #8b6243;
-  }
-  [data-theme="auto"] .post-body a {
-    text-decoration-color: rgba(200, 149, 106, 0.3);
-  }
-  [data-theme="auto"] .post-body a:hover {
-    text-decoration-color: var(--link);
-  }
-  [data-theme="auto"] .post-footer a {
-    text-decoration-color: rgba(200, 149, 106, 0.3);
-  }
-}
-
-.theme-toggle {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.35rem 0.55rem;
-  cursor: pointer;
-  font-size: 0.85rem;
-  line-height: 1;
-  color: var(--text);
-  transition: background 0.15s, color 0.15s;
-}
-.theme-toggle:hover {
-  background: var(--sidebar-bg);
-  color: var(--accent);
-}
-
-/* Respect reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-`;
+  return fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8')
+    .replace(/url\('(fonts\/[^']+\.woff2)'\)/g, (_, rel) => `url('${assetUrl(rel)}')`);
 }
 
 // --- RSS feed ---
@@ -1178,14 +1273,17 @@ function buildRssFeed(posts) {
   const buildDate = new Date().toUTCString();
   const items = byDate.map(p => {
     const pubDate = new Date(p.postedAt).toUTCString();
-    const link = `${SITE_URL}/${p.slug}.html`;
+    const link = `${SITE_URL}/${p.slug}/`;
+    // Keep the old .html URL as the GUID: it is the item's stable identity,
+    // and changing it would make every story reappear as new in readers.
+    const guid = `${SITE_URL}/${p.slug}.html`;
     return `    <item>
       <title>${escapeXml(p.title)}</title>
       <link>${link}</link>
-      <guid isPermaLink="true">${link}</guid>
+      <guid isPermaLink="true">${guid}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(p.title)} — ${estimateReadingTime(p.wordCount)}</description>
-      <content:encoded><![CDATA[${cleanHtml(p.htmlBody).replace(/src="images\//g, `src="${SITE_URL}/images/`)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
+      <content:encoded><![CDATA[${cleanHtml(p.htmlBody, { forFeed: true }).replace(/src="images\//g, `src="${SITE_URL}/images/`)}<p style="margin-top:2em;font-size:0.9em;color:#888"><a href="${SUBSTACK_URL}" style="color:#a0734f">Subscribe via email</a></p>]]></content:encoded>
     </item>`;
   }).join('\n');
 
@@ -2010,11 +2108,31 @@ async function downloadImage(url) {
 // Filled by localizeImages(); used for dist/, the EPUB, and RSS absolutization.
 const LOCAL_IMAGES = new Map();
 
+// Pixel size, for the width and height attributes that keep a page from
+// shifting as its images arrive. A format canvas cannot read just goes without.
+async function imageSize(data, name) {
+  try {
+    const { width, height } = await loadImage(data);
+    return { width, height };
+  } catch (err) {
+    console.warn(`  [DEGRADED] no size for ${name}: ${err.message}`);
+    return {};
+  }
+}
+
 // Download every remote image referenced in post bodies and rewrite the srcs
 // to site-relative paths, so the site doesn't hotlink LessWrong's CDN.
 async function localizeImages(posts) {
   const urlToPath = new Map();
   for (const post of posts) {
+    // LessWrong ships responsive srcset/sizes pointing at its Cloudinary CDN.
+    // Browsers prefer srcset over the localized src, and EPUB forbids remote
+    // resources, so keep only src. Images LW gives no alt text get alt="".
+    post.htmlBody = post.htmlBody.replace(/<img\b[^>]*>/gi, tag => {
+      let t = tag.replace(/\s(?:srcset|sizes)="[^"]*"/gi, '');
+      if (!/\salt=/i.test(t)) t = t.replace(/^<img/i, '<img alt=""');
+      return t;
+    });
     const urls = [...post.htmlBody.matchAll(/<img[^>]*?src="([^"]+)"/gi)].map(m => m[1]);
     for (const url of urls) {
       if (url.startsWith('data:') || url.startsWith('images/')) continue;
@@ -2023,7 +2141,7 @@ async function localizeImages(posts) {
         const img = await downloadImage(url);
         if (!img) continue;
         const name = `images/img-${hashStr(url).toString(36)}.${img.ext}`;
-        LOCAL_IMAGES.set(name, { data: img.data, mediaType: img.mediaType });
+        LOCAL_IMAGES.set(name, { data: img.data, mediaType: img.mediaType, ...await imageSize(img.data, name) });
         urlToPath.set(url, name);
       }
       post.htmlBody = post.htmlBody.split(url).join(urlToPath.get(url));
@@ -2263,7 +2381,7 @@ ${chapterFiles.map(c => `    <item id="${c.halfTitleId}" href="${c.halfTitleFile
 ${allImages.map(img => `    <item id="${img.id}" href="${img.filename}" media-type="${img.mediaType}"/>`).join('\n')}
   </manifest>
   <spine>
-    <itemref idref="cover" linear="no"/>
+    <itemref idref="cover"/>
     <itemref idref="halftitle"/>
     <itemref idref="titlepage"/>
     <itemref idref="copyright"/>
@@ -2290,6 +2408,7 @@ async function main() {
   const fiction = filterFiction(allPosts);
   const external = await fetchExternalStories();
   fiction.push(...external);
+  checkSlugs(fiction);
   console.log(`Found ${fiction.length} fiction posts (${external.length} external)`);
 
   if (fiction.length === 0) {
@@ -2313,26 +2432,75 @@ async function main() {
     console.log(`Wrote ${LOCAL_IMAGES.size} images to images/`);
   }
 
-  // Write stylesheet
+  // Self-hosted text faces (fonts/web/), then the stylesheet that stamps them
+  const webFonts = path.join(__dirname, 'fonts', 'web');
+  fs.mkdirSync(path.join(OUTPUT_DIR, 'fonts'), { recursive: true });
+  for (const name of fs.readdirSync(webFonts).filter(n => n.endsWith('.woff2'))) {
+    fs.copyFileSync(path.join(webFonts, name), path.join(OUTPUT_DIR, 'fonts', name));
+  }
   fs.writeFileSync(path.join(OUTPUT_DIR, 'style.css'), buildStylesheet());
   console.log('Wrote style.css');
+  for (const f of ['favicon.svg', 'site.js']) fs.copyFileSync(path.join(__dirname, f), path.join(OUTPUT_DIR, f));
+  try {
+    fs.writeFileSync(path.join(OUTPUT_DIR, 'apple-touch-icon.png'), await buildTouchIcon());
+    hasTouchIcon = true;
+  } catch (err) {
+    console.warn(`[DEGRADED] no apple-touch-icon.png: ${err.message}`);
+  }
+  if (!SHOW_SIGNUP) console.warn('[DEGRADED] no Formspree form ID, so the footer signup is left out of this build');
+
+  // The cover (shared by the EPUB and og:image), before the pages that state its size
+  const collection = orderForCollection(fiction);
+  const coverPng = buildCoverPng(collection, BOOK_TITLE);
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
+  coverSize = { width: coverPng.readUInt32BE(16), height: coverPng.readUInt32BE(20) };
+  console.log('Wrote cover.png');
+
+  // Reader metrics and per-title fonts
+  attachMetrics(fiction, await fetchSubstackMetrics());
+  const assignedFaces = titleFontFor(fiction);
+  const titleFaceList = titleFaceCatalog(fiction, assignedFaces);
+  const [subsetFonts, titleFonts, specimenFiles] = await Promise.all([
+    fetchSubsetFonts(fiction),
+    fetchTitleFonts(fiction, assignedFaces),
+    fetchTitleFontSpecimens(titleFaceList),
+  ]);
+  pruneSubsets();
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'titles.css'), buildTitlesCss(fiction, subsetFonts, titleFonts));
+  console.log('Wrote titles.css');
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'title-fonts.css'), buildTitleFontsCss(titleFaceList, specimenFiles));
+  console.log('Wrote title-fonts.css');
 
   // Write index page
   fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), buildIndexPage(fiction));
   console.log('Wrote index.html');
 
-  // Write individual post pages
-  for (const post of fiction) {
-    const filename = `${post.slug}.html`;
-    fs.writeFileSync(path.join(OUTPUT_DIR, filename), buildPostPage(post, fiction));
-    console.log(`Wrote ${filename}`);
-  }
+  // Write the title-fonts specimen page
+  const titleFontsDir = path.join(OUTPUT_DIR, 'title-fonts');
+  fs.mkdirSync(titleFontsDir, { recursive: true });
+  fs.writeFileSync(path.join(titleFontsDir, 'index.html'), buildTitleFontsPage(fiction, titleFaceList, specimenFiles));
+  console.log('Wrote title-fonts/index.html');
 
-  // Generate cover (shared by the EPUB and og:image)
-  const collection = orderForCollection(fiction);
-  const coverPng = buildCoverPng(collection, BOOK_TITLE);
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'cover.png'), coverPng);
-  console.log('Wrote cover.png');
+  // Success page for the footer email signup
+  const subscribedDir = path.join(OUTPUT_DIR, 'subscribed');
+  fs.mkdirSync(subscribedDir, { recursive: true });
+  fs.writeFileSync(path.join(subscribedDir, 'index.html'), buildSuccessPage(fiction));
+  console.log('Wrote subscribed/index.html');
+
+  fs.writeFileSync(path.join(OUTPUT_DIR, '404.html'), buildNotFoundPage(fiction));
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'sitemap.xml'), buildSitemap(fiction));
+  fs.writeFileSync(path.join(OUTPUT_DIR, 'robots.txt'), `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+  console.log('Wrote 404.html, sitemap.xml, robots.txt');
+
+  // Write individual post pages as clean directory URLs (/slug/) and keep
+  // the old /slug.html paths as redirects, so existing links still resolve.
+  for (const post of fiction) {
+    const dir = path.join(OUTPUT_DIR, post.slug);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'index.html'), buildPostPage(post, fiction));
+    fs.writeFileSync(path.join(OUTPUT_DIR, `${post.slug}.html`), buildPostRedirect(post));
+    console.log(`Wrote ${post.slug}/index.html (+ ${post.slug}.html redirect)`);
+  }
 
   // Generate EPUB
   const epub = await buildEpub(collection, 'collection', BOOK_TITLE, coverPng);
@@ -2368,13 +2536,48 @@ async function main() {
     `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${SUBSTACK_URL}"/></head><body></body></html>`);
   console.log('Wrote subscribe/index.html (redirect to Substack)');
 
+  checkLocalReferences();
+
   console.log(`\nDone! ${fiction.length} pages + EPUB + RSS generated in ${OUTPUT_DIR}/`);
+}
+
+// Every src and href on every page must resolve to a file in dist/, the way a
+// browser would resolve it from that page. A broken one stops the build, so
+// the last good deploy stays live: story images once 404ed for a day because
+// nothing looked. Links inside story text are the author's, so a relative one
+// there only warns.
+function checkLocalReferences() {
+  const pages = [];
+  const walk = dir => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith('.html')) pages.push(full);
+    }
+  };
+  walk(OUTPUT_DIR);
+  const broken = [], soft = [];
+  for (const page of pages) {
+    const html = fs.readFileSync(page, 'utf8');
+    const start = html.indexOf('<div class="post-body">'), end = html.indexOf('<p class="end-mark"');
+    for (const m of html.matchAll(/\s(src|href)="([^"]+)"/g)) {
+      const url = m[2].replace(/&amp;/g, '&').split(/[?#]/)[0];
+      if (!url || /^[a-z][a-z0-9+.-]*:|^\/\//i.test(m[2])) continue;
+      const target = url.startsWith('/') ? path.join(OUTPUT_DIR, url) : path.resolve(path.dirname(page), url);
+      if (fs.existsSync(target) && (!fs.statSync(target).isDirectory() || fs.existsSync(path.join(target, 'index.html')))) continue;
+      const where = `${path.relative(OUTPUT_DIR, page)}: ${m[2]}`;
+      (m[1] === 'href' && m.index > start && start >= 0 && m.index < end ? soft : broken).push(where);
+    }
+  }
+  for (const w of soft) console.warn(`[DEGRADED] relative link in story text goes nowhere: ${w}`);
+  if (broken.length) throw new Error(`broken references:\n  ${broken.join('\n  ')}`);
+  console.log(`Checked local references on ${pages.length} pages`);
 }
 
 // Export for testing, run if called directly
 function setCoverStyle(s) { COVER_STYLE = s; }
 function setRidgePalette(p) { RIDGE_PALETTE = p; }
-module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildSidebar, buildCoverPng, setCoverStyle, setRidgePalette };
+module.exports = { buildPostPage, buildIndexPage, buildStylesheet, filterFiction, pageShell, buildCoverPng, setCoverStyle, setRidgePalette };
 
 if (require.main === module) {
   main().catch(err => {

@@ -6,9 +6,12 @@
     "build": "node build.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
-    "canvas": "^3.2.1"
+    "canvas": "^3.2.3"
+  },
+  "allowScripts": {
+    "canvas@3.2.3": true
   }
 }
