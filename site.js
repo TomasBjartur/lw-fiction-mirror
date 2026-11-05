@@ -296,8 +296,16 @@
     // page's head decides this and keeps the title hidden until then (.carry). The
     // title's own face must be in first, or its resting box is measured wrong; if
     // that outlasts the wait in style.css, the title has shown at rest and stays so.
-    if(own&&h.classList.contains('carry')){
-      var rest=getComputedStyle(a),late=false;
+    var carried=own&&h.classList.contains('carry'),late=false,release=null;
+    // A prerendered story ran its head script before any click, so it turned its
+    // title on trust. Only now can it read the note; with none, no title was clicked.
+    if(own&&document.prerendering)document.addEventListener('prerenderingchange',function(){
+      var c=null;try{c=sessionStorage.getItem('carry');sessionStorage.removeItem('carry')}catch(x){}
+      if(!carried||c===location.pathname)return;
+      if(release)release();else{late=true;h.classList.remove('carry')}
+    },{once:true});
+    if(carried){
+      var rest=getComputedStyle(a);
       named.addEventListener('animationend',function(){late=true},{once:true});
       Promise.all([mono,document.fonts.load(rest.fontStyle+' '+rest.fontWeight+' '+rest.fontSize+' '+rest.fontFamily,a.textContent),document.fonts.ready]).then(function(){
         h.classList.remove('carry');
@@ -312,9 +320,9 @@
             if(x===null){x=e.clientX;y=e.clientY;return}
             if(e.clientX===x&&e.clientY===y)return;
           }
-          removeEventListener('mousemove',end);removeEventListener('scroll',end);
-          leave();
+          release();
         }
+        release=function(){removeEventListener('mousemove',end);removeEventListener('scroll',end);leave()};
         addEventListener('mousemove',end,{passive:true});
         addEventListener('scroll',end,{passive:true});
       });
