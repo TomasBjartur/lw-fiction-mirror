@@ -721,14 +721,14 @@ async function fetchSubsetFonts(posts) {
 // back to the list's sans, and a failed fetch stops the build.
 const TITLE_FONTS = {
   'duane-arnold-1': ['Monoton', 0.95, 400],
-  'san-silvestro': ['Ballet', 1.7, 400],
+  'san-silvestro': ['Great Vibes', 1.35, 400],
   'the-distaff-texts': ['IM Fell English:ital@1', 1.15, 400],
   'customer-satisfaction-opportunities-1': ['Tiny5:BLED,JITT,ROND,wdth,wght@0,0,100,75,300', 1.15, 300],
   'the-elect-2': ['Jacques Francois Shadow', 1.1, 400],
   'goldfish': ['Kalnia Glaze:wght@500', 1.1, 500],
   'lobsang-s-children-1': ['Tilt Prism', 1.0, 400],
   'remembering-aubrey-chang': ['Moirai One', 1.1, 400, 0.01],
-  'penny-s-hands': ['League Script', 1.4, 400],
+  'penny-s-hands': ['Playwrite US Trad:wght@400', 1.0, 400],
   'that-mad-olympiad-1': ['Faster One', 1.0, 400],
   'the-origami-men': ['Tourney', 1.0, 400],
   'our-beloved-monsters': ['Bungee Spice', 1.0, 400],
