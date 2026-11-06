@@ -90,7 +90,7 @@ let checked = 0; const worstW = [0, 0], worstH = [0, 0];
 const failures = [], shrunk = [];
 for (const [w, h] of sizes) {
   let browser = null, page = null, born = 0;
-  for (const [file, sel] of [['index.html', '.stories .morph'], ...stories.map(s => [s, '.post-header .morph, .post-nav .morph'])]) {
+  for (const [file, sel] of [['index.html', '.stories .morph'], ...stories.map(s => [s, '.post-nav .morph'])]) {
     if (Date.now() - born > LIFE_MS) {
       await browser?.close();
       browser = await launch();

@@ -279,16 +279,9 @@ the end of the column, or in the newer/older row up to the other link,
 where it shrinks to fit. The mono glyphs overflow that box rather than
 resize it, so they are not hit-testable: the link's resting box is the
 whole hover target, and a hovered title cannot cover its neighbour. A
-story's own title does the same, with the whole window as its room. Opened by clicking a title with a mouse, it
-starts already turned and lets go when the pointer moves off it or on the first
-scroll. The click leaves a note in `sessionStorage`; a small script in the next
-page's head reads it before first paint and keeps the title hidden until it has
-turned, since Firefox and Safari would otherwise flash its resting face. After
-0.6 s it shows at rest and stays at rest. A page Chrome prerendered ran that
-script before the click, so it reads the note when it is shown, and lets go of
-the title if there is none. `node scripts/hover-check.mjs
+story's own title sits still in its face, with no hover. `node scripts/hover-check.mjs
 <chrome|firefox|webkit>` hovers every title in a real engine (the list, and
-each story's title and newer/older links, at three desktop widths) and fails if a
+each story's newer/older links, at three desktop widths) and fails if a
 hovered title breaks that rule (width times height off by more than 3%,
 either off by more than 40%, a wrapped word growing) or its row moves.
 Title colours shade from near-black (newest) to dark purple

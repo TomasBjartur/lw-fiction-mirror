@@ -169,8 +169,6 @@
   // Display; leaving resets it at once. The title (or, if it wraps, each
   // word) keeps its resting box, so nothing around it moves; the mono
   // letters keep the title's size, never distorted (see .morph in style.css).
-  // A story's own title does the same, and takes over from the title that was
-  // clicked to open it (below).
   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!matchMedia('(hover: hover)').matches)return;
   var mono=document.fonts?document.fonts.load('1em "Major Mono Display"'):Promise.resolve();
   // The mono text keeps the title's width and height about equally: its
@@ -189,10 +187,7 @@
     return m>0?h/m:fontPx;
   }
   document.querySelectorAll('.morph').forEach(function(a){
-    var spans=null,words=null,text=null,timers=[],left=null,dir=0,running=false,turning=false;
-    // The letters are hidden from screen readers, so the name goes on the link,
-    // or on the heading for a story's own title, whose span cannot carry one.
-    var named=a.closest('h1')||a,own=a.closest('.post-header');
+    var spans=null,words=null,text=null,timers=[],left=null,dir=0,running=false;
     function split(){
       var br=a.getBoundingClientRect(),box=br.width,boxH=br.height; // before splitting, which can shift kerning
       var inline=/^inline/.test(getComputedStyle(a).display);
@@ -202,7 +197,7 @@
       // the letter spans add fragments.
       var lr=document.createRange();lr.selectNodeContents(a);
       var oneLine=lr.getClientRects().length===1,textW=lr.getBoundingClientRect().width;
-      text=a.textContent;named.setAttribute('aria-label',text);a.textContent='';spans=[];words=[];
+      text=a.textContent;a.setAttribute('aria-label',text);a.textContent='';spans=[];words=[];
       var mi=document.createElement('span');mi.className='mi';
       text.split(/(\s+)/).forEach(function(part){
         if(!part)return;
@@ -233,10 +228,9 @@
         // The mono text may run past the title, up to the end of the title
         // column (the meta beside it fades meanwhile) or, in the newer/older
         // row, up to the other link; if it needs more, the other link fades
-        // too (.spread) and it has the whole row. A story's own title is
-        // centred with nothing beside it, so it has the window. Only past that
-        // does it shrink further.
-        var nav=a.closest('.post-nav'),room=own?document.documentElement.clientWidth-32:cr.right-ar.left-4;
+        // too (.spread) and it has the whole row. Only past that does it
+        // shrink further.
+        var nav=a.closest('.post-nav'),room=cr.right-ar.left-4;
         if(nav){
           var o=Array.from(nav.querySelectorAll('.morph')).filter(function(x){return x!==a})[0],or=o&&o.getBoundingClientRect();
           room=cr.width-(ar.width-textW);
@@ -260,7 +254,7 @@
     // waits a random time before the next, mostly short with rare pauses
     // (cubed random). A layout change under the pointer can fire mouseenter
     // again; 'running' keeps a second chain from starting on the same queue.
-    function stop(){timers.forEach(clearTimeout);timers=[];running=false;turning=false}
+    function stop(){timers.forEach(clearTimeout);timers=[];running=false}
     function run(){
       if(running)return;
       running=true;
@@ -281,67 +275,16 @@
         timers.push(setTimeout(step,next-now));
       })();
     }
-    a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(turning){stop();left=spans.map(function(s,i){return s.className?-1:i}).filter(function(i){return i>=0})}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
+    a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
     // A resize rescales the titles, so pins measured at the old size are
     // dropped; the next hover measures afresh. A click leaves the page with
     // the title morphed and no mouseleave, so a page restored from the
     // back/forward cache starts over too.
-    function reset(){if(!spans)return;stop();dir=0;a.textContent=text;a.removeAttribute('style');named.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null}
+    function reset(){if(!spans)return;stop();dir=0;a.textContent=text;a.removeAttribute('style');a.removeAttribute('aria-label');a.classList.remove('pinned','spread');spans=null}
     addEventListener('resize',reset);
     addEventListener('pageshow',function(e){if(e.persisted)reset()});
     // Leaving resets the title at once; the morph only plays forwards.
     function leave(){dir=-1;stop();if(spans){spans.forEach(function(s){s.className=''});left=null}}
     a.addEventListener('mouseleave',leave);
-    // A title clicked while it is hovered leaves a note for the next page's head.
-    if(a.href)a.addEventListener('click',function(e){if(dir>0&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey)try{sessionStorage.setItem('carry',a.pathname)}catch(x){}});
-    // A title clicked in the list or the newer/older row opens on its story page
-    // already turned, holds there a moment, then turns back letter by letter, right
-    // to left and slower than the hover, so the hover plays out rather than snaps
-    // off. A pointer resting on it keeps it turned, and leaving resets it, as a
-    // hover. The page's head decides this and keeps the title hidden until then
-    // (.carry). The title's own face must be in first, or its resting box is
-    // measured wrong; if that outlasts the wait in style.css, the title has shown
-    // at rest and stays so. Hovering it while it turns back stops that and turns
-    // it again from where it got to, as a hover does.
-    var HOLD=700,UNTURN=1200;
-    function unrun(){
-      // Slower than the hover, and the same length for every title: about
-      // UNTURN ms in all (a step averages 15.5 ms at pace 1).
-      turning=true;
-      var back=[];words.forEach(function(g){back=back.concat(g)});back.reverse();
-      var pace=UNTURN/(15.5*spans.length),next=performance.now();
-      (function step(){
-        var now=performance.now();
-        while(back.length&&next<=now){
-          spans[back.shift()].className='';
-          var r=Math.random();next+=pace*(2.7+51.4*r*r*r);
-        }
-        if(!back.length){turning=false;dir=-1;left=null;return}
-        timers.push(setTimeout(step,next-now));
-      })();
-    }
-    var carried=own&&h.classList.contains('carry'),late=false,release=null;
-    // A prerendered story ran its head script before any click, so it turned its
-    // title on trust. Only now can it read the note; with none, no title was clicked.
-    if(own&&document.prerendering)document.addEventListener('prerenderingchange',function(){
-      var c=null;try{c=sessionStorage.getItem('carry');sessionStorage.removeItem('carry')}catch(x){}
-      if(!carried||c===location.pathname)return;
-      if(release)release();else{late=true;h.classList.remove('carry')}
-    },{once:true});
-    if(carried){
-      var rest=getComputedStyle(a);
-      named.addEventListener('animationend',function(){late=true},{once:true});
-      Promise.all([mono,document.fonts.load(rest.fontStyle+' '+rest.fontWeight+' '+rest.fontSize+' '+rest.fontFamily,a.textContent),document.fonts.ready]).then(function(){
-        h.classList.remove('carry');
-        if(late)return;
-        split();dir=1;left=[];
-        spans.forEach(function(s){s.className='mm'});
-        release=leave;
-        // A prerendered page waits to be shown before it starts the clock; the
-        // listener above runs first and may already have let go.
-        var start=function(){if(dir>0)timers.push(setTimeout(function(){if(dir>0&&!running&&!a.matches(':hover'))unrun()},HOLD))};
-        if(document.prerendering)document.addEventListener('prerenderingchange',start,{once:true});else start();
-      });
-    }
   });
 })();

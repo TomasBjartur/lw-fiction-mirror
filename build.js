@@ -950,13 +950,6 @@ function buildTitleFontsPage(posts, faces, files) {
   });
 }
 
-// A story opened by clicking a title with a mouse takes over that title's hover
-// (site.js leaves a note for this page), unless a saved reading place will take the
-// reader past the title anyway. A prerendered page runs this before any click, so
-// it turns the title on trust and site.js lets go when it is shown with no note.
-// Before first paint, so the title can wait.
-const CARRY_SCRIPT = "try{let c=sessionStorage.getItem('carry');sessionStorage.removeItem('carry');if((c===location.pathname||document.prerendering)&&performance.getEntriesByType('navigation')[0].type==='navigate'&&matchMedia('(hover:hover) and (prefers-reduced-motion:no-preference)').matches&&!localStorage.getItem('read:'+location.pathname))document.documentElement.classList.add('carry')}catch(e){}";
-
 // Where the email form lands after a successful signup.
 function buildSuccessPage(posts) {
   const content = `
@@ -1238,7 +1231,6 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="${PAPER.light}">
   <script>try{if(localStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name=color-scheme]').content='dark';document.querySelector('meta[name=theme-color]').content='${PAPER.dark}'}}catch(e){}</script>
-  ${currentSlug ? `<script>${CARRY_SCRIPT}</script>` : ''}
   <script src="${base}${assetUrl('site.js')}" defer></script>
   <link rel="stylesheet" href="${base}${assetUrl('style.css')}">
   <link rel="stylesheet" href="${base}${assetUrl('titles.css')}">
@@ -1354,7 +1346,7 @@ function buildPostPage(post, allPosts, titleFace) {
   const content = `
     <article>
       <header class="post-header">
-        <h1 class="t-${post.slug}"><span class="morph">${escapeHtml(post.title)}</span></h1>
+        <h1 class="t-${post.slug}">${escapeHtml(post.title)}</h1>
         <p class="post-meta meta">${when}</p>
         ${social ? `<p class="post-meta meta">${social}</p>` : ''}
         <span class="orn" aria-hidden="true"></span>
@@ -1390,7 +1382,7 @@ function buildPostPage(post, allPosts, titleFace) {
 // often normalise a link to, so it is the whole story page rather than a bare
 // redirect: a client that runs no script reads the full text here. A browser
 // is moved to the clean /slug/ URL before anything paints (reading position
-// and the title carry are keyed by that path). No meta refresh: a fetcher that
+// is keyed by that path). No meta refresh: a fetcher that
 // follows it would drop the slash again and land back here. The canonical
 // already points at /slug/, so search engines see only the clean page.
 function buildPostRedirect(page, post) {
