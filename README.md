@@ -81,6 +81,12 @@ studies). `light-dark()` sets the browser baseline (Safari 17.5, Chrome
 123, Firefox 120, all from May 2024 or earlier); older browsers are not
 supported.
 
+The light theme declares `color-scheme: only light` (in `:root`, in the
+meta tag and when the button switches back to it). Safari 27.3 repaints
+pages that declare no dark mode in its own dark colours when the device is
+in Dark Mode (Adaptive Dark Mode), which left a phone with two darks and no
+light page; `only` is Apple's opt-out for a page that is light on purpose.
+
 `style.css` keeps every colour, size, space and duration as a token in
 `:root`; components use only tokens, and breakpoints change tokens or
 the layout tokens can't express (its header lists the breakpoints). The

@@ -43,7 +43,10 @@
      dark-mode research memo: a warm near-black page at Material's #121212
      lightness, off-white text at APCA Lc 88 (not pure white), accents
      lifted in lightness and halved in chroma. */
-  color-scheme: light;
+  /* "only": Safari 27.3's Adaptive Dark Mode repaints a light page in its
+     own dark colours on a phone in Dark Mode, unless the page says it is
+     light on purpose. This one is, with its own dark theme a tap away. */
+  color-scheme: only light;
   --paper:         light-dark(oklch(0.99 0.006 85),  oklch(0.18 0.006 85));
   --paper-2:       light-dark(oklch(0.965 0.008 82), oklch(0.215 0.007 82));
   --ink:           light-dark(oklch(0.24 0.01 264),  oklch(0.91 0.008 85));

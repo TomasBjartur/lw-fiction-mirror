@@ -13,7 +13,7 @@
     var cur=function(){return h.getAttribute('data-theme')==='dark'?'dark':'light'};
     var show=function(){
       var c=cur();tb.title=NAME[c]+' (click to change)';tb.setAttribute('aria-label',NAME[c]+'. Change theme');
-      document.querySelector('meta[name=color-scheme]').content=c;
+      document.querySelector('meta[name=color-scheme]').content=c==='dark'?'dark':'only light';
       document.querySelector('meta[name=theme-color]').content=getComputedStyle(document.body).backgroundColor;
     };
     tb.addEventListener('click',function(e){

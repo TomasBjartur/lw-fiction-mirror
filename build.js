@@ -1238,7 +1238,7 @@ function pageShell(content, title, posts, currentSlug, opts = {}) {
   <meta name="twitter:description" content="${escapeAttr(description)}">
   <meta name="twitter:image" content="${SITE_URL}/cover.png">
   <meta name="twitter:image:alt" content="${escapeAttr(`Cover of ${SITE_TITLE}`)}">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="only light">
   <meta name="theme-color" content="${PAPER.light}">
   <script>try{if(localStorage.getItem('theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name=color-scheme]').content='dark';document.querySelector('meta[name=theme-color]').content='${PAPER.dark}'}}catch(e){}</script>
   <script src="${base}${assetUrl('site.js')}" defer></script>
