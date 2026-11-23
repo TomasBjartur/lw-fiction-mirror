@@ -664,6 +664,38 @@ function woff2HasColr(buf) {
   return false;
 }
 
+// A woff2 file without the named tables. The table directory is rewritten
+// and the one Brotli stream that holds every table is cut and packed again.
+function woff2Without(buf, drop) {
+  const zlib = require('zlib');
+  if (buf.toString('latin1', 0, 4) !== 'wOF2' || buf.toString('latin1', 4, 8) === 'ttcf' || buf.readUInt32BE(28) || buf.readUInt32BE(40)) {
+    throw new Error('woff2Without: not a single woff2 font without metadata');
+  }
+  let o = 48;
+  const varint = () => { let v = 0, b; do { b = buf[o++]; v = v * 128 + (b & 0x7f); } while (b & 0x80); return v; };
+  const tables = [];
+  for (let i = 0, n = buf.readUInt16BE(12); i < n; i++) {
+    const start = o, flags = buf[o++], tag = flags & 63, transform = flags >> 6;
+    const name = tag === 63 ? buf.toString('latin1', o, o += 4) : tag === 34 ? 'COLR' : tag === 35 ? 'CPAL' : '';
+    const orig = varint();
+    const length = (tag === 10 || tag === 11 ? transform === 0 : transform !== 0) ? varint() : orig;
+    tables.push({ name, orig, length, entry: buf.subarray(start, o) });
+  }
+  const data = zlib.brotliDecompressSync(buf.subarray(o, o + buf.readUInt32BE(20)));
+  let at = 0;
+  const kept = tables.filter(t => { t.bytes = data.subarray(at, at += t.length); return !drop.includes(t.name); });
+  if (at !== data.length) throw new Error('woff2Without: the table lengths do not add up');
+  const packed = zlib.brotliCompressSync(Buffer.concat(kept.map(t => t.bytes)),
+    { params: { [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_FONT, [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } });
+  const head = Buffer.from(buf.subarray(0, 48)), entries = Buffer.concat(kept.map(t => t.entry));
+  const size = 48 + entries.length + packed.length, pad = (4 - size % 4) % 4;
+  head.writeUInt32BE(size + pad, 8);
+  head.writeUInt16BE(kept.length, 12);
+  head.writeUInt32BE(12 + 16 * kept.length + kept.reduce((sum, t) => sum + ((t.orig + 3) & ~3), 0), 16);
+  head.writeUInt32BE(packed.length, 20);
+  return Buffer.concat([head, entries, packed, Buffer.alloc(pad)]);
+}
+
 // Safari's engine, so every iPhone browser, has no COLRv1 and draws those
 // faces as nothing. scripts/colr-twin.py makes the copy it can draw, kept in
 // fonts/subsets/ beside the subset and committed, so CI (which has no uv) only
@@ -681,14 +713,33 @@ function colrTwin(spec, text) {
 }
 
 // Writes a title or specimen face to dist/ and returns what its @font-face
-// needs: the file, and for a colour face the twin (null if it could not be made).
+// needs: the file, and for a colour face the twin (null if it could not be made)
+// and the plain cut. The twin draws nothing on some iPhones (2026-11: two
+// titles were blank boxes on an iPhone while Safari on a Mac drew them), and no
+// test here reaches such a phone. So site.js tries each colour face once it has
+// loaded, and swaps one that leaves no ink for its plain cut: the same file
+// without COLR and CPAL, which every engine draws as an ordinary outline in
+// the title's colour, on the same advances.
 async function writeTitleFace(spec, text, file) {
   const buf = await fetchGoogleSubset(spec, text);
   fs.writeFileSync(path.join(OUTPUT_DIR, file), buf);
   if (!woff2HasColr(buf)) return { file };
   const twin = colrTwin(spec, text), twinFile = file.replace(/\.woff2$/, '.safari.woff2');
   if (twin) fs.writeFileSync(path.join(OUTPUT_DIR, twinFile), twin);
-  return { file, twin: twin ? twinFile : null, colour: true };
+  const plain = file.replace(/\.woff2$/, '.plain.woff2');
+  fs.writeFileSync(path.join(OUTPUT_DIR, plain), woff2Without(buf, ['COLR', 'CPAL']));
+  return { file, twin: twin ? twinFile : null, plain, colour: true };
+}
+
+// What site.js needs to fall back from a colour face: the plain cut's
+// @font-face under the family's name plus "-plain", and, on the rule that names
+// the face, that name and a few of the face's own letters to try it with.
+function plainFace(family, face, weight) {
+  return face.plain ? `@font-face{font-family:'${family}-plain';src:url('${assetUrl(face.plain)}') format('woff2');font-weight:${weight};font-display:block}\n` : '';
+}
+function plainVars(family, face, text) {
+  const sample = text.replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 10).trim();
+  return face.plain && sample ? `;--plain:'${family}-plain';--plain-sample:"${sample}"` : '';
 }
 
 // The src of a title face. tech() keeps Chrome and Firefox on the COLR file
@@ -871,10 +922,11 @@ function buildTitlesCss(posts, subsetFonts, titleFonts) {
     .map(f => `@font-face{font-family:'${f.as}';src:url('${assetUrl(f.file)}') format('woff2')${f.weight ? `;font-weight:${f.weight}` : ''};font-display:${f.display}}\n`)
     .join('');
   const titleFaces = [...titleFonts].map(([slug, f]) =>
-    `@font-face{font-family:'tf-${slug}';src:${titleFaceSrc(f.face)};font-weight:${f.weight};font-display:block}\n`).join('');
+    `@font-face{font-family:'tf-${slug}';src:${titleFaceSrc(f.face)};font-weight:${f.weight};font-display:block}\n`
+    + plainFace(`tf-${slug}`, f.face, f.weight)).join('');
   return face + titleFaces + byDate.map((p, rank) => {
     const f = titleFonts.get(p.slug);
-    const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}${f.stroke ? `;--tk:${f.stroke}em` : ''}` : '';
+    const font = f ? `;--tf:'tf-${p.slug}';--tw:${f.weight};--ts:${f.size}${f.stroke ? `;--tk:${f.stroke}em` : ''}${plainVars(`tf-${p.slug}`, f.face, p.title)}` : '';
     return `.t-${p.slug}{--tc:${titleColor(rank, byDate.length)}${font}}`;
   }).join('\n') + '\n';
 }
@@ -884,7 +936,8 @@ function buildTitlesCss(posts, subsetFonts, titleFonts) {
 function buildTitleFontsCss(faces, files) {
   const generated = faces.map((f, i) =>
     `@font-face{font-family:'TF${i}';src:${titleFaceSrc(files[i])};font-weight:${f.weight};font-display:block}\n`
-    + `.tf-face-${i}{--f:'TF${i}';--w:${f.weight};--sz:${f.size};--stroke:${f.stroke}em}`).join('\n');
+    + plainFace(`TF${i}`, files[i], f.weight)
+    + `.tf-face-${i}{--f:'TF${i}';--w:${f.weight};--sz:${f.size};--stroke:${f.stroke}em${plainVars(`TF${i}`, files[i], f.name)}}`).join('\n');
   return `/* Title fonts specimen; faces generated by build.js. */\n${generated}\n\n`
     + fs.readFileSync(path.join(__dirname, 'title-fonts.css'), 'utf8');
 }

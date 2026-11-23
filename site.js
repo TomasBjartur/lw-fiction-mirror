@@ -5,6 +5,48 @@
 (function(){
   var h=document.documentElement;
 
+  // Colour title faces. Safari's engine draws them from a copy of the font
+  // (build.js, colrTwin), and on some iPhones that copy draws nothing: the
+  // title is a blank box that still takes taps. So a colour face that has
+  // loaded is tried on a canvas with a few of its own letters, and one that
+  // leaves no ink is swapped for its plain cut, the same outlines without the
+  // colour, by rewriting the rule that names it (the build gives each such
+  // rule --plain and --plain-sample). data-colour-faces on <html> records each
+  // face tried and whether it was drawn or swapped.
+  var tried={};
+  function bare(s){return s.trim().replace(/^["']|["']$/g,'')}
+  function tryColourFaces(){
+    var faces=Array.from(document.fonts);
+    Array.prototype.forEach.call(document.styleSheets,function(sheet){
+      var rules;try{rules=sheet.cssRules}catch(e){return}
+      Array.prototype.forEach.call(rules,function(r){
+        var s=r.style,plain=s&&s.getPropertyValue('--plain').trim();
+        if(!plain)return;
+        var prop=s.getPropertyValue('--tf')?'--tf':'--f',name=bare(s.getPropertyValue(prop)),text=bare(s.getPropertyValue('--plain-sample'));
+        var face=faces.filter(function(f){return bare(f.family)===name})[0];
+        if(!face||face.status!=='loaded'||tried[name])return;
+        var n=0;
+        try{
+          var c=document.createElement('canvas');c.width=640;c.height=96;
+          var g=c.getContext('2d');g.font=face.weight+' 48px "'+name+'"';g.textBaseline='middle';g.fillText(text,8,48);
+          var d=g.getImageData(0,0,640,96).data;
+          for(var i=3;i<d.length;i+=4)if(d[i]>64)n++;
+        }catch(e){return}
+        // A letter drawn at this size inks hundreds of pixels; a face that
+        // draws nothing leaves none, or a stray dot.
+        tried[name]=n<20*text.replace(/ /g,'').length?'plain':'drawn';
+        if(tried[name]==='plain'){s.setProperty(prop,plain);s.removeProperty('--plain')}
+      });
+    });
+    h.setAttribute('data-colour-faces',Object.keys(tried).map(function(k){return k+'='+tried[k]}).join(' '));
+  }
+  // Faces load as the page is laid out, some after this script has run.
+  if(document.fonts&&document.fonts.ready){
+    document.fonts.ready.then(tryColourFaces);
+    document.fonts.addEventListener('loadingdone',tryColourFaces);
+    addEventListener('load',function(){document.fonts.ready.then(tryColourFaces)});
+  }
+
   // Theme: light until the reader picks dark; the toggle switches between
   // the two and remembers the choice.
   var tb=document.getElementById('theme-btn');

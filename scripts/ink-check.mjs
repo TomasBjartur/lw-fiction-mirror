@@ -13,10 +13,16 @@
 // black (Firefox, on an OpenType SVG Bitcount). An item's ink is what changes
 // when it is hidden: boxes overlap their neighbours' letters, so counting
 // everything off the page colour let a blank title pass on the row beside it.
+// site.js tries each colour face on a canvas and swaps one that draws nothing
+// for its plain cut (build.js, writeTitleFace). Every engine must report that
+// it tried each colour face and kept it. WebKit then runs again with each
+// Safari copy answered by the COLR file, which it draws as nothing: every
+// colour title must be swapped, have ink and keep its box.
 // Exits 1 on any failure.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadImage, createCanvas } from 'canvas';
 
 const [engine, base = 'http://localhost:8787/'] = process.argv.slice(2);
@@ -108,46 +114,108 @@ const SET_HIDDEN = ([sel, half, hide]) => {
 const launch = () => engine === 'chrome' ? pw.chromium.launch({ channel: 'chrome' }) : pw[engine].launch();
 const LIFE_MS = 15000;
 const failures = [];
-let checked = 0;
-for (const [w, h] of [[1280, 800], [393, 659]]) {
-  let browser = null, page = null, born = 0;
-  for (const file of new Set(PAGES.map(p => p[0]))) {
-    if (Date.now() - born > LIFE_MS) {
-      await browser?.close();
-      browser = await launch();
-      born = Date.now();
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
-      await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
-      page = await ctx.newPage();
-    }
-    const fullPage = WHOLE_PAGE.has(file);
-    await page.goto(new URL(file, base).href, { waitUntil: 'load' });
-    await page.evaluate(() => document.fonts.ready);
-    await page.evaluate(() => Promise.all([...document.fonts].map(f => f.load().catch(() => {}))));
-    const shown = await pixels(page, fullPage);
-    for (const [, sel, ownFace] of PAGES.filter(p => p[0] === file)) {
-      const items = await page.evaluate(COLLECT, sel);
-      if (!items.length) failures.push(`${w}px /${file} ${sel}: no elements`);
-      for (const half of [0, 1]) {
-        await page.evaluate(SET_HIDDEN, [sel, half, true]);
-        const hidden = await pixels(page, fullPage);
-        await page.evaluate(SET_HIDDEN, [sel, half, false]);
-        items.forEach((it, i) => {
-          if (i % 2 !== half) return;
-          checked++;
-          const { ink, colour } = inkIn(shown.data, hidden.data, shown.W, shown.H, it, 2);
-          const where = `${w}px /${file} "${it.text}" (${it.family})`;
-          if (ownFace && !it.loaded) failures.push(`${where}: its face did not load`);
-          if (ink < MIN_INK) failures.push(`${where}: blank, ${(ink * 100).toFixed(2)}% ink`);
-          else if (colourFamilies.has(it.family) && !GREY_PALETTE.has(it.text) && colour < MIN_COLOUR) failures.push(`${where}: no colour, ${(colour * 100).toFixed(2)}%`);
+let checked = 0, fellBack = 0;
+const boxes = new Map(), colourPages = new Set();
+
+// What site.js's colour-face check left on <html>, once it has tried every
+// colour face that sets text on the page: ["family=drawn", ...]. A face the
+// page does not use is never loaded by it, and site.js leaves it alone.
+const VERDICTS = () => new Promise(resolve => {
+  const bare = s => s.trim().replace(/^["']|["']$/g, '').replace(/-plain$/, '');
+  const offered = new Set(), used = new Set();
+  for (const sheet of document.styleSheets) for (const r of sheet.cssRules) {
+    const s = r.style;
+    if (s && s.getPropertyValue('--plain-sample')) offered.add(bare(s.getPropertyValue('--tf') || s.getPropertyValue('--f')));
+  }
+  for (const e of document.querySelectorAll('body *')) {
+    if (![...e.childNodes].some(n => n.nodeType === 3 && n.nodeValue.trim())) continue;
+    const family = bare(getComputedStyle(e).fontFamily.split(',')[0]);
+    if (offered.has(family)) used.add(family);
+  }
+  const t0 = Date.now();
+  (function poll() {
+    const got = (document.documentElement.getAttribute('data-colour-faces') || '').split(' ').filter(Boolean);
+    const missing = [...used].filter(f => !got.some(g => g.split('=')[0] === f));
+    if (!missing.length || Date.now() - t0 > 5000) resolve({ got, missing });
+    else setTimeout(poll, 50);
+  })();
+});
+
+const loadFonts = async page => {
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => Promise.all([...document.fonts].map(f => f.load().catch(() => {}))));
+};
+
+// One run over the pages. With blank set, every Safari copy is answered by
+// its COLR file, which WebKit draws as nothing, and only the colour titles on
+// the pages that have them are read.
+async function pass(blank) {
+  for (const [w, h] of [[1280, 800], [393, 659]]) {
+    let browser = null, page = null, born = 0;
+    for (const file of new Set(PAGES.map(p => p[0]))) {
+      if (blank && !colourPages.has(file)) continue;
+      if (Date.now() - born > LIFE_MS) {
+        await browser?.close();
+        browser = await launch();
+        born = Date.now();
+        const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+        await ctx.route(/ipapi\.co/, r => r.abort());  // fresh profiles would spend the readers' geo lookups
+        if (blank) await ctx.route(/\.safari\.woff2/, r => {
+          const rel = decodeURIComponent(new URL(r.request().url()).pathname).slice(new URL(base).pathname.length);
+          return r.fulfill({ path: fileURLToPath(new URL(rel.replace(/\.safari\.woff2$/, '.woff2'), dist)), contentType: 'font/woff2' });
         });
+        page = await ctx.newPage();
+      }
+      const fullPage = WHOLE_PAGE.has(file);
+      await page.goto(new URL(file, base).href, { waitUntil: 'load' });
+      await loadFonts(page);
+      const { got, missing } = await page.evaluate(VERDICTS);
+      for (const f of missing) failures.push(`${w}px /${file} ${f}: site.js did not try this colour face`);
+      for (const v of got) {
+        const [f, verdict] = v.split('=');
+        if (!blank && verdict !== 'drawn') failures.push(`${w}px /${file} ${f}: swapped for its plain cut though the engine draws it`);
+        if (blank && verdict !== 'plain') failures.push(`${w}px /${file} ${f}: kept, though it draws nothing`);
+      }
+      if (blank) await loadFonts(page);  // the plain cuts
+      const shown = await pixels(page, fullPage);
+      for (const [, sel, ownFace] of PAGES.filter(p => p[0] === file)) {
+        const items = await page.evaluate(COLLECT, sel);
+        if (!items.length) failures.push(`${w}px /${file} ${sel}: no elements`);
+        for (const half of [0, 1]) {
+          await page.evaluate(SET_HIDDEN, [sel, half, true]);
+          const hidden = await pixels(page, fullPage);
+          await page.evaluate(SET_HIDDEN, [sel, half, false]);
+          items.forEach((it, i) => {
+            if (i % 2 !== half) return;
+            const key = `${w}|${file}|${sel}|${i}`, colourFace = colourFamilies.has(it.family.replace(/-plain$/, ''));
+            if (blank && !colourFace) return;
+            const { ink, colour } = inkIn(shown.data, hidden.data, shown.W, shown.H, it, 2);
+            const where = `${w}px /${file} "${it.text}" (${it.family})`;
+            if (ownFace && !it.loaded) failures.push(`${where}: its face did not load`);
+            if (ink < MIN_INK) failures.push(`${where}: blank, ${(ink * 100).toFixed(2)}% ink`);
+            if (blank) {
+              fellBack++;
+              const was = boxes.get(key);
+              if (!it.family.endsWith('-plain')) failures.push(`${where}: not set in its plain cut`);
+              if (!was || ['x', 'y', 'w', 'h'].some(k => Math.abs(was[k] - it[k]) > 0.6)) failures.push(`${where}: its box moved when it fell back`);
+              return;
+            }
+            checked++;
+            if (colourFace) { boxes.set(key, it); colourPages.add(file); }
+            if (ink >= MIN_INK && colourFace && !GREY_PALETTE.has(it.text) && colour < MIN_COLOUR) failures.push(`${where}: no colour, ${(colour * 100).toFixed(2)}%`);
+          });
+        }
       }
     }
+    await browser?.close();
   }
-  await browser.close();
 }
 
-console.log(`${engine}: ${checked} boxes, ${colourFamilies.size} colour faces`);
+await pass(false);
+if (engine === 'webkit') await pass(true);
+
+console.log(`${engine}: ${checked} boxes, ${colourFamilies.size} colour faces`
+  + (engine === 'webkit' ? `; ${fellBack} colour titles fell back to a plain cut when the Safari copies drew nothing` : ''));
 for (const f of failures) console.log(`  ✗ ${f}`);
 console.log(failures.length ? `FAIL (${failures.length})` : 'PASS');
 process.exit(failures.length ? 1 : 0);

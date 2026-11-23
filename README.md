@@ -264,6 +264,22 @@ story, at a desktop and a phone width, and fails on a blank box, a face
 that did not load or a colour face drawn without colour. Run it after
 changing a title face; the width checks cannot see a blank glyph.
 
+That copy still draws nothing on some iPhones: in November 2026 the two
+colour titles were blank boxes on an iPhone (they still took taps) while
+Safari on a Mac drew them, and nothing here can stand in for that phone. So
+`site.js` tries each colour face a page uses on a canvas once it has
+loaded, and swaps one that leaves no ink for its plain cut: the COLR file
+without its COLR and CPAL tables (`woff2Without` in `build.js`, written to
+`dist/fonts/*.plain.woff2`), which every engine draws as an ordinary outline
+in the title's colour on the same advances. `data-colour-faces` on `<html>`
+records each face tried and whether it was drawn or swapped. The copy cannot
+carry this fallback itself. On a Mac, WebKit draws it right only with both
+its SVG and its COLR table: without SVG it draws nothing, and without COLR
+Kalnia Glaze loses its translucency and Bitcount turns black. `ink-check`
+holds both halves: every engine must keep each colour face, and WebKit runs
+again with every Safari copy answered by the COLR file, where each colour
+title must be swapped, have ink and keep its box.
+
 `dist/title-fonts/` (the unlinked `/title-fonts/` page) is a specimen of
 every face the site has picked: each story's title face in contents
 order, then the backlog. Each shows the family name set in the face, the
