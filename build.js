@@ -1112,9 +1112,9 @@ async function fetchSubstackMetrics() {
   try {
     // The archive answers { posts, nextCursor }, at most 25 posts a page (since
     // November 2026; it was a bare array with offset and limit=50, which now
-    // gets HTTP 400). The cursor's parameter name is a guess: the publication
-    // has 17 posts, so no second page has been seen. A wrong guess fails loud
-    // below, and any page that brings nothing new ends the loop.
+    // gets HTTP 400). The next page is ?cursor=<nextCursor>, checked on
+    // 2026-11-23 with limit=5; other names are ignored and answer page one
+    // again, which the loop ends on since it brings nothing new.
     for (let cursor = null, pages = 0; pages < 40; pages++) {
       const page = await substackJson(`${SUBSTACK_BASE}/api/v1/archive?sort=new&limit=25${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
       const list = Array.isArray(page) ? page : page.posts;
