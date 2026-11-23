@@ -1043,9 +1043,17 @@ function saveSubstackMetrics(metrics) {
 async function fetchSubstackMetrics() {
   const out = new Map();
   try {
-    for (let offset = 0; ; offset += 50) {
-      const page = await substackJson(`${SUBSTACK_BASE}/api/v1/archive?sort=new&offset=${offset}&limit=50`);
-      for (const p of page) {
+    // The archive answers { posts, nextCursor }, at most 25 posts a page (since
+    // November 2026; it was a bare array with offset and limit=50, which now
+    // gets HTTP 400). The cursor's parameter name is a guess: the publication
+    // has 17 posts, so no second page has been seen. A wrong guess fails loud
+    // below, and any page that brings nothing new ends the loop.
+    for (let cursor = null, pages = 0; pages < 40; pages++) {
+      const page = await substackJson(`${SUBSTACK_BASE}/api/v1/archive?sort=new&limit=25${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+      const list = Array.isArray(page) ? page : page.posts;
+      if (!Array.isArray(list)) throw new Error(`unexpected archive response: ${JSON.stringify(page).slice(0, 120)}`);
+      const before = out.size;
+      for (const p of list) {
         out.set(normTitle(p.title), {
           url: p.canonical_url,
           likes: p.reaction_count ?? 0,
@@ -1053,8 +1061,10 @@ async function fetchSubstackMetrics() {
           comments: p.comment_count ?? 0,
         });
       }
-      if (page.length < 50) break;
+      cursor = Array.isArray(page) ? null : page.nextCursor;
+      if (!cursor || out.size === before) break;
     }
+    if (!out.size) throw new Error('the archive listed no posts');
     console.log(`Fetched Substack metrics for ${out.size} posts`);
     saveSubstackMetrics(out);
   } catch (err) {
