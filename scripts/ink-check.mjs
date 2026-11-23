@@ -51,7 +51,7 @@ const PAGES = [
   ['', '.story-title', true],
   ['', '.story .when, .story .n, .site-h1, .bk-title', false],
   ['title-fonts/', '.tf-specimen', true],
-  ...stories.map(s => [s, '.post-header .morph', true]),
+  ...stories.map(s => [s, '.post-header h1', true]),
 ];
 // A story is long and its title is at the top, so only the first screen is read.
 const WHOLE_PAGE = new Set(['', 'title-fonts/']);
