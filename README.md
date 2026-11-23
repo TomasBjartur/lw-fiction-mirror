@@ -280,6 +280,14 @@ holds both halves: every engine must keep each colour face, and WebKit runs
 again with every Safari copy answered by the COLR file, where each colour
 title must be swapped, have ink and keep its box.
 
+That check did not swap the titles on the iPhone that showed the blanks, so
+phones do not depend on it. On the phone layout (40em and narrower), and in
+iOS WebKit at any width (`@supports (-webkit-touch-callout: none)`, which
+is every browser on an iPhone or iPad), `titles.css` and `title-fonts.css`
+set each colour title in its plain cut by rule (`plainWhere` in `build.js`)
+and the colour files are never fetched. `ink-check` requires the plain cut,
+loaded and with ink, at its phone width in every engine.
+
 `dist/title-fonts/` (the unlinked `/title-fonts/` page) is a specimen of
 every face the site has picked: each story's title face in contents
 order, then the backlog. Each shows the family name set in the face, the

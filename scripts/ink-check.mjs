@@ -18,6 +18,10 @@
 // it tried each colour face and kept it. WebKit then runs again with each
 // Safari copy answered by the COLR file, which it draws as nothing: every
 // colour title must be swapped, have ink and keep its box.
+// On the phone layout the colour faces are not offered: titles.css sets those
+// titles in the plain cut by rule (build.js, plainWhere), since the check did
+// not swap them on the iPhone that drew them blank. So at the phone width every
+// engine must show each colour title in its plain cut, loaded and with ink.
 // Exits 1 on any failure.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -62,6 +66,7 @@ const PAGES = [
 // A story is long and its title is at the top, so only the first screen is read.
 const WHOLE_PAGE = new Set(['', 'title-fonts/']);
 const MIN_INK = 0.015, MIN_COLOUR = 0.01;  // shares of the box's pixels
+const PHONE_MAX = 640;  // the phone layout's 40em, where the plain cuts are set by rule
 // Foldit's own palette is three greys, so it has no colour to lose. If a story
 // takes it from the backlog, add that story's title here.
 const GREY_PALETTE = new Set(['Foldit']);
@@ -114,13 +119,14 @@ const SET_HIDDEN = ([sel, half, hide]) => {
 const launch = () => engine === 'chrome' ? pw.chromium.launch({ channel: 'chrome' }) : pw[engine].launch();
 const LIFE_MS = 15000;
 const failures = [];
-let checked = 0, fellBack = 0;
+let checked = 0, fellBack = 0, plainOnPhone = 0;
 const boxes = new Map(), colourPages = new Set();
 
 // What site.js's colour-face check left on <html>, once it has tried every
 // colour face that sets text on the page: ["family=drawn", ...]. A face the
 // page does not use is never loaded by it, and site.js leaves it alone.
-const VERDICTS = () => new Promise(resolve => {
+const VERDICTS = phone => new Promise(resolve => {
+  if (phone) return resolve({ got: [], missing: [] });  // no colour face is in use there
   const bare = s => s.trim().replace(/^["']|["']$/g, '').replace(/-plain$/, '');
   const offered = new Set(), used = new Set();
   for (const sheet of document.styleSheets) for (const r of sheet.cssRules) {
@@ -151,6 +157,8 @@ const loadFonts = async page => {
 // the pages that have them are read.
 async function pass(blank) {
   for (const [w, h] of [[1280, 800], [393, 659]]) {
+    const phone = w <= PHONE_MAX;
+    if (blank && phone) continue;  // the Safari copies are not used there
     let browser = null, page = null, born = 0;
     for (const file of new Set(PAGES.map(p => p[0]))) {
       if (blank && !colourPages.has(file)) continue;
@@ -169,7 +177,7 @@ async function pass(blank) {
       const fullPage = WHOLE_PAGE.has(file);
       await page.goto(new URL(file, base).href, { waitUntil: 'load' });
       await loadFonts(page);
-      const { got, missing } = await page.evaluate(VERDICTS);
+      const { got, missing } = await page.evaluate(VERDICTS, phone);
       for (const f of missing) failures.push(`${w}px /${file} ${f}: site.js did not try this colour face`);
       for (const v of got) {
         const [f, verdict] = v.split('=');
@@ -201,6 +209,10 @@ async function pass(blank) {
               return;
             }
             checked++;
+            if (phone) {
+              if (colourFace) { plainOnPhone++; if (!it.family.endsWith('-plain')) failures.push(`${where}: a colour face on the phone layout, not its plain cut`); }
+              return;
+            }
             if (colourFace) { boxes.set(key, it); colourPages.add(file); }
             if (ink >= MIN_INK && colourFace && !GREY_PALETTE.has(it.text) && colour < MIN_COLOUR) failures.push(`${where}: no colour, ${(colour * 100).toFixed(2)}%`);
           });
@@ -214,7 +226,8 @@ async function pass(blank) {
 await pass(false);
 if (engine === 'webkit') await pass(true);
 
-console.log(`${engine}: ${checked} boxes, ${colourFamilies.size} colour faces`
+if (!plainOnPhone) failures.push('no colour title was read at the phone width');
+console.log(`${engine}: ${checked} boxes, ${colourFamilies.size} colour faces, ${plainOnPhone} set in a plain cut at the phone width`
   + (engine === 'webkit' ? `; ${fellBack} colour titles fell back to a plain cut when the Safari copies drew nothing` : ''));
 for (const f of failures) console.log(`  ✗ ${f}`);
 console.log(failures.length ? `FAIL (${failures.length})` : 'PASS');
