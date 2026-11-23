@@ -3,7 +3,9 @@
 //   node scripts/hover-check.mjs <chrome|firefox|webkit> [base-url]
 //
 // Serve dist/ first and install the engines as for initials-check.mjs (its
-// header says how). At three desktop widths it hovers every title in the
+// header says how). At three desktop widths, and at a phone's width (a narrow
+// window, where the list takes the phone layout and switches its morph off: a
+// hovered title there must stay as it is), it hovers every title in the
 // contents list, and the title and newer/older links on every story page, waits
 // for the morph to finish, and compares the mono text with the resting title.
 // The morph takes the geometric mean of the sizes that match the title's
@@ -38,7 +40,7 @@ const stories = fs.readdirSync(dist, { withFileTypes: true })
   .filter(s => fs.existsSync(new URL(`${s}index.html`, dist)) &&
     fs.readFileSync(new URL(`${s}index.html`, dist), 'utf8').includes('class="post-nav"'));
 if (!stories.length) { console.error('no story pages in dist/: run node build.js'); process.exit(2); }
-const sizes = [[1440, 900], [1024, 768], [700, 900]];
+const sizes = [[1440, 900], [1024, 768], [700, 900], [402, 800]];
 const TOL = 0.03, FAR = 0.4;
 
 // "chrome" is the installed Google Chrome, driven by Playwright. macOS quits it
@@ -68,6 +70,16 @@ const HOVER = async sel => {
     const t = a.textContent, cs = getComputedStyle(a), row = a.closest('.story, .post-nav, .post-header');
     const w0 = width(a), h0 = height(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, t);
     const r0 = row.getBoundingClientRect(), b0 = a.closest('.story, .post-header') ? baseline(a) : null;
+    const list = a.closest('.stories');
+    if (list && getComputedStyle(list).getPropertyValue('--title-morph').trim() === 'off') {
+      a.dispatchEvent(new MouseEvent('mouseenter'));
+      await new Promise(r => setTimeout(r, 150));
+      const r1 = row.getBoundingClientRect();
+      out.push({ t, off: true, err: a.querySelector('.mi') ? 'morphed where the list switches the morph off'
+        : Math.abs(r1.top - r0.top) + Math.abs(r1.height - r0.height) > 0.5 ? 'its row moved on hover' : null });
+      a.dispatchEvent(new MouseEvent('mouseleave'));
+      continue;
+    }
     a.dispatchEvent(new MouseEvent('mouseenter'));
     const done = () => a.querySelector('.mi') && !a.querySelector('.mi .w > span:not(.mm)');
     for (const t0 = performance.now(); !done() && performance.now() - t0 < 3000;) await new Promise(r => setTimeout(r, 16));
@@ -86,7 +98,7 @@ const HOVER = async sel => {
   return out;
 };
 
-let checked = 0; const worstW = [0, 0], worstH = [0, 0];
+let checked = 0, still = 0; const worstW = [0, 0], worstH = [0, 0];
 const failures = [], shrunk = [];
 for (const [w, h] of sizes) {
   let browser = null, page = null, born = 0;
@@ -107,6 +119,7 @@ for (const [w, h] of sizes) {
     for (const r of res) {
       checked++;
       if (r.err) { failures.push(`${w}px ${file} "${r.t}": ${r.err}`); continue; }
+      if (r.off) { still++; continue; }
       worstW[0] = Math.max(worstW[0], 1 - r.w); worstW[1] = Math.max(worstW[1], r.w - 1);
       worstH[0] = Math.max(worstH[0], 1 - r.h); worstH[1] = Math.max(worstH[1], r.h - 1);
       const why = [r.wrapped ? r.w > 1.02 && `a word grew ${r.w.toFixed(3)}x`
@@ -123,7 +136,8 @@ for (const [w, h] of sizes) {
 }
 
 console.log(`${engine}: ${checked} hovers (list, and title and newer/older on ${stories.length} stories) at ${sizes.map(s => s[0]).join(', ')}px;` +
-  ` width ${(1 - worstW[0]).toFixed(2)}-${(1 + worstW[1]).toFixed(2)}x, height ${(1 - worstH[0]).toFixed(2)}-${(1 + worstH[1]).toFixed(2)}x`);
+  ` width ${(1 - worstW[0]).toFixed(2)}-${(1 + worstW[1]).toFixed(2)}x, height ${(1 - worstH[0]).toFixed(2)}-${(1 + worstH[1]).toFixed(2)}x` +
+  (still ? `; ${still} left still where the list has no morph` : ''));
 for (const f of shrunk) console.log(`  · ${f}`);
 for (const f of failures) console.log(`  ✗ ${f}`);
 console.log(failures.length ? `FAIL (${failures.length})` : 'PASS');

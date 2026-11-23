@@ -99,14 +99,14 @@ the paper colour (dark values in a dark system theme); `scripts/favicon.py`
 writes it to `favicon.svg` from the name's font subset, which the build
 copies to `dist/` and also draws as a full-bleed `apple-touch-icon.png`.
 The build writes `404.html`, `robots.txt` and `sitemap.xml` too. Every story's row is the
-same height: a share of the window's height (on phones, with the
-browser's toolbars showing), at most 2.875rem and at most what the
-list's width lets a title be, with titles scaled to the row, so rows
-never sit looser than their titles. Spare height stays under the list
-and the footer sits at the bottom of the window. Each row's baseline
-falls in the same place whatever its title's face (`--title-base` in
-`style.css`), and the date and counts share it, so the rows read as
-evenly spaced at every width. The footer is the last row of a one-column grid
+same height. In wide windows that is a share of the window's height, at
+most 2.875rem and at most what the list's width lets a title be, with
+titles scaled to the row, so rows never sit looser than their titles;
+they stop shrinking at 1.9rem, and past that the page scrolls. Spare
+height stays under the list and the footer sits at the bottom of the
+window. Each row's baseline falls in the same place whatever its title's
+face (`--title-base` in `style.css`), and the date and counts beside it
+share it, so the rows read as evenly spaced at every width. The footer is the last row of a one-column grid
 that fills the window on every page, so a short story's footer still
 sits at the bottom; the author's signature (Homemade Apple, subset) is
 at its right. The footer also carries the email signup, copied from
@@ -115,11 +115,18 @@ markusstrasser.org's form; its Formspree endpoint is
 ID is supplied. Until then a deploy (CI set) leaves the form out and logs
 `[DEGRADED]`; a local build keeps it for review. The nav Subscribe button
 still goes to Substack, and a successful signup lands on `/subscribed/`. On
-phones (40em, 640 px at the default text size, and under) the meta sits on its own line under each
-title and the largest faces come partway back to the others
-(`--ts-spread`), so San Silvestro's swash clears the date above it. Rows
-stop shrinking at 1.9rem, or 2.3rem on phones to keep titles readable,
-and past that the page scrolls. A title too
+phones (40em, 640 px at the default text size, and under) the list
+scrolls instead of filling the window, because a phone's height can't hold
+a row per story at a size worth reading (fitted to the window, 15 stories
+came out at 15 px titles and 10.6 px counts on a 402 px phone). The list
+starts on the name's left edge, with no indent, and titles take their size
+from its width, 27 px on that phone: the longest title in an ordinary face
+(Customer Satisfaction Opportunities) spans the list, and the one wider
+(Remembering Aubrey Chang, in a very wide face) is shrunk to it. The
+meta sits under each title in three columns (date and reading time,
+LessWrong's counts, Substack's), each as wide as its widest entry, so the
+source marks stand in a column down the list. The gap under a story's meta
+is wider than the gap above it, so a date reads as its own title's. A title too
 wide for its space (a long title in a wide face in a list row, or a long
 word in a story's title, on a phone) is shrunk to fit by a small script
 (`site.js`, which holds all the behaviour except the geo curtain; that
@@ -281,7 +288,7 @@ resize it, so they are not hit-testable: the link's resting box is the
 whole hover target, and a hovered title cannot cover its neighbour. A
 story's own title sits still in its face, with no hover. `node scripts/hover-check.mjs
 <chrome|firefox|webkit>` hovers every title in a real engine (the list, and
-each story's newer/older links, at three desktop widths) and fails if a
+each story's newer/older links, at three desktop widths and a phone's, where the list's titles span it and must not morph) and fails if a
 hovered title breaks that rule (width times height off by more than 3%,
 either off by more than 40%, a wrapped word growing) or its row moves.
 Title colours shade from near-black (newest) to dark purple

@@ -89,7 +89,7 @@
     rows.forEach(function(li){
       var a=li.querySelector('.story-title'),c=li.querySelector('.title-cell'),m=li.querySelector('.meta');
       if(!a||!c)return;
-      var ms=m&&getComputedStyle(m),beside=ms&&ms.display!=='block'?m.getBoundingClientRect().width+parseFloat(ms.marginLeft)+4:0;
+      var ms=m&&getComputedStyle(m),beside=ms&&/^inline/.test(ms.display)?m.getBoundingClientRect().width+parseFloat(ms.marginLeft)+4:0;
       setFit(li,a.getBoundingClientRect().width,c.clientWidth-2-beside);
     });
     heads.forEach(function(h){setFit(h,h.scrollWidth,h.clientWidth)});
@@ -275,7 +275,9 @@
         timers.push(setTimeout(step,next-now));
       })();
     }
-    a.addEventListener('mouseenter',function(){dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
+    // The phone layout switches the list's morph off (style.css, --title-morph).
+    var list=a.closest('.stories');
+    a.addEventListener('mouseenter',function(){if(list&&getComputedStyle(list).getPropertyValue('--title-morph').trim()==='off')return;dir=1;mono.then(function(){if(dir<1)return;if(!spans||a.textContent!==text){split();left=null}if(!left){left=[];words.forEach(function(g){left=left.concat(g)})}run()})});
     // A resize rescales the titles, so pins measured at the old size are
     // dropped; the next hover measures afresh. A click leaves the page with
     // the title morphed and no mouseleave, so a page restored from the

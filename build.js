@@ -1109,10 +1109,10 @@ function whenText(p) {
 function stats(p) {
   const n = (v, k, label) => `<span class="n k-${k}" title="${v} ${label}">${v}<span class="sr-only"> ${label}</span></span>`;
   const lw = p.lw
-    ? `<span class="m"><a class="src src-lw" href="${p.lw.url}" title="On LessWrong" aria-label="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}</span>`
+    ? `<span class="m m-lw"><a class="src src-lw" href="${p.lw.url}" title="On LessWrong" aria-label="On LessWrong">${ICON_LW}</a>${n(p.lw.karma, 'karma', 'karma')}${n(p.lw.comments, 'cmts', 'comments')}</span>`
     : '';
   const ss = p.ss
-    ? `<span class="m"><a class="src src-ss" href="${p.ss.url}" title="On Substack" aria-label="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}</span>`
+    ? `<span class="m m-ss"><a class="src src-ss" href="${p.ss.url}" title="On Substack" aria-label="On Substack">${ICON_SS}</a>${n(p.ss.likes, 'likes', 'likes')}${n(p.ss.restacks, 'restacks', 'restacks')}${n(p.ss.comments, 'cmts', 'comments')}</span>`
     : '';
   return lw + ss;
 }
