@@ -1,4 +1,4 @@
-// Checks the saved reading place and the carried title with real input.
+// Checks the saved reading place and a story's title with real input.
 //
 //   node scripts/reading-check.mjs <chrome|firefox|webkit> [base-url]
 //
@@ -37,9 +37,11 @@ const anchor = p => p.evaluate(() => {
   const b = [...document.querySelector('.post-body').children], i = b.findIndex(e => e.getBoundingClientRect().bottom > 0), r = b[i].getBoundingClientRect();
   return { i, f: -r.top / r.height };
 });
+// A story's own title: shown, and set still. The list's hover wraps a title's
+// letters in spans; a story's title has none.
 const title = p => p.evaluate(() => {
-  const a = document.querySelector('.post-header .morph'), s = [...a.querySelectorAll('.w > span')];
-  return { n: s.length, turned: s.filter(x => x.className === 'mm').length, carry: document.documentElement.classList.contains('carry'), shown: getComputedStyle(a.closest('h1')).visibility === 'visible' };
+  const h = document.querySelector('.post-header h1'), r = h.getBoundingClientRect();
+  return { still: h.children.length === 0, shown: getComputedStyle(h).visibility === 'visible' && r.width > 0 && r.height > 0 };
 });
 const open = async (p, s) => { await p.goto(url(s), { waitUntil: 'load' }); await p.evaluate(() => document.fonts.ready); };
 // A real wheel turn, then long enough for the 300 ms save.
@@ -85,42 +87,28 @@ async function run(name, fn, viewport = { width: 1280, height: 800 }) {
 
 const ROW = '.story-title.t-the-company-man';
 
-await run('carry', async p => {
+await run('title', async p => {
   await open(p, '');
   await hoverAndClick(p, ROW);
   await p.waitForURL(`**/${STORY}`); await p.waitForTimeout(500);
   let t = await title(p);
-  check(t.n > 0 && t.turned === t.n, `a clicked title opens turned (${t.turned}/${t.n})`);
-  await p.mouse.move(40, 500, { steps: 3 }); await p.waitForTimeout(150);
-  await p.mouse.move(60, 520, { steps: 3 }); await p.waitForTimeout(150);
-  check((await title(p)).turned === 0, 'moving off lets it go');
-  const h = await p.locator('.post-header .morph').boundingBox();
+  check(t.shown && t.still, 'a clicked title opens shown and still');
+  const h = await p.locator('.post-header h1').boundingBox();
   await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2, { steps: 3 }); await p.waitForTimeout(1000);
   t = await title(p);
-  check(t.turned === t.n, `hovering the title turns it (${t.turned}/${t.n})`);
-  await p.mouse.move(40, 520, { steps: 3 }); await p.waitForTimeout(150);
-  check((await title(p)).turned === 0, 'leaving the title resets it');
+  check(t.shown && t.still, 'hovering the title leaves it still');
   const at = p.url();
   await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowLeft'); await p.waitForTimeout(300);
   check(p.url() === at, 'arrow keys stay on the page');
 });
 
-await run('carry, scroll', async p => {
-  await open(p, '');
-  await hoverAndClick(p, ROW);
-  await p.waitForURL(`**/${STORY}`); await p.waitForTimeout(500);
-  const before = (await title(p)).turned;
-  await p.evaluate(() => scrollBy(0, 200)); await p.waitForTimeout(150);
-  check(before > 0 && (await title(p)).turned === 0, 'the first scroll lets it go');
-});
-
-await run('carry, no mouse click', async (p, ctx) => {
+await run('title, no mouse click', async (p, ctx) => {
   await open(p, '');
   await p.locator(ROW).focus();
   await p.keyboard.press('Enter');
   await p.waitForURL(`**/${STORY}`);
   let t = await title(p);
-  check(t.turned === 0 && !t.carry && t.shown, 'opening by keyboard shows the title at rest at once');
+  check(t.shown && t.still, 'opening by keyboard shows the title at once');
   await open(p, '');
   const opened = ctx.waitForEvent('page', { timeout: 3000 }).catch(() => null);
   await p.locator(ROW).click({ modifiers: ['Meta'] });
@@ -128,26 +116,8 @@ await run('carry, no mouse click', async (p, ctx) => {
   if (tab) {
     await tab.waitForLoadState('load'); await tab.waitForTimeout(300);
     t = await title(tab);
-    check(t.turned === 0 && !t.carry, 'a tab opened with cmd-click shows the title at rest');
+    check(t.shown && t.still, 'a tab opened with cmd-click shows the title');
   } else console.log(`  skip ${scenario}: cmd-click opened no tab in this engine`);
-});
-
-await run('carry, slow fonts', async (p, ctx) => {
-  await open(p, '');
-  await slowFonts(ctx, 1300);
-  await hoverAndClick(p, ROW);
-  await p.waitForURL(`**/${STORY}`, { waitUntil: 'commit' });
-  await p.waitForTimeout(900);
-  let t = await title(p);
-  check(t.shown && t.turned === 0, 'past the wait the title shows at rest');
-  await p.mouse.move(40, 500, { steps: 2 });
-  await p.waitForTimeout(1500);
-  t = await title(p);
-  check(t.shown && t.turned === 0 && !t.carry, `it stays at rest when the fonts arrive (${t.turned} turned)`);
-  const h = await p.locator('.post-header .morph').boundingBox();
-  await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2, { steps: 3 }); await p.waitForTimeout(1000);
-  t = await title(p);
-  check(t.turned === t.n, `a later hover still turns it (${t.turned}/${t.n})`);
 });
 
 await run('place', async p => {
@@ -160,7 +130,7 @@ await run('place', async p => {
   const back = await topBlock(p);
   check(back.i === at.i && near(back.off, at.off, 2), `the same width reopens on the same line (off ${at.off} -> ${back.off})`);
   const t = await title(p);
-  check(t.turned === 0 && t.shown, 'no carried title when reopening at a place');
+  check(t.still && t.shown, 'the title is shown and still when reopening at a place');
   check(await p.evaluate(() => document.querySelector('.nav').classList.contains('hidden')), 'the nav stays out of the way');
   await p.setViewportSize({ width: 430, height: 800 }); await p.waitForTimeout(500);
   check(near((await topBlock(p)).i, at.i), 'resizing keeps the paragraph');

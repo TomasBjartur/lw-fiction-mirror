@@ -7,7 +7,7 @@
    in :root, and components only use tokens. Breakpoints change tokens, or
    layout that tokens can't express. Widths are in em, so a reader's larger
    text setting gets the layout that has room for it (px at the default size):
-     max-width 40em    640px, phones: smaller type, the meta under each title
+     max-width 40em    640px, phones: the contents list scrolls, sized from its width, the meta under each title
      max-width 32.5em  520px, story text goes ragged (justified lines gap there)
      min-width 65em    1040px, the book joins the name's row on the contents page
      max-width 19.5em  312px, zoomed phones: the marks go under the name
@@ -43,7 +43,10 @@
      dark-mode research memo: a warm near-black page at Material's #121212
      lightness, off-white text at APCA Lc 88 (not pure white), accents
      lifted in lightness and halved in chroma. */
-  color-scheme: light;
+  /* "only": Safari 27.3's Adaptive Dark Mode repaints a light page in its
+     own dark colours on a phone in Dark Mode, unless the page says it is
+     light on purpose. This one is, with its own dark theme a tap away. */
+  color-scheme: only light;
   --paper:         light-dark(oklch(0.99 0.006 85),  oklch(0.18 0.006 85));
   --paper-2:       light-dark(oklch(0.965 0.008 82), oklch(0.215 0.007 82));
   --ink:           light-dark(oklch(0.24 0.01 264),  oklch(0.91 0.008 85));
@@ -83,11 +86,10 @@
   --fs-s:    1rem;      /* nav labels */
   --fs-mark: 1.35rem;   /* TB, the name, in the story nav */
   --fs-name: 2.9rem;    /* the name on the contents page */
-  --fs-book: clamp(0.9rem, 4.3vw, 1.65rem);  /* the book under the rule: a title's size, on one line */
+  --fs-book: clamp(0.75rem, 5vw - 0.1rem, 1.65rem);  /* the book under the rule, on one line: it is 19.7em long and has the window less its gutters */
   --icon-k:  1.2;       /* an icon is 1.2x its label */
   --title-size: 0.99rem; /* titles outside the filling list (newer/older, short windows) */
   --title-line: 1.85rem;
-  --ts-spread: 1;       /* how much of a face's size factor (--ts) applies */
   --story-size: clamp(1.1176rem, 0.8471rem + 0.45vw, 1.2647rem);  /* story text, 19-21.5px; Rello et al. 2016 */
 
   /* Weights. Light text on dark reads heavier, so dark takes the
@@ -121,7 +123,8 @@
   --indent: clamp(1.25rem, 4vw, 3.5rem);  /* the list sits at least one indent in from the name */
   --list-w: 55rem;  /* the widest contents row at its largest */
 
-  /* The contents list (Contents, below): one row per story, all the same
+  /* The contents list in wide windows (Contents, below; phones set their own
+     measures): one row per story, all the same
      height, at most --row-max and at least --row-min. The title is
      --title-k of the row, at most --title-cqw of the list's width (a title
      still too wide for its row with its meta shrinks alone, --fit), and its
@@ -454,7 +457,7 @@ main {
 .story-title, .post-nav-link, .post-header h1 {
   font-family: var(--tf, var(--sans)), var(--sans);
   font-weight: var(--tw, var(--w-light));
-  font-size: calc(var(--title-size) * (1 + (var(--ts, 1) - 1) * var(--ts-spread)) * var(--fit, 1));
+  font-size: calc(var(--title-size) * var(--ts, 1) * var(--fit, 1));
   line-height: var(--title-line);
   color: var(--tc, var(--ink));
   -webkit-text-stroke: var(--tk, 0) currentColor;
@@ -582,8 +585,8 @@ main {
   .site-head .nav-epub { margin-left: calc(var(--s-2) * -1 + 0.3em); }
 }
 
-/* The page fills the window, and the list takes the height left under the
-   header. Rows are all one height (one per story, --n, set by the build): an
+/* In wide windows (phones: see Phones, below) the page fills the window, and
+   the list takes the height left under the header. Rows are all one height (one per story, --n, set by the build): an
    equal share of that height, at most what the list's width lets a title be
    and at most --row-max, so rows never sit looser than their titles. Spare
    height stays under the list, and the footer sits at the window's bottom.
@@ -855,21 +858,26 @@ main {
   :root {
     --fs-name: clamp(1.5rem, 7vw, 2.3rem);
     --story-size: 1.1875rem;  /* 19px */
-    /* The meta goes under each title: a row splits about 60/40 between
-       title and meta. The floor keeps titles readable, so a short phone
-       scrolls a little rather than shrinking them. */
-    --row-min:   2.3rem;
-    --row-max:   2.75rem;
-    --title-k:   0.414;
-    --title-cqw: 5.85cqw;
-    --title-lh:  0.52;
-    --meta-k:    0.2;
-    --meta-min:  0.66rem;
-    --meta-max:  0.8rem;
-    /* Rows are tight here, with a date right above each title, so the largest
-       faces come partway back to the others: San Silvestro's swash would
-       otherwise cross the date above it. */
-    --ts-spread: 0.55;
+    /* The contents list scrolls here: a window's height can't hold a row per
+       story at a size worth reading on a phone. It starts on the name's left
+       edge, with no indent, and titles are sized from its width: a title 13.7
+       title sizes wide spans it, which the longest in an ordinary face does
+       (Customer Satisfaction Opportunities, 13.5). The one wider, Remembering
+       Aubrey Chang in Moirai One (16.2), is shrunk to the list's width by
+       site.js, where its tall letters still match its neighbours'. The meta
+       goes under each title. A row is the title's line, the meta's line and a
+       gap wider than the one inside it, so a date reads as its own title's. */
+    --indent:    0rem;
+    --title-cqw: 7.3cqw;
+    --title-max: 1.75rem;   /* past a large phone's width the meta stays small, so titles stop growing */
+    --title-lead: 1.3;      /* the title's line, in title sizes */
+    --meta-cqw:  3.9cqw;    /* the longest meta line is about 25em */
+    --meta-max:  0.8125rem;
+    --meta-lh:   1.35;
+    /* Both in title sizes. The first clears the deepest descender (the y of
+       Penny's Hands, 0.52 below the baseline) from the date under it. */
+    --meta-gap:  0.14;
+    --row-gap:   0.62;
   }
   .nav-rss { display: none; }
   .foot-copy, .foot-copy + .sep { display: none; }
@@ -879,14 +887,53 @@ main {
   .site-head { column-gap: var(--s-2); margin-bottom: 0.625rem; }
   .head-book { margin: 0.875rem 0 0 var(--indent); }
   .is-index .foot-book-item { display: none; }
-  /* The longest line is about 25em, so the cap keeps it inside the column where
-     the rem size would not fit: very narrow windows and large text settings. */
-  .story .meta {
-    display: block;
-    margin: 0;
-    font-size: min(clamp(var(--meta-min), var(--row) * var(--meta-k), var(--meta-max)), 3.9cqw);
-    line-height: 1.3;
+
+  /* The contents list. It takes its own height, so the page scrolls, and its
+     width is the only measure (inline-size: under size containment the rows
+     would not give the list its height, and would run over the footer). Its
+     three columns are the meta's: the date, LessWrong's counts and Substack's,
+     each as wide as its widest, so every mark stands in one column down the
+     list. Rows, title cells and metas pass those columns down as subgrids, and
+     a title spans them all. */
+  .stories {
+    flex: none;
+    min-height: 0;
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+    container-type: inline-size;
   }
+  .story {
+    --title-size: min(var(--title-cqw), var(--title-max));
+    --title-line: calc(var(--title-size) * var(--title-lead));
+    --meta-size: min(var(--meta-cqw), var(--meta-max));
+    --row: calc(var(--title-line) + var(--meta-size) * var(--meta-lh) + var(--title-size) * (var(--meta-gap) + var(--row-gap)));
+  }
+  .story, .title-cell, .story .meta {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    align-content: start;
+  }
+  .story .story-title { grid-column: 1 / -1; justify-self: start; }
+  .story .meta {
+    align-items: baseline;
+    margin: calc(var(--title-size) * var(--meta-gap)) 0 0;
+    font-size: var(--meta-size);
+    line-height: var(--meta-lh);
+  }
+  .story .meta .m-lw { grid-column: 2; }
+  .story .meta .m-ss { grid-column: 3; }
+  /* Titles span the list here, which leaves the wider mono face no room (it
+     shrank a hovered Customer Satisfaction Opportunities to 0.62 of its letter
+     height), so in a narrow window with a mouse a hovered title only turns the
+     accent. site.js reads --title-morph. */
+  .stories { --title-morph: off; }
+  @media (hover: hover) { .stories .morph:hover { color: var(--accent); } }
+  /* With no indent the pick's ring hangs in the gutter. */
+  .story.pick::before { left: -0.78rem; }
+  /* Until the script has fitted a title wider than the list (or without
+     scripts), it is cut at the window's edge instead of making the page pan
+     sideways. */
+  .is-index { overflow-x: clip; }
 }
 
 /* The smallest phones: the name and the marks take the row, and the Subscribe
