@@ -924,7 +924,7 @@ main {
      height), so in a narrow window with a mouse a hovered title only turns the
      accent. site.js reads --title-morph. */
   .stories { --title-morph: off; }
-  .stories .morph:hover { color: var(--accent); }
+  @media (hover: hover) { .stories .morph:hover { color: var(--accent); } }
   /* With no indent the pick's ring hangs in the gutter. */
   .story.pick::before { left: -0.78rem; }
   /* Until the script has fitted a title wider than the list (or without
